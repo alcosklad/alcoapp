@@ -1,7 +1,7 @@
 import PocketBase from 'pocketbase';
 
 // Используем IP-адрес для доступа с телефона и компьютера
-const pb = new PocketBase('http://192.168.1.4:8090');
+const pb = new PocketBase('http://146.103.121.96:8090');
 
 // Отключаем автоотмену запросов для мобильных устройств
 pb.autoCancellation(false);

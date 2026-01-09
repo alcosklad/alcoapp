@@ -1,0 +1,65 @@
+#!/bin/bash
+
+echo "🚀 РАЗВЕРТЫВАНИЕ AlcoApp НА СЕРВЕРЕ VDsina"
+echo "============================================"
+
+echo ""
+echo "1. 📁 Подключаемся к серверу:"
+echo "ssh root@146.103.121.96"
+
+echo ""
+echo "2. 📦 Устанавливаем Node.js (если нет):"
+echo "curl -fsSL https://deb.nodesource.com/setup_18.x | sudo -E bash -"
+echo "sudo apt-get install -y nodejs"
+
+echo ""
+echo "3. 📥 Клонируем репозиторий:"
+echo "cd /var/www"
+echo "git clone https://github.com/alcosklad/alcoapp.git"
+echo "cd alcoapp"
+
+echo ""
+echo "4. 📦 Устанавливаем зависимости:"
+echo "npm install"
+
+echo ""
+echo "5. 🗄️ Скачиваем и настраиваем PocketBase:"
+echo "wget https://github.com/pocketbase/pocketbase/releases/download/v0.22.5/pocketbase_0.22.5_linux_amd64.zip"
+echo "unzip pocketbase_0.22.5_linux_amd64.zip"
+echo "rm pocketbase_0.22.5_linux_amd64.zip"
+echo "chmod +x pocketbase"
+
+echo ""
+echo "6. 🚀 Запускаем PocketBase:"
+echo "./pocketbase serve --http=0.0.0.0:8090 &"
+
+echo ""
+echo "7. 🌐 Настраиваем Vite для работы с сервером:"
+echo "Создаем файл vite.config.js:"
+echo "import { defineConfig } from 'vite'"
+echo "import react from '@vitejs/plugin-react'"
+echo ""
+echo "export default defineConfig({"
+echo "  plugins: [react()],"
+echo "  server: {"
+echo "    host: '0.0.0.0',"
+echo "    port: 5173"
+echo "  },"
+echo "  build: {"
+echo "    outDir: 'dist',"
+echo "    assetsDir: 'assets'"
+echo "  }"
+echo "})"
+
+echo ""
+echo "8. 🔧 Обновляем pocketbase.js для работы с сервером:"
+echo "В файле src/lib/pocketbase.js меняем:"
+echo "pb = new PocketBase('http://146.103.121.96:8090');"
+
+echo ""
+echo "9. 🚀 Запускаем приложение:"
+echo "npm run dev"
+
+echo ""
+echo "✅ Готово! Приложение будет доступно по адресу:"
+echo "http://146.103.121.96:5173"
