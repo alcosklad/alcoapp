@@ -185,7 +185,6 @@ export default function EditReceptionModal({ isOpen, onClose, reception, onSave,
       const newItem = {
         product: selectedProduct.id,
         quantity: newQuantity,
-        product: selectedProduct,
         price: selectedProduct.price || 0
       };
 
