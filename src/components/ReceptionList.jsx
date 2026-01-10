@@ -157,11 +157,6 @@ export default function ReceptionList({ onCreate }) {
                         return '0';
                       })()} ₽
                     </p>
-                    <p className={`text-xs mt-1 ${
-                      doc?.status === 'done' ? 'text-green-600' : 'text-gray-400'
-                    }`}>
-                      {doc?.status === 'done' ? 'Проведен' : 'Черновик'}
-                    </p>
                   </div>
                 </div>
               </div>
