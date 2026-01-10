@@ -140,7 +140,22 @@ export default function ReceptionList({ onCreate }) {
                   </div>
                   <div className="text-right">
                     <p className="text-lg font-bold text-gray-900">
-                      {(doc?.total_amount || 0).toLocaleString('ru-RU')} ₽
+                      {(() => {
+                        // Сначала пробуем totalAmount, потом total_amount, потом считаем из items
+                        if (doc?.totalAmount) {
+                          return doc.totalAmount.toLocaleString('ru-RU');
+                        } else if (doc?.total_amount) {
+                          return doc.total_amount.toLocaleString('ru-RU');
+                        } else if (doc?.items) {
+                          // Считаем сумму из items
+                          const items = Array.isArray(doc.items) ? doc.items : (doc.items ? JSON.parse(doc.items) : []);
+                          const total = items.reduce((sum, item) => {
+                            return sum + (item.quantity * (item.price || item.cost || 0));
+                          }, 0);
+                          return total.toLocaleString('ru-RU');
+                        }
+                        return '0';
+                      })()} ₽
                     </p>
                     <p className={`text-xs mt-1 ${
                       doc?.status === 'done' ? 'text-green-600' : 'text-gray-400'
