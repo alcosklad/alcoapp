@@ -10,8 +10,8 @@ export default function ReceptionActionModal({ isOpen, onClose, onCreateReceptio
       <div className="fixed inset-0 bg-black/50 z-50" onClick={onClose} />
       
       {/* Modal */}
-      <div className="fixed inset-0 z-50 flex items-end">
-        <div className="bg-white w-full rounded-t-3xl max-h-[80vh] overflow-y-auto animate-slide-up">
+      <div className="fixed inset-0 z-50 flex items-start justify-center pt-20">
+        <div className="bg-white w-full max-w-md rounded-t-3xl max-h-[60vh] overflow-y-auto animate-slide-up">
           {/* Header */}
           <div className="sticky top-0 bg-white border-b border-gray-200 px-4 py-4">
             <div className="flex items-center justify-between">
