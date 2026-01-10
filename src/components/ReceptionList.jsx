@@ -133,9 +133,21 @@ export default function ReceptionList({ onCreate }) {
                     </p>
                     {/* Показываем количество товаров */}
                     {doc?.items && (
-                      <p className="text-xs text-gray-400 mt-1">
-                        Товаров: {Array.isArray(doc.items) ? doc.items.length : (doc.items ? JSON.parse(doc.items).length : 0)}
-                      </p>
+                      <div className="mt-1">
+                        <p className="text-xs text-gray-400">
+                          Товаров: {Array.isArray(doc.items) ? doc.items.length : (doc.items ? JSON.parse(doc.items).length : 0)}
+                        </p>
+                        {/* Показываем наименования товаров */}
+                        <p className="text-xs text-gray-500 mt-1">
+                          {(() => {
+                            const items = Array.isArray(doc.items) ? doc.items : (doc.items ? JSON.parse(doc.items) : []);
+                            if (items.length === 0) return '';
+                            if (items.length === 1) return items[0].name || 'Товар';
+                            if (items.length === 2) return `${items[0].name || 'Товар'} и ${items[1].name || 'Товар'}`;
+                            return `${items[0].name || 'Товар'} и еще ${items.length - 1}`;
+                          })()}
+                        </p>
+                      </div>
                     )}
                   </div>
                   <div className="text-right">
