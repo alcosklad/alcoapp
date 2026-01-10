@@ -123,7 +123,23 @@ export default function ReceptionList({ onCreate }) {
                 <div className="flex justify-between items-start">
                   <div className="flex-1">
                     <p className="text-sm text-gray-500">
-                      {new Date(doc?.date || Date.now()).toLocaleDateString('ru-RU')}
+                      {(() => {
+                        if (doc?.datetime) {
+                          // Показываем дату и время из datetime
+                          const dt = new Date(doc.datetime);
+                          return dt.toLocaleString('ru-RU', {
+                            day: '2-digit',
+                            month: '2-digit',
+                            year: 'numeric',
+                            hour: '2-digit',
+                            minute: '2-digit',
+                            second: '2-digit'
+                          });
+                        } else {
+                          // Если нет datetime, показываем только дату
+                          return new Date(doc?.date || Date.now()).toLocaleDateString('ru-RU');
+                        }
+                      })()}
                     </p>
                     <p className="font-semibold text-gray-900 mt-1">
                       {doc?.expand?.supplier?.name || 'Город'}

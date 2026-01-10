@@ -116,17 +116,22 @@ export default function ReceptionCreate({ onBack, onSuccess, initialItems = [], 
         return sum + (item.quantity * item.cost);
       }, 0);
       
+      // Получаем точное время сохранения
+      const now = new Date();
+      const currentDateTime = now.toISOString();
+      
       const receptionData = {
         supplier: selectedSupplier,
         warehouse: selectedWarehouse,
         date: date,
+        datetime: currentDateTime,  // Добавляем точное время создания
         status: 'draft',  // Правильное значение - draft
         items: items.map(item => ({
           product: item.product.id,
           quantity: item.quantity,
           cost: item.cost
         })),
-        total_amount: totalAmount
+        totalAmount: totalAmount
       };
       
       console.log('📦 Данные для сохранения:', receptionData);
