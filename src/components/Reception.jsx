@@ -1,14 +1,12 @@
 import React, { useState } from 'react';
 import ReceptionList from './ReceptionList';
 import ReceptionCreate from './ReceptionCreate';
-import ReceptionActionModal from './ReceptionActionModal';
 import CreateReceptionScreen from './CreateReceptionScreen';
 import ProductSelectorModal from './ProductSelectorModal';
 import { Plus } from 'lucide-react';
 
 export default function Reception({ onNavigate }) {
   const [view, setView] = useState('list'); // 'list', 'create', 'createScreen', 'select'
-  const [isActionModalOpen, setIsActionModalOpen] = useState(false);
   const [isSelectModalOpen, setIsSelectModalOpen] = useState(false);
   const [tempItems, setTempItems] = useState([]);
   const [receptionData, setReceptionData] = useState({});
@@ -31,21 +29,12 @@ export default function Reception({ onNavigate }) {
     setView('create');
   };
 
-  const handleActionCreate = () => {
-    setView('createScreen');
-    setTempItems([]);
-  };
-
   const handleCreateContinue = (data) => {
     console.log('handleCreateContinue получен:', data);
     setReceptionData(data);
     setView('create');
     setTempItems(data.items || []);
     console.log('Установлены tempItems:', data.items);
-  };
-
-  const handleActionSelect = () => {
-    setIsSelectModalOpen(true);
   };
 
   const handleAddItem = (item) => {
@@ -78,17 +67,9 @@ export default function Reception({ onNavigate }) {
   return (
     <>
       <ReceptionList
-        onCreate={() => setIsActionModalOpen(true)}
+        onCreate={() => setView('createScreen')}
       />
       
-      {/* Модал выбора действия */}
-      <ReceptionActionModal
-        isOpen={isActionModalOpen}
-        onClose={() => setIsActionModalOpen(false)}
-        onCreateReception={handleActionCreate}
-        onSelectProducts={handleActionSelect}
-      />
-
       {/* Модал выбора товаров */}
       <ProductSelectorModal
         isOpen={isSelectModalOpen}
@@ -98,7 +79,7 @@ export default function Reception({ onNavigate }) {
 
       {/* FAB для быстрого создания приемки */}
       <button
-        onClick={() => setIsActionModalOpen(true)}
+        onClick={() => setView('createScreen')}
         className="fixed bottom-24 right-4 w-14 h-14 bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white rounded-full shadow-lg hover:shadow-xl transform hover:scale-110 transition-all duration-200 flex items-center justify-center z-40"
       >
         <Plus size={24} />
