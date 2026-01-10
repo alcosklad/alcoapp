@@ -137,14 +137,27 @@ export default function ReceptionList({ onCreate }) {
                         <p className="text-xs text-gray-400">
                           Товаров: {Array.isArray(doc.items) ? doc.items.length : (doc.items ? JSON.parse(doc.items).length : 0)}
                         </p>
-                        {/* Показываем наименования товаров */}
+                        {/* Показываем наименования товаров с количеством */}
                         <p className="text-xs text-gray-500 mt-1">
                           {(() => {
                             const items = Array.isArray(doc.items) ? doc.items : (doc.items ? JSON.parse(doc.items) : []);
                             if (items.length === 0) return '';
-                            if (items.length === 1) return items[0].name || 'Товар';
-                            if (items.length === 2) return `${items[0].name || 'Товар'} и ${items[1].name || 'Товар'}`;
-                            return `${items[0].name || 'Товар'} и еще ${items.length - 1}`;
+                            
+                            // Форматируем каждый товар: название количество штук
+                            const formattedItems = items.map(item => {
+                              const name = item.name || item.expand?.product?.name || 'Товар';
+                              const quantity = item.quantity || 0;
+                              return `${name} ${quantity} шт`;
+                            });
+                            
+                            if (formattedItems.length === 1) {
+                              return formattedItems[0];
+                            } else if (formattedItems.length === 2) {
+                              return `${formattedItems[0]}, ${formattedItems[1]}`;
+                            } else {
+                              // Показываем первые 2 и "и еще X"
+                              return `${formattedItems[0]}, ${formattedItems[1]} и еще ${formattedItems.length - 2}`;
+                            }
                           })()}
                         </p>
                       </div>
