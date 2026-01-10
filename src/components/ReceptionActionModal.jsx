@@ -51,30 +51,6 @@ export default function ReceptionActionModal({ isOpen, onClose, onCreateReceptio
               </div>
             </button>
 
-            {/* Выбрать товары */}
-            <button
-              onClick={() => {
-                onSelectProducts();
-                onClose();
-              }}
-              className="w-full bg-white border border-gray-200 rounded-2xl p-4 hover:bg-gray-50 transition-colors group"
-            >
-              <div className="flex items-center gap-4">
-                <div className="w-14 h-14 bg-green-100 rounded-2xl flex items-center justify-center group-hover:bg-green-200 transition-colors">
-                  <Package size={28} className="text-green-600" />
-                </div>
-                <div className="flex-1 text-left">
-                  <h4 className="text-lg font-semibold text-gray-900">Выбрать товары</h4>
-                  <p className="text-sm text-gray-500 mt-1">
-                    Быстрый выбор товаров для приемки
-                  </p>
-                </div>
-                <svg className="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                </svg>
-              </div>
-            </button>
-
             {/* Разделитель */}
             <div className="border-t border-gray-100 my-4"></div>
 
@@ -89,7 +65,7 @@ export default function ReceptionActionModal({ isOpen, onClose, onCreateReceptio
                 <div>
                   <p className="text-sm font-medium text-blue-900">Совет</p>
                   <p className="text-sm text-blue-700 mt-1">
-                    Используйте "Создать приемку" для полной документации или "Выбрать товары" для быстрого добавления
+                    Создавайте приемки для учета поступления товаров на склад
                   </p>
                 </div>
               </div>
