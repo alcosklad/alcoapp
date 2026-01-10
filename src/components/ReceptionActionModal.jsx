@@ -50,26 +50,6 @@ export default function ReceptionActionModal({ isOpen, onClose, onCreateReceptio
                 </svg>
               </div>
             </button>
-
-            {/* Разделитель */}
-            <div className="border-t border-gray-100 my-4"></div>
-
-            {/* Дополнительная информация */}
-            <div className="bg-blue-50 rounded-2xl p-4">
-              <div className="flex items-start gap-3">
-                <div className="w-8 h-8 bg-blue-100 rounded-lg flex items-center justify-center flex-shrink-0 mt-0.5">
-                  <svg className="w-4 h-4 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                  </svg>
-                </div>
-                <div>
-                  <p className="text-sm font-medium text-blue-900">Совет</p>
-                  <p className="text-sm text-blue-700 mt-1">
-                    Создавайте приемки для учета поступления товаров на склад
-                  </p>
-                </div>
-              </div>
-            </div>
           </div>
         </div>
       </div>
