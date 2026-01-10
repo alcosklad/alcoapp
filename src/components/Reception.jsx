@@ -10,6 +10,27 @@ export default function Reception({ onNavigate }) {
   const [isSelectModalOpen, setIsSelectModalOpen] = useState(false);
   const [tempItems, setTempItems] = useState([]);
   const [receptionData, setReceptionData] = useState({});
+  const [error, setError] = useState(null);
+
+  // Error boundary
+  if (error) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="text-center">
+          <p className="text-red-600 mb-4">Произошла ошибка: {error}</p>
+          <button 
+            onClick={() => {
+              setError(null);
+              setView('list');
+            }}
+            className="px-4 py-2 bg-blue-600 text-white rounded-lg"
+          >
+            Вернуться
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   const handleCreateSuccess = () => {
     console.log('🎯 handleCreateSuccess вызван - переход на список приемок');
@@ -34,7 +55,7 @@ export default function Reception({ onNavigate }) {
     setReceptionData(data);
     setView('create');
     setTempItems(data.items || []);
-    console.log('Установлены tempItems:', data.items);
+    console.log('Установлены tempItems:', data.items || []);
   };
 
   const handleAddItem = (item) => {
