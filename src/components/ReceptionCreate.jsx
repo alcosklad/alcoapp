@@ -62,6 +62,11 @@ export default function ReceptionCreate({ onBack, onSuccess, initialItems = [], 
         console.log('Выбран город по умолчанию:', safeSuppliers[0].name);
       }
       
+      // Устанавливаем текущую дату с устройства
+      const today = new Date().toISOString().split('T')[0];
+      setDate(today);
+      console.log('Установлена дата с устройства:', today);
+      
     } catch (error) {
       console.error('Error loading data:', error);
     } finally {
