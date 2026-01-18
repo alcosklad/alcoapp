@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Plus, Search } from 'lucide-react';
-import { getStocks, getWarehouses, getProducts, pb } from '../lib/pocketbase';
+import { getStocks, getWarehouses, getProducts } from '../lib/pocketbase';
+import pb from '../lib/pocketbase';
 import AddProductModal from './AddProductModal';
 
 export default function PriceList() {

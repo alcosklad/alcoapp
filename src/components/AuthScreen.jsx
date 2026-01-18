@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { pb } from '../lib/pocketbase';
+import pb from '../lib/pocketbase';
 import { LogIn, Eye, EyeOff } from 'lucide-react';
 
 export default function AuthScreen({ onAuth }) {

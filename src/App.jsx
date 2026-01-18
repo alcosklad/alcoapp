@@ -5,7 +5,7 @@ import Reception from './components/Reception';
 import Stock from './components/Stock';
 import PriceList from './components/PriceList';
 import AuthScreen from './components/AuthScreen';
-import { pb } from './lib/pocketbase';
+import pb from './lib/pocketbase';
 
 function App() {
   const [activeTab, setActiveTab] = useState('dashboard');
