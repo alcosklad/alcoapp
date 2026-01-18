@@ -36,6 +36,8 @@ export default function AuthScreen({ onAuth }) {
 
     try {
       const authData = await pb.collection('users').authWithPassword(email, password);
+      console.log('AuthScreen: Успешный вход:', authData.record);
+      console.log('AuthScreen: Роль пользователя:', authData.record.role);
       onAuth(authData.record);
     } catch (err) {
       setError('Неверный email или пароль');
