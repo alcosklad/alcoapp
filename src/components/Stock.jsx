@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { getSuppliers, getStocksWithDetails, updateStock, pb, createSale } from '../lib/pocketbase';
+import { getSuppliers, getStocksWithDetails, updateStock, createSale } from '../lib/pocketbase';
+import pb from '../lib/pocketbase';
 import { Minus, DollarSign } from 'lucide-react';
 import SellModal2 from './SellModal2';
 
