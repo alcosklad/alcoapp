@@ -1,7 +1,10 @@
 import PocketBase from 'pocketbase';
 
-// Используем IP-адрес для доступа с телефона и компьютера
-const pb = new PocketBase('http://146.103.121.96:8090');
+// Определяем URL в зависимости от окружения
+const isLocalhost = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+const pbUrl = isLocalhost ? 'http://localhost:8090' : 'http://146.103.121.96:8090';
+
+const pb = new PocketBase(pbUrl);
 
 // Отключаем автоотмену запросов для мобильных устройств
 pb.autoCancellation(false);
