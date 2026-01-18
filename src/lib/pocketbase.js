@@ -394,4 +394,33 @@ export const deleteReception = async (id) => {
   }
 };
 
+// Создание продажи
+export const createSale = async (saleData) => {
+  try {
+    console.log('PocketBase: Создаем продажу:', saleData);
+    const record = await pb.collection('sales').create(saleData);
+    console.log('PocketBase: Продажа успешно создана:', record);
+    return record;
+  } catch (error) {
+    console.error('PocketBase: Error creating sale:', error);
+    throw error;
+  }
+};
+
+// Получение продаж
+export const getSales = async (filters = {}) => {
+  try {
+    console.log('PocketBase: Запрашиваем продажи...');
+    const records = await pb.collection('sales').getFullList({
+      sort: '-created',
+      ...filters
+    });
+    console.log('PocketBase: Продажи успешно загружены:', records.length, 'шт');
+    return records;
+  } catch (error) {
+    console.error('PocketBase: Error loading sales:', error);
+    throw error;
+  }
+};
+
 export default pb;

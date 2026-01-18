@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { getSuppliers, getStocksWithDetails, updateStock } from '../lib/pocketbase';
-import { Minus } from 'lucide-react';
-import SellModal from './SellModal';
+import { getSuppliers, getStocksWithDetails, updateStock, pb, createSale } from '../lib/pocketbase';
+import { Minus, DollarSign } from 'lucide-react';
+import SellModal2 from './SellModal2';
 
 export default function Stock() {
   const [stocks, setStocks] = useState([]);
@@ -12,6 +12,10 @@ export default function Stock() {
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedStock, setSelectedStock] = useState(null);
   const [isSellModalOpen, setIsSellModalOpen] = useState(false);
+  
+  // Получаем роль и город пользователя
+  const userRole = pb.authStore.model?.role;
+  const userSupplier = pb.authStore.model?.supplier;
 
   useEffect(() => {
     loadSuppliers();
@@ -28,7 +32,11 @@ export default function Stock() {
         return [];
       });
       setSuppliers(data || []);
-      if (data && data.length > 0) {
+      
+      // Для worker устанавливаем только его город
+      if (userRole === 'worker' && userSupplier) {
+        setSelectedSupplier(userSupplier);
+      } else if (data && data.length > 0) {
         setSelectedSupplier(data[0].id);
       }
     } catch (error) {
@@ -56,6 +64,22 @@ export default function Stock() {
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleSellClick = (stock) => {
+    // Подготавливаем данные для модального окна
+    const productData = {
+      id: stock.id,
+      name: stock?.product?.name || stock?.expand?.product?.name || 'Товар',
+      article: stock?.product?.article || stock?.expand?.product?.article,
+      quantity: stock?.quantity || 0,
+      price: stock?.product?.price || stock?.expand?.product?.price || 0,
+      supplier: stock.supplier,
+      userId: pb.authStore.model?.id
+    };
+    
+    setSelectedStock(productData);
+    setIsSellModalOpen(true);
   };
 
   const handleSellItem = async (stock) => {
@@ -100,14 +124,17 @@ export default function Stock() {
 
   const handleSellFromModal = async (sellData) => {
     try {
-      const supplierId = sellData.supplierId || null;
-      await updateStock(sellData.productId, sellData.warehouseId, -sellData.quantity, supplierId);
+      // Создаем запись о продаже
+      await createSale(sellData);
+      
+      // Обновляем остатки
+      await updateStock(sellData.product, null, -sellData.quantity, sellData.supplier);
       
       // Перезагружаем остатки
       loadStocks();
       
-      console.log(`✅ Продано: ${sellData.quantity} шт, причина: ${sellData.reason}`);
-      alert(`Успешно продано ${sellData.quantity} шт!`);
+      console.log(`✅ Продано: ${sellData.quantity} шт товара ID: ${sellData.product}`);
+      alert(`Успешно продано ${sellData.quantity} шт на сумму ${sellData.total.toLocaleString('ru-RU')} ₽!`);
     } catch (error) {
       console.error('❌ Ошибка продажи:', error);
       throw error; // Пробрасываем ошибку в модальное окно
@@ -198,18 +225,21 @@ export default function Stock() {
               className="w-full pl-10 pr-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
             />
           </div>
-          <select
-            value={selectedSupplier}
-            onChange={(e) => setSelectedSupplier(e.target.value)}
-            className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-          >
-            <option value="">Все города</option>
-            {(suppliers || []).map(supplier => (
-              <option key={supplier?.id || Math.random()} value={supplier?.id}>
-                {supplier?.name || 'Неизвестный город'}
-              </option>
-            ))}
-          </select>
+          {/* Селект города - только не для worker */}
+          {userRole !== 'worker' && (
+            <select
+              value={selectedSupplier}
+              onChange={(e) => setSelectedSupplier(e.target.value)}
+              className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+            >
+              <option value="">Все города</option>
+              {(suppliers || []).map(supplier => (
+                <option key={supplier?.id || Math.random()} value={supplier?.id}>
+                  {supplier?.name || 'Неизвестный город'}
+                </option>
+              ))}
+            </select>
+          )}
         </div>
 
         {/* Stock List */}
@@ -257,7 +287,7 @@ export default function Stock() {
                       <p className="text-sm font-medium text-gray-700 mt-2">
                         Общая сумма: {totalSum.toLocaleString('ru-RU')} ₽
                       </p>
-                      {isClickable && (
+                      {userRole !== 'worker' && isClickable && (
                         <p className="text-xs text-blue-500 mt-2">
                           🔵 Нажмите для продажи
                         </p>
@@ -281,6 +311,19 @@ export default function Stock() {
                           Нет в наличии
                         </p>
                       )}
+                      {/* Кнопка продажи для worker */}
+                      {userRole === 'worker' && isClickable && (
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleSellClick(stock);
+                          }}
+                          className="mt-2 bg-green-600 hover:bg-green-700 text-white px-3 py-1 rounded-lg text-sm font-medium transition-colors flex items-center gap-1"
+                        >
+                          <DollarSign size={16} />
+                          Продать
+                        </button>
+                      )}
                     </div>
                   </div>
                 </div>
@@ -292,10 +335,10 @@ export default function Stock() {
       </div>
     
     {/* Модальное окно продажи */}
-    <SellModal
+    <SellModal2
       isOpen={isSellModalOpen}
       onClose={() => setIsSellModalOpen(false)}
-      stock={selectedStock}
+      product={selectedStock}
       onSell={handleSellFromModal}
     />
   </div>

@@ -3,9 +3,9 @@ import React from 'react';
 export default function Navigation({ activeTab, onTabChange, userRole }) {
   // Все вкладки
   const allTabs = [
-    { id: 'dashboard', label: 'Главная', icon: '🏠', roles: ['admin', 'operator'] },
+    { id: 'dashboard', label: 'Главная', icon: '🏠', roles: ['admin', 'operator', 'worker'] },
     { id: 'reception', label: 'Приемка', icon: '📦', roles: ['admin'] },
-    { id: 'stock', label: 'Остатки', icon: '📊', roles: ['admin', 'operator'] },
+    { id: 'stock', label: 'Остатки', icon: '📊', roles: ['admin', 'operator', 'worker'] },
     { id: 'pricelist', label: 'Прайс', icon: '📋', roles: ['admin', 'operator'] },
   ];
 
