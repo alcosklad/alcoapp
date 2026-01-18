@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { getDashboardStats, getWarehouses } from '../lib/pocketbase';
+import { LogOut, User } from 'lucide-react';
 
-export default function Dashboard() {
+export default function Dashboard({ user, onLogout }) {
   const [stats, setStats] = useState({ totalProducts: 0, totalValue: 0 });
   const [warehouses, setWarehouses] = useState([]);
   const [selectedWarehouse, setSelectedWarehouse] = useState('');
@@ -74,7 +75,25 @@ export default function Dashboard() {
     <div className="min-h-screen bg-blue-600 pb-20">
       {/* Header */}
       <header className="bg-blue-700 px-4 py-4">
-        <h1 className="text-xl font-bold text-white">Главная</h1>
+        <div className="flex items-center justify-between">
+          <h1 className="text-xl font-bold text-white">Главная</h1>
+          <div className="flex items-center gap-3">
+            <div className="text-right">
+              <p className="text-white text-sm">{user?.name || 'Пользователь'}</p>
+              <p className="text-blue-200 text-xs">
+                {user?.role === 'admin' ? 'Администратор' : 
+                 user?.role === 'operator' ? 'Оператор' : 'Сотрудник'}
+              </p>
+            </div>
+            <button
+              onClick={onLogout}
+              className="p-2 bg-white/10 hover:bg-white/20 rounded-lg transition-colors"
+              title="Выйти"
+            >
+              <LogOut size={20} className="text-white" />
+            </button>
+          </div>
+        </div>
       </header>
 
       {/* Warehouse Selector */}

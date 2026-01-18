@@ -1,12 +1,18 @@
 import React from 'react';
 
-export default function Navigation({ activeTab, onTabChange }) {
-  const tabs = [
-    { id: 'dashboard', label: 'Главная', icon: '🏠' },
-    { id: 'reception', label: 'Приемка', icon: '📦' },
-    { id: 'stock', label: 'Остатки', icon: '📊' },
-    { id: 'pricelist', label: 'Прайс', icon: '📋' },
+export default function Navigation({ activeTab, onTabChange, userRole }) {
+  // Все вкладки
+  const allTabs = [
+    { id: 'dashboard', label: 'Главная', icon: '🏠', roles: ['admin', 'operator'] },
+    { id: 'reception', label: 'Приемка', icon: '📦', roles: ['admin'] },
+    { id: 'stock', label: 'Остатки', icon: '📊', roles: ['admin', 'operator'] },
+    { id: 'pricelist', label: 'Прайс', icon: '📋', roles: ['admin', 'operator'] },
   ];
+
+  // Фильтруем вкладки по роли пользователя
+  const tabs = allTabs.filter(tab => 
+    userRole && tab.roles.includes(userRole)
+  );
 
   return (
     <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 px-2 py-2 z-50">

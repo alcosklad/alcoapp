@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Plus, Search } from 'lucide-react';
-import { getStocks, getWarehouses, getProducts } from '../lib/pocketbase';
+import { getStocks, getWarehouses, getProducts, pb } from '../lib/pocketbase';
 import AddProductModal from './AddProductModal';
 
 export default function PriceList() {
@@ -12,6 +12,9 @@ export default function PriceList() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
+  
+  // Получаем роль пользователя
+  const userRole = pb.authStore.model?.role;
 
   useEffect(() => {
     loadWarehouses();
@@ -247,22 +250,26 @@ export default function PriceList() {
         </div>
       )}
 
-      {/* Floating Action Button */}
-      <button
-        onClick={() => setIsAddModalOpen(true)}
-        className="fixed bottom-24 right-4 w-14 h-14 bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white rounded-full shadow-lg hover:shadow-xl transform hover:scale-110 transition-all duration-200 flex items-center justify-center z-40"
-      >
-        <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M12 4v16m8-8H4" />
-        </svg>
-      </button>
+      {/* Floating Action Button - только для администратора */}
+      {userRole === 'admin' && (
+        <button
+          onClick={() => setIsAddModalOpen(true)}
+          className="fixed bottom-24 right-4 w-14 h-14 bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white rounded-full shadow-lg hover:shadow-xl transform hover:scale-110 transition-all duration-200 flex items-center justify-center z-40"
+        >
+          <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M12 4v16m8-8H4" />
+          </svg>
+        </button>
+      )}
 
-      {/* Add Product Modal */}
-      <AddProductModal
-        isOpen={isAddModalOpen}
-        onClose={() => setIsAddModalOpen(false)}
-        onAdd={handleProductAdded}
-      />
+      {/* Add Product Modal - только для администратора */}
+      {userRole === 'admin' && (
+        <AddProductModal
+          isOpen={isAddModalOpen}
+          onClose={() => setIsAddModalOpen(false)}
+          onAdd={handleProductAdded}
+        />
+      )}
     </div>
   );
 }
