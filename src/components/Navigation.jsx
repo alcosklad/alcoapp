@@ -15,11 +15,6 @@ export default function Navigation({ activeTab, onTabChange, userRole }) {
     ? allTabs.filter(tab => tab.roles.includes(userRole))
     : allTabs.filter(tab => tab.id !== 'reception');
 
-  // Добавляем отладку
-  console.log('Navigation: userRole =', userRole);
-  console.log('Navigation: userRole тип =', typeof userRole);
-  console.log('Navigation: tabs =', tabs.map(t => t.label));
-
   return (
     <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 px-2 py-2 z-50">
       <div className="flex justify-around items-center max-w-lg mx-auto">
