@@ -72,7 +72,7 @@ export default function Dashboard({ user, onLogout }) {
   }
 
   return (
-    <div className="min-h-screen bg-blue-600 pb-20">
+    <div className="h-screen bg-blue-600 pb-20 overflow-hidden">
       {/* Header */}
       <header className="bg-blue-700 px-4 py-4">
         <div className="flex items-center justify-between">
@@ -112,8 +112,10 @@ export default function Dashboard({ user, onLogout }) {
         </select>
       </div>
 
-      {/* Stats Cards */}
-      <div className="px-4 space-y-4">
+      {/* Контент с прокруткой */}
+      <div className="h-[calc(100vh-180px)] overflow-y-auto px-4">
+        {/* Stats Cards */}
+        <div className="space-y-4 pb-4">
         <div className="bg-white rounded-xl p-6 shadow-lg">
           <div className="flex items-center justify-between">
             <div>
@@ -157,6 +159,7 @@ export default function Dashboard({ user, onLogout }) {
               📊 Отчеты
             </button>
           </div>
+        </div>
         </div>
       </div>
     </div>
