@@ -17,6 +17,7 @@ export default function Navigation({ activeTab, onTabChange, userRole }) {
 
   // Добавляем отладку
   console.log('Navigation: userRole =', userRole);
+  console.log('Navigation: userRole тип =', typeof userRole);
   console.log('Navigation: tabs =', tabs.map(t => t.label));
 
   return (
