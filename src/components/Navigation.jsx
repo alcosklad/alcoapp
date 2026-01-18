@@ -10,10 +10,9 @@ export default function Navigation({ activeTab, onTabChange, userRole }) {
   ];
 
   // Фильтруем вкладки по роли пользователя
-  // Если роль не определена, показываем все (для отладки)
-  const tabs = userRole 
-    ? allTabs.filter(tab => tab.roles.includes(userRole))
-    : allTabs;
+  const tabs = allTabs.filter(tab => 
+    userRole && tab.roles.includes(userRole)
+  );
 
   // Добавляем отладку
   console.log('Navigation: userRole =', userRole);

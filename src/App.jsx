@@ -52,11 +52,13 @@ function App() {
   return (
     <div className="relative">
       {renderContent()}
-      <Navigation 
-        activeTab={activeTab} 
-        onTabChange={setActiveTab} 
-        userRole={user?.role}
-      />
+      {!loading && user && (
+        <Navigation 
+          activeTab={activeTab} 
+          onTabChange={setActiveTab} 
+          userRole={user?.role}
+        />
+      )}
     </div>
   );
 }
