@@ -1,0 +1,71 @@
+{
+  "collections": [
+    {
+      "name": "sales",
+      "type": "base",
+      "schema": [
+        {
+          "name": "user",
+          "type": "relation",
+          "required": true,
+          "options": {
+            "collectionId": "_pb_users_auth_",
+            "maxSelect": 1
+          }
+        },
+        {
+          "name": "product",
+          "type": "relation",
+          "required": true,
+          "options": {
+            "collectionId": "products",
+            "maxSelect": 1
+          }
+        },
+        {
+          "name": "quantity",
+          "type": "number",
+          "required": true,
+          "options": {
+            "min": 0
+          }
+        },
+        {
+          "name": "price",
+          "type": "number",
+          "required": true,
+          "options": {
+            "min": 0
+          }
+        },
+        {
+          "name": "total",
+          "type": "number",
+          "required": true,
+          "options": {
+            "min": 0
+          }
+        },
+        {
+          "name": "supplier",
+          "type": "relation",
+          "required": true,
+          "options": {
+            "collectionId": "suppliers",
+            "maxSelect": 1
+          }
+        },
+        {
+          "name": "sale_date",
+          "type": "date",
+          "required": true
+        },
+        {
+          "name": "sale_time",
+          "type": "text",
+          "required": true
+        }
+      ]
+    }
+  ]
+}
