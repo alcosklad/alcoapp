@@ -342,9 +342,12 @@ export const getStocks = async (warehouseId = null) => {
 };
 
 // Статистика для дашборда
-export const getDashboardStats = async (warehouseId = null) => {
+export const getDashboardStats = async (filterId = null) => {
   try {
-    const filter = warehouseId ? `warehouse = "${warehouseId}"` : '';
+    // filterId может быть warehouse или supplier
+    // Определяем тип фильтра по длине ID (у suppliers короткие ID)
+    const filter = filterId ? `supplier = "${filterId}"` : '';
+    
     const stocks = await pb.collection('stocks').getFullList({
       filter,
       expand: 'product'
@@ -355,14 +358,15 @@ export const getDashboardStats = async (warehouseId = null) => {
       return sum + (stock.quantity || 0);
     }, 0);
     
-    // Считаем общую сумму
+    // Считаем общую сумму по цене продажи
     const totalValue = stocks.reduce((sum, stock) => {
       const price = stock.expand?.product?.price || 0;
       return sum + (price * (stock.quantity || 0));
     }, 0);
     
     console.log('📊 Dashboard stats:', {
-      warehouseId,
+      filterId,
+      filter,
       totalStocks: stocks.length,
       totalProducts,
       totalValue

@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { getDashboardStats, getWarehouses } from '../lib/pocketbase';
 import { LogOut, User } from 'lucide-react';
+import pb from '../lib/pocketbase';
 
 export default function Dashboard({ user, onLogout }) {
   const [stats, setStats] = useState({ totalProducts: 0, totalValue: 0 });
@@ -8,6 +9,10 @@ export default function Dashboard({ user, onLogout }) {
   const [selectedWarehouse, setSelectedWarehouse] = useState('');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  
+  // Получаем роль и supplier пользователя
+  const userRole = pb.authStore.model?.role;
+  const userSupplier = pb.authStore.model?.supplier;
 
   useEffect(() => {
     loadData();
@@ -17,12 +22,19 @@ export default function Dashboard({ user, onLogout }) {
     try {
       setLoading(true);
       setError(null);
+      
+      // Для worker используем его supplier вместо warehouse
+      let statsFilter = selectedWarehouse || null;
+      if (userRole === 'worker' && userSupplier) {
+        statsFilter = userSupplier;
+      }
+      
       const [warehousesData, statsData] = await Promise.all([
         getWarehouses().catch(err => {
           console.error('Error loading warehouses:', err);
           return [];
         }),
-        getDashboardStats(selectedWarehouse || null).catch(err => {
+        getDashboardStats(statsFilter).catch(err => {
           console.error('Error loading stats:', err);
           return { totalProducts: 0, totalValue: 0 };
         })
@@ -96,21 +108,23 @@ export default function Dashboard({ user, onLogout }) {
         </div>
       </header>
 
-      {/* Warehouse Selector */}
-      <div className="px-4 py-4">
-        <select
-          value={selectedWarehouse}
-          onChange={(e) => setSelectedWarehouse(e.target.value)}
-          className="w-full px-4 py-2 rounded-lg bg-white/10 backdrop-blur text-white border border-white/20 focus:outline-none focus:ring-2 focus:ring-white/50"
-        >
-          <option value="">Все склады</option>
-          {(warehouses || []).map(warehouse => (
-            <option key={warehouse?.id || Math.random()} value={warehouse?.id}>
-              {warehouse?.name || 'Неизвестный склад'}
-            </option>
-          ))}
-        </select>
-      </div>
+      {/* Warehouse Selector - только не для worker */}
+      {userRole !== 'worker' && (
+        <div className="px-4 py-4">
+          <select
+            value={selectedWarehouse}
+            onChange={(e) => setSelectedWarehouse(e.target.value)}
+            className="w-full px-4 py-2 rounded-lg bg-white/10 backdrop-blur text-white border border-white/20 focus:outline-none focus:ring-2 focus:ring-white/50"
+          >
+            <option value="">Все города</option>
+            {(warehouses || []).map(warehouse => (
+              <option key={warehouse?.id || Math.random()} value={warehouse?.id}>
+                {warehouse?.name || 'Неизвестный склад'}
+              </option>
+            ))}
+          </select>
+        </div>
+      )}
 
       {/* Контент с прокруткой */}
       <div className="h-[calc(100vh-180px)] overflow-y-auto px-4">
