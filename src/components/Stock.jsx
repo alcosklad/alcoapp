@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { getSuppliers, getStocksWithDetails, updateStock, createSale } from '../lib/pocketbase';
 import pb from '../lib/pocketbase';
-import { Minus, DollarSign, X } from 'lucide-react';
+import { Minus, DollarSign, ShoppingCart } from 'lucide-react';
 import SellModal2 from './SellModal2';
 
 export default function Stock() {
@@ -201,12 +201,12 @@ export default function Stock() {
 
   return (
     <div className="min-h-screen bg-gray-50 pb-20">
-      {/* Кнопка крестик в правом верхнем углу */}
+      {/* Кнопка корзина в правом верхнем углу */}
       <button
         onClick={() => setIsCrossModalOpen(true)}
-        className="fixed top-4 right-4 z-40 p-3 bg-blue-600 text-white rounded-lg shadow-lg hover:bg-blue-700 transition-all duration-200"
+        className="fixed top-4 right-4 z-40 p-3 bg-green-600 text-white rounded-lg shadow-lg hover:bg-green-700 transition-all duration-200"
       >
-        <X size={24} />
+        <ShoppingCart size={24} />
       </button>
 
       {/* Модальное окно для крестика */}
@@ -240,11 +240,11 @@ export default function Stock() {
           {/* Левая сторона - маленькие карточки */}
           <div className="space-y-3 pl-8">
             <div className="text-center">
-              <p className="text-base font-semibold text-blue-600">{totalQuantity}</p>
+              <p className="text-2xl font-semibold text-blue-600">{totalQuantity}</p>
               <p className="text-xs text-gray-500">Штук всего</p>
             </div>
             <div className="text-center">
-              <p className="text-base font-semibold text-red-600">{lowStockItems.length}</p>
+              <p className="text-2xl font-semibold text-red-600">{lowStockItems.length}</p>
               <p className="text-xs text-gray-500">Мало остаток</p>
             </div>
           </div>
