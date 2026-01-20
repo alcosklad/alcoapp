@@ -211,7 +211,7 @@ export default function Stock() {
       <div className="px-4 py-4 space-y-3">
         <div className="grid grid-cols-2 gap-3">
           {/* Левая сторона - маленькие карточки */}
-          <div className="space-y-3">
+          <div className="space-y-3 pl-4">
             <div className="text-center">
               <p className="text-base font-semibold text-blue-600">{totalQuantity}</p>
               <p className="text-xs text-gray-500">Штук всего</p>
@@ -225,11 +225,11 @@ export default function Stock() {
           {/* Правая сторона - суммы в столбик */}
           <div className="space-y-3">
             <div className="text-center">
-              <p className="text-lg font-semibold text-green-600">{totalSaleValue.toLocaleString('ru-RU')}</p>
+              <p className="text-xl font-semibold text-green-600">{totalSaleValue.toLocaleString('ru-RU')}</p>
               <p className="text-xs text-gray-500">Сумма продажи</p>
             </div>
             <div className="text-center">
-              <p className="text-lg font-semibold text-purple-600">{totalPurchaseValue.toLocaleString('ru-RU')}</p>
+              <p className="text-xl font-semibold text-purple-600">{totalPurchaseValue.toLocaleString('ru-RU')}</p>
               <p className="text-xs text-gray-500">Сумма закупа</p>
             </div>
           </div>
