@@ -212,24 +212,24 @@ export default function Stock() {
         <div className="grid grid-cols-2 gap-3">
           {/* Левая сторона - маленькие карточки */}
           <div className="space-y-3">
-            <div className="bg-white rounded-lg p-2 text-center">
-              <p className="text-lg font-bold text-blue-600">{totalQuantity}</p>
+            <div className="text-center">
+              <p className="text-base font-semibold text-blue-600">{totalQuantity}</p>
               <p className="text-xs text-gray-500">Штук всего</p>
             </div>
-            <div className="bg-white rounded-lg p-2 text-center">
-              <p className="text-lg font-bold text-red-600">{lowStockItems.length}</p>
+            <div className="text-center">
+              <p className="text-base font-semibold text-red-600">{lowStockItems.length}</p>
               <p className="text-xs text-gray-500">Мало остаток</p>
             </div>
           </div>
           
           {/* Правая сторона - суммы в столбик */}
           <div className="space-y-3">
-            <div className="bg-white rounded-lg p-3 text-center">
-              <p className="text-2xl font-bold text-green-600">{totalSaleValue.toLocaleString('ru-RU')}</p>
+            <div className="text-center">
+              <p className="text-lg font-semibold text-green-600">{totalSaleValue.toLocaleString('ru-RU')}</p>
               <p className="text-xs text-gray-500">Сумма продажи</p>
             </div>
-            <div className="bg-white rounded-lg p-3 text-center">
-              <p className="text-2xl font-bold text-purple-600">{totalPurchaseValue.toLocaleString('ru-RU')}</p>
+            <div className="text-center">
+              <p className="text-lg font-semibold text-purple-600">{totalPurchaseValue.toLocaleString('ru-RU')}</p>
               <p className="text-xs text-gray-500">Сумма закупа</p>
             </div>
           </div>
