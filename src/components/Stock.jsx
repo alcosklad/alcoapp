@@ -190,10 +190,12 @@ export default function Stock() {
 
   return (
     <div className="min-h-screen bg-gray-50 pb-20">
-      {/* Header */}
-      <header className="bg-white shadow-sm px-4 py-4">
-        <h1 className="text-xl font-semibold text-gray-900">Остатки товаров</h1>
-      </header>
+      {/* Header - убран заголовок для Worker */}
+      {userRole !== 'worker' && (
+        <header className="bg-white shadow-sm px-4 py-4">
+          <h1 className="text-xl font-semibold text-gray-900">Остатки товаров</h1>
+        </header>
+      )}
 
       {/* Stats Cards */}
       <div className="px-4 py-4 space-y-3">
