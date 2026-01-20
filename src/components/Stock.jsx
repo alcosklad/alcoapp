@@ -225,11 +225,11 @@ export default function Stock() {
           {/* Правая сторона - суммы в столбик */}
           <div className="space-y-3">
             <div className="text-center">
-              <p className="text-xl font-semibold text-green-600">{totalSaleValue.toLocaleString('ru-RU')}</p>
+              <p className="text-2xl font-semibold text-green-600">{totalSaleValue.toLocaleString('ru-RU')}</p>
               <p className="text-xs text-gray-500">Сумма продажи</p>
             </div>
             <div className="text-center">
-              <p className="text-xl font-semibold text-purple-600">{totalPurchaseValue.toLocaleString('ru-RU')}</p>
+              <p className="text-2xl font-semibold text-purple-600">{totalPurchaseValue.toLocaleString('ru-RU')}</p>
               <p className="text-xs text-gray-500">Сумма закупа</p>
             </div>
           </div>
