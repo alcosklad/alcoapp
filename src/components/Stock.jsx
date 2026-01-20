@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { getSuppliers, getStocksWithDetails, updateStock, createSale } from '../lib/pocketbase';
 import pb from '../lib/pocketbase';
-import { Minus, DollarSign, ShoppingCart } from 'lucide-react';
+import { Minus, DollarSign, ShoppingBasket } from 'lucide-react';
 import SellModal2 from './SellModal2';
 
 export default function Stock() {
@@ -206,7 +206,7 @@ export default function Stock() {
         onClick={() => setIsCrossModalOpen(true)}
         className="fixed top-4 right-4 z-40 p-3 bg-green-600 text-white rounded-lg shadow-lg hover:bg-green-700 transition-all duration-200"
       >
-        <ShoppingCart size={24} />
+        <ShoppingBasket size={24} />
       </button>
 
       {/* Модальное окно для крестика */}
