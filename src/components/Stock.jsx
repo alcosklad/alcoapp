@@ -211,7 +211,7 @@ export default function Stock() {
       <div className="px-4 py-4 space-y-3">
         <div className="grid grid-cols-2 gap-3">
           {/* Левая сторона - маленькие карточки */}
-          <div className="space-y-3 pl-4">
+          <div className="space-y-3 pl-8">
             <div className="text-center">
               <p className="text-base font-semibold text-blue-600">{totalQuantity}</p>
               <p className="text-xs text-gray-500">Штук всего</p>
