@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { getSuppliers, getStocksWithDetails, updateStock, createSale } from '../lib/pocketbase';
 import pb from '../lib/pocketbase';
-import { Minus, DollarSign } from 'lucide-react';
+import { Minus, DollarSign, X } from 'lucide-react';
 import SellModal2 from './SellModal2';
 
 export default function Stock() {
@@ -13,6 +13,7 @@ export default function Stock() {
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedStock, setSelectedStock] = useState(null);
   const [isSellModalOpen, setIsSellModalOpen] = useState(false);
+  const [isCrossModalOpen, setIsCrossModalOpen] = useState(false);
   
   // Получаем роль и город пользователя
   const userRole = pb.authStore.model?.role;
@@ -200,6 +201,32 @@ export default function Stock() {
 
   return (
     <div className="min-h-screen bg-gray-50 pb-20">
+      {/* Кнопка крестик в правом верхнем углу */}
+      <button
+        onClick={() => setIsCrossModalOpen(true)}
+        className="fixed top-4 right-4 z-40 p-3 bg-blue-600 text-white rounded-lg shadow-lg hover:bg-blue-700 transition-all duration-200"
+      >
+        <X size={24} />
+      </button>
+
+      {/* Модальное окно для крестика */}
+      {isCrossModalOpen && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center">
+          <div className="bg-white rounded-xl p-6 m-4 max-w-md w-full">
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-xl font-bold text-gray-900">Меню</h2>
+              <button
+                onClick={() => setIsCrossModalOpen(false)}
+                className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+              >
+                <X size={20} className="text-gray-500" />
+              </button>
+            </div>
+            <p className="text-gray-600">Здесь будет функционал для крестика...</p>
+          </div>
+        </div>
+      )}
+
       {/* Header - убран заголовок для Worker */}
       {userRole !== 'worker' && (
         <header className="bg-white shadow-sm px-4 py-4">
