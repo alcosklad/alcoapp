@@ -119,8 +119,7 @@ export default function Stock() {
 
   const handleCardClick = (stock) => {
     if (stock.quantity > 0) {
-      setSelectedStock(stock);
-      setIsSellModalOpen(true);
+      handleSellClick(stock);
     }
   };
 
