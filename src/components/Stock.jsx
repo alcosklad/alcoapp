@@ -255,7 +255,7 @@ export default function Stock() {
             </div>
             
             {/* Центр - сумма продажи */}
-            <div className="flex items-center justify-center">
+            <div className="flex items-center justify-center h-full">
               <div className="text-center">
                 <p className="text-2xl font-semibold text-green-600">{totalSaleValue.toLocaleString('ru-RU')}</p>
                 <p className="text-xs text-gray-500">Сумма продажи</p>
