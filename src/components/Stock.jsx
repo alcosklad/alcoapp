@@ -319,6 +319,7 @@ export default function Stock() {
                 });
                 
                 const totalSum = (stock?.quantity || 0) * (stock?.expand?.product?.price || 0);
+                const price = stock?.expand?.product?.price || 0;
                 const isClickable = (stock?.quantity || 0) > 0;
                 return (
                 <div 
