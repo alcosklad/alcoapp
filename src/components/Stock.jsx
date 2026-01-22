@@ -239,31 +239,57 @@ export default function Stock() {
 
       {/* Stats Cards */}
       <div className="px-4 py-4 space-y-3">
-        <div className="grid grid-cols-2 gap-3">
-          {/* Левая сторона - маленькие карточки */}
-          <div className="space-y-3 pl-8">
-            <div className="text-center">
-              <p className="text-2xl font-semibold text-blue-600">{totalQuantity}</p>
-              <p className="text-xs text-gray-500">Штук всего</p>
+        {userRole === 'worker' ? (
+          // Для Worker - отдельный layout
+          <div className="grid grid-cols-3 gap-3">
+            {/* Левая сторона - маленькие карточки */}
+            <div className="space-y-3 pl-4">
+              <div className="text-center">
+                <p className="text-2xl font-semibold text-blue-600">{totalQuantity}</p>
+                <p className="text-xs text-gray-500">Штук всего</p>
+              </div>
+              <div className="text-center">
+                <p className="text-2xl font-semibold text-red-600">{lowStockItems.length}</p>
+                <p className="text-xs text-gray-500">Мало остаток</p>
+              </div>
             </div>
-            <div className="text-center">
-              <p className="text-2xl font-semibold text-red-600">{lowStockItems.length}</p>
-              <p className="text-xs text-gray-500">Мало остаток</p>
+            
+            {/* Центр - сумма продажи */}
+            <div className="flex items-center justify-center">
+              <div className="text-center">
+                <p className="text-2xl font-semibold text-green-600">{totalSaleValue.toLocaleString('ru-RU')}</p>
+                <p className="text-xs text-gray-500">Сумма продажи</p>
+              </div>
             </div>
           </div>
-          
-          {/* Правая сторона - суммы в столбик */}
-          <div className="space-y-3 pr-16">
-            <div className="text-center">
-              <p className="text-2xl font-semibold text-green-600">{totalSaleValue.toLocaleString('ru-RU')}</p>
-              <p className="text-xs text-gray-500">Сумма продажи</p>
+        ) : (
+          // Для Admin и Operator - обычный layout
+          <div className="grid grid-cols-2 gap-3">
+            {/* Левая сторона - маленькие карточки */}
+            <div className="space-y-3 pl-8">
+              <div className="text-center">
+                <p className="text-2xl font-semibold text-blue-600">{totalQuantity}</p>
+                <p className="text-xs text-gray-500">Штук всего</p>
+              </div>
+              <div className="text-center">
+                <p className="text-2xl font-semibold text-red-600">{lowStockItems.length}</p>
+                <p className="text-xs text-gray-500">Мало остаток</p>
+              </div>
             </div>
-            <div className="text-center">
-              <p className="text-2xl font-semibold text-purple-600">{totalPurchaseValue.toLocaleString('ru-RU')}</p>
-              <p className="text-xs text-gray-500">Сумма закупа</p>
+            
+            {/* Правая сторона - суммы в столбик */}
+            <div className="space-y-3 pr-16">
+              <div className="text-center">
+                <p className="text-2xl font-semibold text-green-600">{totalSaleValue.toLocaleString('ru-RU')}</p>
+                <p className="text-xs text-gray-500">Сумма продажи</p>
+              </div>
+              <div className="text-center">
+                <p className="text-2xl font-semibold text-purple-600">{totalPurchaseValue.toLocaleString('ru-RU')}</p>
+                <p className="text-xs text-gray-500">Сумма закупа</p>
+              </div>
             </div>
           </div>
-        </div>
+        )}
 
         {/* Search and Filter */}
         <div className="bg-white rounded-lg p-3 shadow-sm space-y-3">
