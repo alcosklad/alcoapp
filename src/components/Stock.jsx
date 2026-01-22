@@ -343,7 +343,7 @@ export default function Stock() {
                       <p className="text-sm text-gray-600 mt-1">
                         Цена за шт: {price.toLocaleString('ru-RU')} ₽
                       </p>
-                      {userRole !== 'worker' && isClickable && (
+                      {isClickable && userRole !== 'worker' && (
                         <p className="text-xs text-blue-500 mt-2">
                           🔵 Нажмите для продажи
                         </p>
