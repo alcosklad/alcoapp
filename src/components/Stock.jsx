@@ -331,28 +331,16 @@ export default function Stock() {
                 >
                   <div className="flex justify-between items-start">
                     <div className="flex-1">
-                      <h3 className={`font-semibold ${
-                        (stock?.quantity || 0) <= 3 && (stock?.quantity || 0) > 0
-                          ? 'text-red-600'
-                          : 'text-gray-900'
-                      }`}>
+                      <h3 className="font-semibold text-gray-900">
                         {stock?.product?.name || stock?.expand?.product?.name || 'Товар'}
                       </h3>
                       {stock?.warehouse && (
                         <p className="text-xs text-gray-400 mt-1">{stock.warehouse.name}</p>
                       )}
-                      <p className={`text-sm font-medium mt-2 ${
-                        (stock?.quantity || 0) <= 3 && (stock?.quantity || 0) > 0
-                          ? 'text-red-600'
-                          : 'text-gray-700'
-                      }`}>
+                      <p className="text-sm font-medium text-gray-700 mt-2">
                         Общая сумма: {totalSum.toLocaleString('ru-RU')} ₽
                       </p>
-                      <p className={`text-sm mt-1 ${
-                        (stock?.quantity || 0) <= 3 && (stock?.quantity || 0) > 0
-                          ? 'text-red-600'
-                          : 'text-gray-600'
-                      }`}>
+                      <p className="text-sm text-gray-600 mt-1">
                         Цена за шт: {price.toLocaleString('ru-RU')} ₽
                       </p>
                       {userRole !== 'worker' && isClickable && (
@@ -365,8 +353,8 @@ export default function Stock() {
                       <p className={`text-lg font-bold px-3 py-1 rounded-lg ${
                         (stock?.quantity || 0) === 0
                           ? 'text-red-600 bg-red-50'
-                          : (stock?.quantity || 0) < 2
-                          ? 'text-orange-600 bg-orange-50'
+                          : (stock?.quantity || 0) <= 3
+                          ? 'text-red-600 bg-red-50'
                           : 'text-green-600 bg-green-50'
                       }`}>
                         {stock?.quantity || 0} шт
