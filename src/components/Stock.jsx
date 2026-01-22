@@ -331,16 +331,28 @@ export default function Stock() {
                 >
                   <div className="flex justify-between items-start">
                     <div className="flex-1">
-                      <h3 className="font-semibold text-gray-900">
+                      <h3 className={`font-semibold ${
+                        (stock?.quantity || 0) <= 3 && (stock?.quantity || 0) > 0
+                          ? 'text-red-600'
+                          : 'text-gray-900'
+                      }`}>
                         {stock?.product?.name || stock?.expand?.product?.name || 'Товар'}
                       </h3>
                       {stock?.warehouse && (
                         <p className="text-xs text-gray-400 mt-1">{stock.warehouse.name}</p>
                       )}
-                      <p className="text-sm font-medium text-gray-700 mt-2">
+                      <p className={`text-sm font-medium mt-2 ${
+                        (stock?.quantity || 0) <= 3 && (stock?.quantity || 0) > 0
+                          ? 'text-red-600'
+                          : 'text-gray-700'
+                      }`}>
                         Общая сумма: {totalSum.toLocaleString('ru-RU')} ₽
                       </p>
-                      <p className="text-sm text-gray-600 mt-1">
+                      <p className={`text-sm mt-1 ${
+                        (stock?.quantity || 0) <= 3 && (stock?.quantity || 0) > 0
+                          ? 'text-red-600'
+                          : 'text-gray-600'
+                      }`}>
                         Цена за шт: {price.toLocaleString('ru-RU')} ₽
                       </p>
                       {userRole !== 'worker' && isClickable && (
