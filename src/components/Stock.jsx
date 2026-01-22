@@ -241,7 +241,7 @@ export default function Stock() {
       <div className="px-4 py-4 space-y-3">
         {userRole === 'worker' ? (
           // Для Worker - отдельный layout
-          <div className="grid grid-cols-3 gap-3">
+          <div className="grid grid-cols-2 gap-3">
             {/* Левая сторона - маленькие карточки */}
             <div className="space-y-3 pl-4">
               <div className="text-center">
@@ -254,8 +254,8 @@ export default function Stock() {
               </div>
             </div>
             
-            {/* Центр - сумма продажи */}
-            <div className="flex items-center justify-center h-full">
+            {/* Правая сторона - сумма продажи */}
+            <div className="space-y-3 pr-16">
               <div className="text-center">
                 <p className="text-2xl font-semibold text-green-600">{totalSaleValue.toLocaleString('ru-RU')}</p>
                 <p className="text-xs text-gray-500">Сумма продажи</p>
