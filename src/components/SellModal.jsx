@@ -1,10 +1,24 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 
 export default function SellModal({ isOpen, onClose, stock, onSell }) {
-  const [quantity, setQuantity] = useState('');
+  const [quantity, setQuantity] = useState('1');
   const [reason, setReason] = useState('продано');
   const [comment, setComment] = useState('');
   const [loading, setLoading] = useState(false);
+
+  // Блокируем скролл при открытии модального окна
+  useEffect(() => {
+    if (isOpen) {
+      document.body.style.overflow = 'hidden';
+    } else {
+      document.body.style.overflow = 'unset';
+    }
+    
+    // Возвращаем скролл при размонтировании
+    return () => {
+      document.body.style.overflow = 'unset';
+    };
+  }, [isOpen]);
 
   if (!isOpen || !stock) return null;
 

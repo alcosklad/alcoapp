@@ -1,9 +1,23 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { X, Package, DollarSign } from 'lucide-react';
 
 export default function SellModal({ isOpen, onClose, product, onSell }) {
   const [quantity, setQuantity] = useState(1);
   const [loading, setLoading] = useState(false);
+
+  // Блокируем скролл при открытии модального окна
+  useEffect(() => {
+    if (isOpen) {
+      document.body.style.overflow = 'hidden';
+    } else {
+      document.body.style.overflow = 'unset';
+    }
+    
+    // Возвращаем скролл при размонтировании
+    return () => {
+      document.body.style.overflow = 'unset';
+    };
+  }, [isOpen]);
 
   if (!isOpen || !product) return null;
 
@@ -59,7 +73,6 @@ export default function SellModal({ isOpen, onClose, product, onSell }) {
             <Package className="text-blue-600 mt-1" size={24} />
             <div className="flex-1">
               <h3 className="font-medium text-gray-900">{product.name}</h3>
-              <p className="text-sm text-gray-500">Артикул: {product.article}</p>
               <p className="text-sm text-gray-500">Доступно: {maxQuantity} шт</p>
             </div>
           </div>
