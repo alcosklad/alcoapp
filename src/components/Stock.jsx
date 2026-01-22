@@ -201,16 +201,18 @@ export default function Stock() {
 
   return (
     <div className="min-h-screen bg-gray-50 pb-20">
-      {/* Кнопка корзина в правом верхнем углу */}
-      <button
-        onClick={() => setIsCrossModalOpen(true)}
-        className="fixed top-4 right-4 z-40 p-3 bg-green-600 text-white rounded-lg shadow-lg hover:bg-green-700 transition-all duration-200"
-      >
-        <ShoppingBasket size={24} />
-      </button>
+      {/* Кнопка корзина в правом верхнем углу - только для admin и worker */}
+      {(userRole === 'admin' || userRole === 'worker') && (
+        <button
+          onClick={() => setIsCrossModalOpen(true)}
+          className="fixed top-4 right-4 z-40 p-3 bg-green-600 text-white rounded-lg shadow-lg hover:bg-green-700 transition-all duration-200"
+        >
+          <ShoppingBasket size={24} />
+        </button>
+      )}
 
-      {/* Модальное окно для крестика */}
-      {isCrossModalOpen && (
+      {/* Модальное окно для крестика - только для admin и worker */}
+      {isCrossModalOpen && (userRole === 'admin' || userRole === 'worker') && (
         <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center">
           <div className="bg-white rounded-xl p-6 m-4 max-w-md w-full">
             <div className="flex items-center justify-between mb-4">
