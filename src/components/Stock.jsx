@@ -255,7 +255,7 @@ export default function Stock() {
             </div>
             
             {/* Правая сторона - сумма продажи */}
-            <div className="space-y-3 pr-16">
+            <div className="space-y-3 pr-16 pt-8">
               <div className="text-center">
                 <p className="text-2xl font-semibold text-green-600">{totalSaleValue.toLocaleString('ru-RU')}</p>
                 <p className="text-xs text-gray-500">Сумма продажи</p>
