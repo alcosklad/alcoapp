@@ -146,9 +146,11 @@ export default function Stock() {
   const filteredStocks = stocks.filter(stock => {
     if (!searchQuery) return true;
     const searchLower = searchQuery.toLowerCase();
+    const productName = stock?.expand?.product?.name || stock?.product?.name || '';
+    const productArticle = stock?.expand?.product?.article || stock?.product?.article || '';
     return (
-      stock?.product?.name?.toLowerCase().includes(searchLower) ||
-      stock?.product?.article?.toLowerCase().includes(searchLower)
+      productName.toLowerCase().includes(searchLower) ||
+      productArticle.toLowerCase().includes(searchLower)
     );
   });
 
@@ -331,14 +333,14 @@ export default function Stock() {
                       <h3 className="font-semibold text-gray-900">
                         {stock?.product?.name || stock?.expand?.product?.name || 'Товар'}
                       </h3>
-                      {(stock?.product?.article || stock?.expand?.product?.article) && (
-                        <p className="text-sm text-gray-500 mt-1">Арт. {stock.product?.article || stock.expand?.product?.article}</p>
-                      )}
                       {stock?.warehouse && (
                         <p className="text-xs text-gray-400 mt-1">{stock.warehouse.name}</p>
                       )}
                       <p className="text-sm font-medium text-gray-700 mt-2">
                         Общая сумма: {totalSum.toLocaleString('ru-RU')} ₽
+                      </p>
+                      <p className="text-sm text-gray-600 mt-1">
+                        Цена за шт: {price.toLocaleString('ru-RU')} ₽
                       </p>
                       {userRole !== 'worker' && isClickable && (
                         <p className="text-xs text-blue-500 mt-2">
