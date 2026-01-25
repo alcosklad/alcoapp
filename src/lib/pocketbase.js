@@ -2,7 +2,20 @@ import PocketBase from 'pocketbase';
 
 // Определяем URL в зависимости от окружения
 const isLocalhost = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
-const pbUrl = isLocalhost ? 'http://localhost:8090' : 'http://146.103.121.96:8090';
+const isLocalNetwork = window.location.hostname.startsWith('192.168.') || 
+                       window.location.hostname.startsWith('10.') ||
+                       window.location.hostname.startsWith('172.');
+
+let pbUrl;
+if (isLocalhost) {
+  pbUrl = 'http://localhost:8090';
+} else if (isLocalNetwork) {
+  // Для локальной сети используем IP компьютера
+  pbUrl = 'http://192.168.1.4:8090';
+} else {
+  // Для продакшена
+  pbUrl = 'http://146.103.121.96:8090';
+}
 
 const pb = new PocketBase(pbUrl);
 
