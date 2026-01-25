@@ -437,7 +437,7 @@ export const createOrder = async (orderData) => {
       discount_type: orderData.discountType,
       discount_value: orderData.discountValue || '',
       total: orderData.total,
-      payment_method: orderData.paymentMethod, // Отправляем как строку
+      payment_method: "0", // Поле select принимает только "0"
       local_time: orderData.localTime,
       created_date: new Date().toISOString()
     };
