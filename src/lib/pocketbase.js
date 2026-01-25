@@ -428,13 +428,6 @@ export const createOrder = async (orderData) => {
   try {
     console.log('PocketBase: Создаем заказ:', orderData);
     
-    // Преобразуем способ оплаты в число
-    const paymentMethodMap = {
-      'cash': 0,
-      'transfer': 1,
-      'prepaid': 2
-    };
-    
     // Формируем данные для сохранения
     const data = {
       user: pb.authStore.model?.id,
@@ -444,7 +437,7 @@ export const createOrder = async (orderData) => {
       discount_type: orderData.discountType,
       discount_value: orderData.discountValue || '',
       total: orderData.total,
-      payment_method: paymentMethodMap[orderData.paymentMethod] || 0,
+      payment_method: orderData.paymentMethod, // Отправляем как строку
       local_time: orderData.localTime,
       created_date: new Date().toISOString()
     };
