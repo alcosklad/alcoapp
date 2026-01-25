@@ -439,7 +439,7 @@ export const createOrder = async (orderData) => {
       total: orderData.total,
       payment_method: orderData.paymentMethod,
       local_time: orderData.localTime,
-      created: new Date().toISOString()
+      created_date: new Date().toISOString()
     };
     
     const result = await pb.collection('orders').create(data);
