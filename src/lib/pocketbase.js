@@ -433,20 +433,23 @@ export const createOrder = async (orderData) => {
       user: pb.authStore.model?.id,
       items: orderData.items,
       subtotal: orderData.subtotal,
-      discount: orderData.discount,
+      discount: orderData.discount || 0,
       discount_type: orderData.discountType,
-      discount_value: orderData.discountValue,
+      discount_value: orderData.discountValue || '',
       total: orderData.total,
       payment_method: orderData.paymentMethod,
       local_time: orderData.localTime,
       created_date: new Date().toISOString()
     };
     
+    console.log('PocketBase: Данные для отправки:', JSON.stringify(data, null, 2));
+    
     const result = await pb.collection('orders').create(data);
     console.log('PocketBase: Заказ успешно создан:', result);
     return result;
   } catch (error) {
     console.error('PocketBase: Error creating order:', error);
+    console.error('PocketBase: Error details:', error.data);
     throw error;
   }
 };
