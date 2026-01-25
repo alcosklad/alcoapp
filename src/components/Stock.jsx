@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from 'react';
-import { getSuppliers, getStocksWithDetails, updateStock, createSale } from '../lib/pocketbase';
+import { getSuppliers, getStocksWithDetails, updateStock, createSale, createOrder } from '../lib/pocketbase';
 import pb from '../lib/pocketbase';
-import { Minus, DollarSign, ShoppingBasket } from 'lucide-react';
+import { Minus, DollarSign, ShoppingBasket, ShoppingCart } from 'lucide-react';
 import SellModal2 from './SellModal2';
+import CartModal from './CartModal';
 
 export default function Stock() {
   const [stocks, setStocks] = useState([]);
@@ -14,6 +15,8 @@ export default function Stock() {
   const [selectedStock, setSelectedStock] = useState(null);
   const [isSellModalOpen, setIsSellModalOpen] = useState(false);
   const [isCrossModalOpen, setIsCrossModalOpen] = useState(false);
+  const [isCartOpen, setIsCartOpen] = useState(false);
+  const [cartMode, setCartMode] = useState(false); // false - корзина, true - составить
   
   // Получаем роль и город пользователя
   const userRole = pb.authStore.model?.role;
@@ -142,6 +145,27 @@ export default function Stock() {
     }
   };
 
+  // Обработчик завершения заказа из корзины
+  const handleCompleteOrder = async (orderData) => {
+    try {
+      // Создаем заказ в базе данных
+      await createOrder(orderData);
+      
+      // Обновляем остатки на складе
+      for (const item of orderData.items) {
+        await updateStock(item.id, null, -item.quantity);
+      }
+      
+      alert(`Заказ успешно оформлен на сумму ${orderData.total.toLocaleString('ru-RU')} ₽!`);
+      
+      // Перезагружаем остатки
+      loadStocks();
+    } catch (error) {
+      console.error('❌ Ошибка оформления заказа:', error);
+      alert('Ошибка при оформлении заказа: ' + error.message);
+    }
+  };
+
   const filteredStocks = stocks.filter(stock => {
     if (!searchQuery) return true;
     const searchLower = searchQuery.toLowerCase();
@@ -205,12 +229,20 @@ export default function Stock() {
       {/* Кнопка корзина в правом верхнем углу - только для admin и worker */}
       {(userRole === 'admin' || userRole === 'worker') && (
         <button
-          onClick={() => setIsCrossModalOpen(true)}
+          onClick={() => setIsCartOpen(true)}
           className="fixed top-4 right-4 z-40 p-3 bg-green-600 text-white rounded-lg shadow-lg hover:bg-green-700 transition-all duration-200"
         >
-          <ShoppingBasket size={24} />
+          {cartMode ? <ShoppingCart size={24} /> : <ShoppingBasket size={24} />}
         </button>
       )}
+
+      {/* Модальное окно для корзины */}
+      <CartModal
+        isOpen={isCartOpen}
+        onClose={() => setIsCartOpen(false)}
+        stocks={filteredStocks}
+        onCompleteOrder={handleCompleteOrder}
+      />
 
       {/* Модальное окно для крестика - только для admin и worker */}
       {isCrossModalOpen && (userRole === 'admin' || userRole === 'worker') && (

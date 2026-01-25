@@ -423,6 +423,34 @@ export const deleteReception = async (id) => {
   }
 };
 
+// Создание заказа
+export const createOrder = async (orderData) => {
+  try {
+    console.log('PocketBase: Создаем заказ:', orderData);
+    
+    // Формируем данные для сохранения
+    const data = {
+      user: pb.authStore.model?.id,
+      items: orderData.items,
+      subtotal: orderData.subtotal,
+      discount: orderData.discount,
+      discount_type: orderData.discountType,
+      discount_value: orderData.discountValue,
+      total: orderData.total,
+      payment_method: orderData.paymentMethod,
+      local_time: orderData.localTime,
+      created: new Date().toISOString()
+    };
+    
+    const result = await pb.collection('orders').create(data);
+    console.log('PocketBase: Заказ успешно создан:', result);
+    return result;
+  } catch (error) {
+    console.error('PocketBase: Error creating order:', error);
+    throw error;
+  }
+};
+
 // Создание продажи
 export const createSale = async (saleData) => {
   try {
