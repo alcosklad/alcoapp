@@ -153,7 +153,11 @@ export default function Stock() {
       
       // Обновляем остатки на складе
       for (const item of orderData.items) {
-        await updateStock(item.id, null, -item.quantity);
+        // Ищем склад для товара
+        const stock = filteredStocks.find(s => s.id === item.id);
+        if (stock) {
+          await updateStock(item.id, stock.warehouse, -item.quantity, stock.supplier || stock.expand?.supplier?.id);
+        }
       }
       
       alert(`Заказ успешно оформлен на сумму ${orderData.total.toLocaleString('ru-RU')} ₽!`);
