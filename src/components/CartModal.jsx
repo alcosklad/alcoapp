@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { X, Plus, Minus, Percent, DollarSign, ShoppingCart, Check } from 'lucide-react';
 
 export default function CartModal({ isOpen, onClose, stocks, onCompleteOrder }) {
