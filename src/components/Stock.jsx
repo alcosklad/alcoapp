@@ -377,14 +377,10 @@ export default function Stock() {
                 
                 const totalSum = (stock?.quantity || 0) * (stock?.expand?.product?.price || 0);
                 const price = stock?.expand?.product?.price || 0;
-                const isClickable = (stock?.quantity || 0) > 0;
                 return (
                 <div 
                   key={stock?.id || Math.random()} 
-                  className={`p-4 transition-colors ${
-                    isClickable ? 'hover:bg-gray-50 cursor-pointer' : ''
-                  }`}
-                  onClick={() => isClickable && handleCardClick(stock)}
+                  className="p-4 transition-colors"
                 >
                   <div className="flex justify-between items-start">
                     <div className="flex-1">
@@ -400,11 +396,6 @@ export default function Stock() {
                       <p className="text-sm text-gray-600 mt-1">
                         Цена за шт: {price.toLocaleString('ru-RU')} ₽
                       </p>
-                      {isClickable && userRole !== 'worker' && (
-                        <p className="text-xs text-blue-500 mt-2">
-                          🔵 Нажмите для продажи
-                        </p>
-                      )}
                     </div>
                     <div className="text-right">
                       <p className={`text-lg font-bold px-3 py-1 rounded-lg ${
@@ -419,23 +410,10 @@ export default function Stock() {
                       {(stock?.quantity || 0) < 2 && (
                         <p className="text-xs text-red-500 mt-1">Заканчивается!</p>
                       )}
-                      {!isClickable && (
+                      {(stock?.quantity || 0) === 0 && (
                         <p className="text-xs text-gray-400 mt-2">
                           Нет в наличии
                         </p>
-                      )}
-                      {/* Кнопка продажи для worker */}
-                      {userRole === 'worker' && isClickable && (
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleSellClick(stock);
-                          }}
-                          className="mt-2 bg-green-600 hover:bg-green-700 text-white px-3 py-1 rounded-lg text-sm font-medium transition-colors flex items-center gap-1"
-                        >
-                          <DollarSign size={16} />
-                          Продать
-                        </button>
                       )}
                     </div>
                   </div>
