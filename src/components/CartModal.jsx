@@ -210,7 +210,7 @@ export default function CartModal({ isOpen, onClose, stocks, onCompleteOrder }) 
               </div>
 
               {/* Скидка */}
-              <div className="bg-yellow-50 rounded-lg p-3">
+              <div className="rounded-lg p-3">
                 <p className="font-medium mb-2">Скидка</p>
                 <div className="flex gap-2">
                   <input
@@ -239,7 +239,7 @@ export default function CartModal({ isOpen, onClose, stocks, onCompleteOrder }) 
               </div>
 
               {/* Способ оплаты */}
-              <div className="bg-green-50 rounded-lg p-3">
+              <div className="rounded-lg p-3">
                 <p className="font-medium mb-2">Способ оплаты</p>
                 <div className="grid grid-cols-3 gap-2">
                   <button
