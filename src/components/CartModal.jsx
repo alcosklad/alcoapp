@@ -104,6 +104,20 @@ export default function CartModal({ isOpen, onClose, stocks, onCompleteOrder }) 
     setDiscountValue('');
   };
 
+  // Блокируем скролл body при открытии модального окна
+  useEffect(() => {
+    if (isOpen) {
+      document.body.style.overflow = 'hidden';
+    } else {
+      document.body.style.overflow = 'unset';
+    }
+    
+    // Возвращаем скролл при размонтировании
+    return () => {
+      document.body.style.overflow = 'unset';
+    };
+  }, [isOpen]);
+
   if (!isOpen) return null;
 
   return (
