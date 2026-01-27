@@ -433,7 +433,7 @@ export const getOrders = async () => {
     // Получаем заказы текущего пользователя
     const orders = await pb.collection('orders').getFullList({
       filter: `user = "${pb.authStore.model?.id}"`,
-      sort: '-created_date',
+      sort: '-local_time',
       expand: 'user'
     });
     return orders;

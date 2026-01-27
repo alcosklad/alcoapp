@@ -36,8 +36,28 @@ export default function SalesHistory({ isOpen, onClose }) {
       console.log('📊 Первый заказ для примера:', data[0]);
       console.log('📊 Поля первого заказа:', Object.keys(data[0] || {}));
       console.log('📊 Items первого заказа:', data[0]?.items);
-      // Сортируем по дате (новые первые)
-      const sorted = data.sort((a, b) => new Date(b.created_date) - new Date(a.created_date));
+      // Сортируем по local_time (новые первые)
+      const sorted = data.sort((a, b) => {
+        // Если есть local_time, используем его
+        if (a.local_time && b.local_time) {
+          // Преобразуем local_time в формат для сравнения
+          const dateA = new Date(a.local_time.replace(/(\d+)\s+(\w+)\s+(\d+),\s+(\d+):(\d+)/, 
+            (match, day, month, year, hours, minutes) => {
+              const months = {'января': '01', 'февраля': '02', 'марта': '03', 'апреля': '04', 'мая': '05', 'июня': '06',
+                             'июля': '07', 'августа': '08', 'сентября': '09', 'октября': '10', 'ноября': '11', 'декабря': '12'};
+              return `${year}-${months[month]}-${day.padStart(2, '0')}T${hours.padStart(2, '0')}:${minutes.padStart(2, '0')}:00`;
+            }));
+          const dateB = new Date(b.local_time.replace(/(\d+)\s+(\w+)\s+(\d+),\s+(\d+):(\d+)/, 
+            (match, day, month, year, hours, minutes) => {
+              const months = {'января': '01', 'февраля': '02', 'марта': '03', 'апреля': '04', 'мая': '05', 'июня': '06',
+                             'июля': '07', 'августа': '08', 'сентября': '09', 'октября': '10', 'ноября': '11', 'декабря': '12'};
+              return `${year}-${months[month]}-${day.padStart(2, '0')}T${hours.padStart(2, '0')}:${minutes.padStart(2, '0')}:00`;
+            }));
+          return dateB - dateA;
+        }
+        // Иначе используем created_date
+        return new Date(b.created_date) - new Date(a.created_date);
+      });
       console.log('📊 Отсортированные заказы:', sorted);
       setOrders(sorted);
     } catch (error) {
@@ -56,6 +76,18 @@ export default function SalesHistory({ isOpen, onClose }) {
     // Фильтр по дате
     if (dateFilter) {
       filtered = filtered.filter(order => {
+        // Используем local_time для фильтрации
+        if (order.local_time) {
+          const parts = order.local_time.split(', ');
+          const orderDate = parts[0] || '';
+          const filterDate = new Date(dateFilter).toLocaleDateString('ru-RU', { 
+            day: 'numeric', 
+            month: 'long', 
+            year: 'numeric' 
+          });
+          return orderDate === filterDate;
+        }
+        // Иначе используем created_date
         const orderDate = new Date(order.created_date).toLocaleDateString('ru-RU');
         return orderDate === new Date(dateFilter).toLocaleDateString('ru-RU');
       });
