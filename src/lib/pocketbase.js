@@ -186,11 +186,8 @@ export const updateStock = async (productId, warehouseId, quantity, supplierId =
   try {
     console.log(`🔍 Ищем остаток для товара ${productId} на складе ${warehouseId}`);
     
-    // Ищем существующую запись остатка
+    // Ищем существующую запись остатка (без supplier в фильтре)
     let filterQuery = `product = "${productId}" && warehouse = "${warehouseId}"`;
-    if (supplierId) {
-      filterQuery += ` && supplier = "${supplierId}"`;
-    }
     
     console.log(`📋 Фильтр поиска: ${filterQuery}`);
     
