@@ -430,7 +430,9 @@ export const deleteReception = async (id) => {
 // Получение всех заказов
 export const getOrders = async () => {
   try {
+    // Получаем заказы текущего пользователя
     const orders = await pb.collection('orders').getFullList({
+      filter: `user = "${pb.authStore.model?.id}"`,
       sort: '-created_date',
       expand: 'user'
     });
