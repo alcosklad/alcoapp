@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { X, Menu, Clock, History } from 'lucide-react';
+import { X, Menu, Clock, History, Package } from 'lucide-react';
 import pb from '../lib/pocketbase';
 
 export default function WorkerSidebar({ activeTab, onTabChange }) {
@@ -8,6 +8,12 @@ export default function WorkerSidebar({ activeTab, onTabChange }) {
   const user = pb.authStore.model;
   
   const menuItems = [
+    {
+      id: 'stock',
+      label: 'Остатки',
+      icon: Package,
+      description: 'Товары на складе'
+    },
     {
       id: 'shift',
       label: 'Смена',
@@ -32,7 +38,7 @@ export default function WorkerSidebar({ activeTab, onTabChange }) {
       {/* Кнопка бургер */}
       <button
         onClick={() => setIsOpen(!isOpen)}
-        className="fixed top-4 left-4 z-50 p-3 bg-blue-600 text-white rounded-lg shadow-lg hover:bg-blue-700 transition-all duration-200"
+        className="fixed top-2 left-4 z-50 p-3 bg-blue-600 text-white rounded-lg shadow-lg hover:bg-blue-700 transition-all duration-200"
       >
         {isOpen ? <X size={24} /> : <Menu size={24} />}
       </button>

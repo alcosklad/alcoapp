@@ -448,16 +448,29 @@ export const createOrder = async (orderData) => {
   try {
     console.log('PocketBase: Создаем заказ:', orderData);
     
+    // Конвертируем paymentMethod в правильное значение
+    let paymentMethodValue = "0"; // по умолчанию наличные
+    if (orderData.paymentMethod === 'transfer') {
+      paymentMethodValue = "1";
+    } else if (orderData.paymentMethod === 'prepaid') {
+      paymentMethodValue = "2";
+    }
+    
+    // Для скидки: если тип percentage, сохраняем значение процента, иначе сумму в рублях
+    const discountValue = orderData.discountType === 'percentage' 
+      ? parseFloat(orderData.discountValue) || 0  // сохраняем процент
+      : orderData.discount; // сохраняем сумму в рублях
+    
     // Формируем данные для сохранения
     const data = {
       user: pb.authStore.model?.id,
       items: orderData.items,
       subtotal: orderData.subtotal,
-      discount: orderData.discount || 0,
+      discount: discountValue,
       discount_type: orderData.discountType,
       discount_value: orderData.discountValue || '',
       total: orderData.total,
-      payment_method: "0", // Поле select принимает только "0"
+      payment_method: paymentMethodValue,
       local_time: orderData.localTime,
       created_date: new Date().toISOString()
     };

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { History, Calendar, DollarSign, Package, Search, Percent, Clock } from 'lucide-react';
+import { History, Calendar, DollarSign, Package, Search, Percent, Clock, Wallet, Smartphone, FileText, Check } from 'lucide-react';
 import { getOrders } from '../lib/pocketbase';
 
 export default function WorkerHistory() {
@@ -71,11 +71,16 @@ export default function WorkerHistory() {
   const totalRevenue = filteredOrders.reduce((sum, order) => sum + (order.total || 0), 0);
   const totalOrders = filteredOrders.length;
 
-  // Способы оплаты
+  // Способы оплаты с иконками
   const paymentMethods = {
-    '0': { name: 'Наличные', icon: '💵' },
-    '1': { name: 'Перевод', icon: '💳' },
-    '2': { name: 'Предоплата', icon: '📋' }
+    '0': { name: 'Наличные', icon: Wallet },
+    '1': { name: 'Перевод', icon: () => (
+      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-blue-600">
+        <rect width="14" height="20" x="5" y="2" rx="2" ry="2" />
+        <path d="m9 10 2 2 4-4" stroke="currentColor" strokeWidth="2" className="text-blue-400" />
+      </svg>
+    )},
+    '2': { name: 'Предоплата', icon: FileText }
   };
 
   // Получаем тип скидки
@@ -102,8 +107,6 @@ export default function WorkerHistory() {
       {/* Header */}
       <div className="bg-white shadow-sm border-b">
         <div className="px-4 py-4">
-          <h1 className="text-2xl font-bold text-gray-900">История продаж</h1>
-          <p className="text-gray-600 mt-1">Все ваши заказы</p>
         </div>
       </div>
 
@@ -176,6 +179,13 @@ export default function WorkerHistory() {
         ) : (
           <div className="space-y-3">
             {filteredOrders.map((order) => {
+              console.log('Order data:', {
+                discount: order.discount,
+                discount_type: order.discount_type,
+                subtotal: order.subtotal,
+                total: order.total
+              });
+              
               const dateTime = order.local_time ? {
                 date: order.local_time.split(', ')[0] || '',
                 time: order.local_time.split(', ')[1] || ''
@@ -191,7 +201,8 @@ export default function WorkerHistory() {
                 })
               };
               
-              const payment = paymentMethods[order.payment_method] || { name: 'Неизвестно', icon: '❓' };
+              const payment = paymentMethods[order.payment_method] || { name: 'Неизвестно', icon: Wallet };
+              const PaymentIcon = typeof payment.icon === 'function' ? payment.icon : () => <payment.icon size={24} className="text-blue-600" />;
               const discountType = getDiscountType(order.discount_type);
               
               return (
@@ -203,9 +214,8 @@ export default function WorkerHistory() {
                       <span className="font-medium">{dateTime.date}</span>
                       <span className="ml-2 text-sm">{dateTime.time}</span>
                     </div>
-                    <div className="flex items-center gap-2">
-                      <span className="text-2xl">{payment.icon}</span>
-                      <span className="text-sm font-medium text-gray-700">{payment.name}</span>
+                    <div className="flex items-center">
+                      <PaymentIcon />
                     </div>
                   </div>
 
@@ -227,17 +237,18 @@ export default function WorkerHistory() {
                   <div className="border-t pt-3 flex justify-between items-center">
                     <div>
                       {order.discount > 0 && (
-                        <div className="flex items-center text-sm text-green-600">
-                          <Percent size={14} className="mr-1" />
-                          <span>
-                            Скидка: {discountType === 'percentage' ? `${order.discount}%` : `${order.discount} ₽`}
-                          </span>
+                        <div className="text-sm text-green-600">
+                          {discountType === 'percentage' ? (
+                            <span>Скидка {order.discount}%</span>
+                          ) : (
+                            <span>Скидка {order.discount} ₽</span>
+                          )}
                         </div>
                       )}
                     </div>
                     <div className="text-right">
                       <div className="text-lg font-bold text-gray-800">
-                        {order.total.toLocaleString('ru-RU')} ₽
+                        {parseFloat(order.total).toLocaleString('ru-RU')} ₽
                       </div>
                     </div>
                   </div>

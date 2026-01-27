@@ -72,13 +72,11 @@ export default function WorkerShift() {
       {/* Header */}
       <div className="bg-white shadow-sm border-b">
         <div className="px-4 py-4">
-          <h1 className="text-2xl font-bold text-gray-900">Смена</h1>
-          <p className="text-gray-600 mt-1">Управление рабочей сменой</p>
         </div>
       </div>
 
       {/* Status Card */}
-      <div className="p-4">
+      <div className="p-4 pt-8">
         <div className={`rounded-xl p-6 ${
           shiftActive 
             ? 'bg-green-50 border-2 border-green-200' 
