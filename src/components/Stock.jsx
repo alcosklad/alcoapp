@@ -148,7 +148,7 @@ export default function Stock() {
   // Обработчик завершения заказа из корзины
   const handleCompleteOrder = async (orderData) => {
     try {
-      // Создаем заказ в базе данных
+      // Сначала создаем заказ в базе данных
       await createOrder(orderData);
       
       // Обновляем остатки на складе
@@ -157,10 +157,8 @@ export default function Stock() {
         const stock = filteredStocks.find(s => s.id === item.id);
         if (stock) {
           // Получаем правильные ID
-          const warehouseId = stock.warehouse?.id || stock.warehouse;
+          const warehouseId = stock.warehouse?.id || stock.warehouse || stock.expand?.warehouse?.id;
           const supplierId = stock.supplier?.id || stock.supplier || stock.expand?.supplier?.id;
-          
-          alert(`Данные для обновления:\nТовар: ${item.name}\nID товара: ${item.id}\nСклад: ${warehouseId}\nПоставщик: ${supplierId}\nКол-во: -${item.quantity}\nТекущий остаток: ${stock.quantity}`);
           
           console.log('🔄 Обновляем остаток:', {
             itemId: item.id,
@@ -168,7 +166,8 @@ export default function Stock() {
             warehouseId,
             supplierId,
             quantity: -item.quantity,
-            currentStock: stock.quantity
+            currentStock: stock.quantity,
+            stockObject: stock
           });
           
           await updateStock(item.id, warehouseId, -item.quantity, supplierId);
