@@ -184,17 +184,23 @@ export const createReception = async (data) => {
 // Функция для обновления остатков
 export const updateStock = async (productId, warehouseId, quantity, supplierId = null) => {
   try {
+    console.log(`🔍 Ищем остаток для товара ${productId} на складе ${warehouseId}`);
+    
     // Ищем существующую запись остатка
     let filterQuery = `product = "${productId}" && warehouse = "${warehouseId}"`;
     if (supplierId) {
       filterQuery += ` && supplier = "${supplierId}"`;
     }
     
+    console.log(`📋 Фильтр поиска: ${filterQuery}`);
+    
     const existingStock = await pb.collection('stocks').getFirstListItem(
       filterQuery
     ).catch(() => null);
     
     if (existingStock) {
+      console.log(`✅ Найден остаток: ID=${existingStock.id}, количество=${existingStock.quantity}`);
+      
       // Проверяем что не уходим в минус при продаже
       const newQuantity = existingStock.quantity + quantity;
       if (newQuantity < 0) {
@@ -217,6 +223,7 @@ export const updateStock = async (productId, warehouseId, quantity, supplierId =
         console.log(`PocketBase: Остаток обновлен: ${productId} на складе ${warehouseId}, новое количество: ${updatedStock.quantity}`);
       }
     } else {
+      console.log(`❌ Остаток не найден! Пробуем создать новый...`);
       // Создаем новую запись остатка (только для положительного количества)
       if (quantity <= 0) {
         throw new Error('Нельзя создать остаток с отрицательным количеством');
