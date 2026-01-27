@@ -22,6 +22,7 @@ export default function CartModal({ isOpen, onClose, stocks, onCompleteOrder }) 
       // Добавляем новый товар
       setCartItems([...cartItems, {
         id: stock.id,
+        productId: stock.product, // Сохраняем ID товара
         name: stock.expand?.product?.name || 'Товар',
         price: stock.expand?.product?.price || 0,
         quantity: 1,

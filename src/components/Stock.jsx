@@ -162,15 +162,16 @@ export default function Stock() {
           
           console.log('🔄 Обновляем остаток:', {
             itemId: item.id,
+            productId: item.productId, // Используем productId
             itemName: item.name,
             warehouseId,
             supplierId,
             quantity: -item.quantity,
-            currentStock: stock.quantity,
-            stockObject: stock
+            currentStock: stock.quantity
           });
           
-          await updateStock(item.id, warehouseId, -item.quantity, supplierId);
+          // Передаем productId вместо item.id
+          await updateStock(item.productId, warehouseId, -item.quantity, supplierId);
         }
       }
       
