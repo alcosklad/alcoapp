@@ -34,6 +34,7 @@ export default function SalesHistory({ isOpen, onClose }) {
       const data = await getOrders();
       console.log('✅ Получены заказы:', data);
       console.log('📊 Первый заказ для примера:', data[0]);
+      console.log('📊 Поля первого заказа:', Object.keys(data[0] || {}));
       // Сортируем по дате (новые первые)
       const sorted = data.sort((a, b) => new Date(b.created_date) - new Date(a.created_date));
       console.log('📊 Отсортированные заказы:', sorted);
@@ -178,6 +179,7 @@ export default function SalesHistory({ isOpen, onClose }) {
           ) : (
             <div className="space-y-4">
               {filteredOrders.map((order) => {
+                console.log('🎨 Рендеринг заказа:', order);
                 const dateTime = formatDateTime(order.created_date);
                 const payment = paymentMethods[order.payment_method] || { name: 'Неизвестно', icon: '❓' };
                 
@@ -198,7 +200,7 @@ export default function SalesHistory({ isOpen, onClose }) {
 
                     {/* Товары */}
                     <div className="mb-3">
-                      {order.items.map((item, index) => (
+                      {order.items && order.items.map((item, index) => (
                         <div key={index} className="flex justify-between items-center py-1">
                           <span className="text-gray-800">
                             {item.name} <span className="text-gray-500">×{item.quantity}</span>
