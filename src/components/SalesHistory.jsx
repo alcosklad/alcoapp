@@ -30,12 +30,16 @@ export default function SalesHistory({ isOpen, onClose }) {
   const loadOrders = async () => {
     try {
       setLoading(true);
+      console.log('🔄 Начинаю загрузку заказов...');
       const data = await getOrders();
+      console.log('✅ Получены заказы:', data);
       // Сортируем по дате (новые первые)
       const sorted = data.sort((a, b) => new Date(b.created_date) - new Date(a.created_date));
       setOrders(sorted);
     } catch (error) {
-      console.error('Ошибка загрузки заказов:', error);
+      console.error('❌ Ошибка загрузки заказов:', error);
+      // Показываем ошибку пользователю
+      alert('Ошибка при загрузке истории: ' + error.message);
     } finally {
       setLoading(false);
     }
