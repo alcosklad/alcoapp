@@ -156,7 +156,20 @@ export default function Stock() {
         // Ищем склад для товара
         const stock = filteredStocks.find(s => s.id === item.id);
         if (stock) {
-          await updateStock(item.id, stock.warehouse, -item.quantity, stock.supplier || stock.expand?.supplier?.id);
+          // Получаем правильные ID
+          const warehouseId = stock.warehouse?.id || stock.warehouse;
+          const supplierId = stock.supplier?.id || stock.supplier || stock.expand?.supplier?.id;
+          
+          console.log('🔄 Обновляем остаток:', {
+            itemId: item.id,
+            itemName: item.name,
+            warehouseId,
+            supplierId,
+            quantity: -item.quantity,
+            currentStock: stock.quantity
+          });
+          
+          await updateStock(item.id, warehouseId, -item.quantity, supplierId);
         }
       }
       
