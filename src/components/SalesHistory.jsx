@@ -93,6 +93,28 @@ export default function SalesHistory({ isOpen, onClose }) {
     };
   };
 
+  // Получаем тип скидки (discount_type может быть массивом)
+  const getDiscountType = (discountType) => {
+    if (Array.isArray(discountType)) {
+      return discountType[0] || 'percentage';
+    }
+    return discountType || 'percentage';
+  };
+
+  // Форматируем local_time из заказа
+  const getOrderDateTime = (order) => {
+    // Если есть local_time, используем его
+    if (order.local_time) {
+      const parts = order.local_time.split(', ');
+      return {
+        date: parts[0] || '',
+        time: parts[1] || ''
+      };
+    }
+    // Иначе форматируем created_date
+    return formatDateTime(order.created_date);
+  };
+
   if (!isOpen) return null;
 
   return (
@@ -181,8 +203,9 @@ export default function SalesHistory({ isOpen, onClose }) {
             <div className="space-y-4">
               {filteredOrders.map((order) => {
                 console.log('🎨 Рендеринг заказа:', order);
-                const dateTime = formatDateTime(order.created_date);
+                const dateTime = getOrderDateTime(order);
                 const payment = paymentMethods[order.payment_method] || { name: 'Неизвестно', icon: '❓' };
+                const discountType = getDiscountType(order.discount_type);
                 
                 return (
                   <div key={order.id} className="bg-white border border-gray-200 rounded-lg p-4 shadow-sm hover:shadow-md transition-shadow">
@@ -220,7 +243,7 @@ export default function SalesHistory({ isOpen, onClose }) {
                           <div className="flex items-center text-sm text-green-600">
                             <Percent size={14} className="mr-1" />
                             <span>
-                              Скидка: {order.discount_type === 'percentage' ? `${order.discount}%` : `${order.discount} ₽`}
+                              Скидка: {discountType === 'percentage' ? `${order.discount}%` : `${order.discount} ₽`}
                             </span>
                           </div>
                         )}
