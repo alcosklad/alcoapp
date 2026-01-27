@@ -1,9 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { getSuppliers, getStocksWithDetails, updateStock, createSale, createOrder } from '../lib/pocketbase';
 import pb from '../lib/pocketbase';
-import { Minus, DollarSign, ShoppingBasket, ShoppingCart } from 'lucide-react';
+import { Minus, DollarSign, ShoppingBasket, ShoppingCart, Menu, X, History } from 'lucide-react';
 import SellModal2 from './SellModal2';
 import CartModal from './CartModal';
+import SalesHistory from './SalesHistory';
 
 export default function Stock() {
   const [stocks, setStocks] = useState([]);
@@ -17,6 +18,8 @@ export default function Stock() {
   const [isCrossModalOpen, setIsCrossModalOpen] = useState(false);
   const [isCartOpen, setIsCartOpen] = useState(false);
   const [cartMode, setCartMode] = useState(false); // false - корзина, true - составить
+  const [isHistoryOpen, setIsHistoryOpen] = useState(false); // Модальное окно истории
+  const [isMenuOpen, setIsMenuOpen] = useState(false); // Мобильное меню
   
   // Получаем роль и город пользователя
   const userRole = pb.authStore.model?.role;
@@ -263,6 +266,12 @@ export default function Stock() {
         onCompleteOrder={handleCompleteOrder}
       />
 
+      {/* Модальное окно истории продаж */}
+      <SalesHistory
+        isOpen={isHistoryOpen}
+        onClose={() => setIsHistoryOpen(false)}
+      />
+
       {/* Модальное окно для крестика - только для admin и worker */}
       {isCrossModalOpen && (userRole === 'admin' || userRole === 'worker') && (
         <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center">
@@ -276,7 +285,18 @@ export default function Stock() {
                 <X size={20} className="text-gray-500" />
               </button>
             </div>
-            <p className="text-gray-600">Здесь будет функционал для крестика...</p>
+            <div className="space-y-2">
+              <button
+                onClick={() => {
+                  setIsHistoryOpen(true);
+                  setIsCrossModalOpen(false);
+                }}
+                className="w-full text-left px-4 py-3 hover:bg-gray-100 rounded-lg transition-colors flex items-center gap-3"
+              >
+                <History size={20} className="text-blue-600" />
+                <span>История продаж</span>
+              </button>
+            </div>
           </div>
         </div>
       )}

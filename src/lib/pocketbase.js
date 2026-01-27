@@ -427,6 +427,20 @@ export const deleteReception = async (id) => {
   }
 };
 
+// Получение всех заказов
+export const getOrders = async () => {
+  try {
+    const orders = await pb.collection('orders').getFullList({
+      sort: '-created_date',
+      expand: 'user'
+    });
+    return orders;
+  } catch (error) {
+    console.error('PocketBase: Error loading orders:', error);
+    throw error;
+  }
+};
+
 // Создание заказа
 export const createOrder = async (orderData) => {
   try {
