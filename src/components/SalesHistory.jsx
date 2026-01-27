@@ -35,6 +35,7 @@ export default function SalesHistory({ isOpen, onClose }) {
       console.log('✅ Получены заказы:', data);
       console.log('📊 Первый заказ для примера:', data[0]);
       console.log('📊 Поля первого заказа:', Object.keys(data[0] || {}));
+      console.log('📊 Items первого заказа:', data[0]?.items);
       // Сортируем по дате (новые первые)
       const sorted = data.sort((a, b) => new Date(b.created_date) - new Date(a.created_date));
       console.log('📊 Отсортированные заказы:', sorted);
