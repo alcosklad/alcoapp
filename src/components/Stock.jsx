@@ -160,6 +160,8 @@ export default function Stock() {
           const warehouseId = stock.warehouse?.id || stock.warehouse;
           const supplierId = stock.supplier?.id || stock.supplier || stock.expand?.supplier?.id;
           
+          alert(`Данные для обновления:\nТовар: ${item.name}\nID товара: ${item.id}\nСклад: ${warehouseId}\nПоставщик: ${supplierId}\nКол-во: -${item.quantity}\nТекущий остаток: ${stock.quantity}`);
+          
           console.log('🔄 Обновляем остаток:', {
             itemId: item.id,
             itemName: item.name,
