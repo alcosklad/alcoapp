@@ -33,8 +33,10 @@ export default function SalesHistory({ isOpen, onClose }) {
       console.log('🔄 Начинаю загрузку заказов...');
       const data = await getOrders();
       console.log('✅ Получены заказы:', data);
+      console.log('📊 Первый заказ для примера:', data[0]);
       // Сортируем по дате (новые первые)
       const sorted = data.sort((a, b) => new Date(b.created_date) - new Date(a.created_date));
+      console.log('📊 Отсортированные заказы:', sorted);
       setOrders(sorted);
     } catch (error) {
       console.error('❌ Ошибка загрузки заказов:', error);
@@ -47,6 +49,7 @@ export default function SalesHistory({ isOpen, onClose }) {
 
   const filterOrders = () => {
     let filtered = [...orders];
+    console.log('🔍 Начинаю фильтрацию, всего заказов:', filtered.length);
 
     // Фильтр по дате
     if (dateFilter) {
@@ -54,13 +57,16 @@ export default function SalesHistory({ isOpen, onClose }) {
         const orderDate = new Date(order.created_date).toLocaleDateString('ru-RU');
         return orderDate === new Date(dateFilter).toLocaleDateString('ru-RU');
       });
+      console.log('📅 После фильтра по дате:', filtered.length);
     }
 
     // Фильтр по способу оплаты
     if (paymentFilter) {
       filtered = filtered.filter(order => order.payment_method === paymentFilter);
+      console.log('💳 После фильтра по оплате:', filtered.length);
     }
 
+    console.log('✅ Итоговый отфильтрованный список:', filtered);
     setFilteredOrders(filtered);
   };
 
