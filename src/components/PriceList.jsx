@@ -1,33 +1,62 @@
 import React, { useState, useEffect } from 'react';
-import { Plus, Search } from 'lucide-react';
-import { getStocks, getWarehouses, getProducts } from '../lib/pocketbase';
+import { Search, Filter, ChevronUp, ChevronDown, Edit } from 'lucide-react';
+import { getProducts, updateProduct } from '../lib/pocketbase';
 import pb from '../lib/pocketbase';
-import AddProductModal from './AddProductModal';
+import EditProductModal from './EditProductModal';
 
 export default function PriceList() {
-  const [stocks, setStocks] = useState([]);
-  const [warehouses, setWarehouses] = useState([]);
   const [products, setProducts] = useState([]);
-  const [selectedWarehouse, setSelectedWarehouse] = useState('');
+  const [filteredProducts, setFilteredProducts] = useState([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  const [isAddModalOpen, setIsAddModalOpen] = useState(false);
+  const [isFilterModalOpen, setIsFilterModalOpen] = useState(false);
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [selectedProduct, setSelectedProduct] = useState(null);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [sortField, setSortField] = useState('name');
+  const [sortDirection, setSortDirection] = useState('asc');
+  
+  // Фильтры
+  const [filters, setFilters] = useState({
+    category: '',
+    minPrice: '',
+    maxPrice: '',
+    minCost: '',
+    maxCost: '',
+    volume: ''
+  });
+  
+  const productsPerPage = 50;
   
   // Получаем роль пользователя
   const userRole = pb.authStore.model?.role;
 
   useEffect(() => {
-    loadWarehouses();
     loadProducts();
   }, []);
 
+  // Блокировка скролла при открытом модальном окне
   useEffect(() => {
-    loadStocks();
-  }, [selectedWarehouse]);
+    if (isFilterModalOpen || isEditModalOpen) {
+      document.body.style.overflow = 'hidden';
+    } else {
+      document.body.style.overflow = 'unset';
+    }
+    
+    return () => {
+      document.body.style.overflow = 'unset';
+    };
+  }, [isFilterModalOpen, isEditModalOpen]);
+
+  useEffect(() => {
+    applyFilters();
+  }, [products, searchQuery, filters, sortField, sortDirection]);
 
   const loadProducts = async () => {
     try {
+      setLoading(true);
+      setError(null);
       const data = await getProducts().catch(err => {
         console.error('Error loading products:', err);
         return [];
@@ -35,46 +64,103 @@ export default function PriceList() {
       setProducts(data || []);
     } catch (error) {
       console.error('Error loading products:', error);
-    }
-  };
-
-  const loadWarehouses = async () => {
-    try {
-      const data = await getWarehouses().catch(err => {
-        console.error('Error loading warehouses:', err);
-        return [];
-      });
-      setWarehouses(data || []);
-      if (data && data.length > 0) {
-        setSelectedWarehouse(data[0].id);
-      }
-    } catch (error) {
-      console.error('Error loading warehouses:', error);
-      setError('Ошибка загрузки складов');
-    }
-  };
-
-  const loadStocks = async () => {
-    try {
-      setLoading(true);
-      setError(null);
-      const data = await getStocks(selectedWarehouse || null).catch(err => {
-        console.error('Error loading stocks:', err);
-        return [];
-      });
-      setStocks(data || []);
-    } catch (error) {
-      console.error('Error loading stocks:', error);
-      setError('Ошибка загрузки остатков');
+      setError('Ошибка загрузки товаров');
     } finally {
       setLoading(false);
     }
   };
 
-  const handleProductAdded = () => {
-    // Обновляем список товаров после добавления
-    loadStocks();
+  const applyFilters = () => {
+    let filtered = [...products];
+    
+    // Фильтрация
+    const filteredProducts = products.filter(product => {
+      // Фильтр по поиску
+      if (searchQuery && !product?.name?.toLowerCase().includes(searchQuery.toLowerCase())) {
+        return false;
+      }
+      
+      // Фильтр по категории
+      if (filters.category && product?.category !== filters.category) {
+        return false;
+      }
+      
+      // Фильтр по цене продажи
+      if (filters.minPrice && (!product?.price || product.price < parseFloat(filters.minPrice))) {
+        return false;
+      }
+      if (filters.maxPrice && (!product?.price || product.price > parseFloat(filters.maxPrice))) {
+        return false;
+      }
+      
+      // Фильтр по цене закупа
+      if (filters.minCost && (!product?.cost || product.cost < parseFloat(filters.minCost))) {
+        return false;
+      }
+      if (filters.maxCost && (!product?.cost || product.cost > parseFloat(filters.maxCost))) {
+        return false;
+      }
+      
+      // Фильтр по объему
+      if (filters.volume && product?.volume !== filters.volume) {
+        return false;
+      }
+      
+      return true;
+    });
+    
+    // Сортировка
+    filtered.sort((a, b) => {
+      let aValue = a[sortField] || '';
+      let bValue = b[sortField] || '';
+      
+      if (sortField === 'price' || sortField === 'cost') {
+        aValue = parseFloat(aValue) || 0;
+        bValue = parseFloat(bValue) || 0;
+      } else {
+        aValue = aValue.toString().toLowerCase();
+        bValue = bValue.toString().toLowerCase();
+      }
+      
+      if (sortDirection === 'asc') {
+        return aValue > bValue ? 1 : -1;
+      } else {
+        return aValue < bValue ? 1 : -1;
+      }
+    });
+    
+    setFilteredProducts(filtered);
+    setCurrentPage(1);
   };
+
+  const handleSort = (field) => {
+    if (sortField === field) {
+      setSortDirection(sortDirection === 'asc' ? 'desc' : 'asc');
+    } else {
+      setSortField(field);
+      setSortDirection('asc');
+    }
+  };
+
+  const handleEditProduct = (product) => {
+    setSelectedProduct(product);
+    setIsEditModalOpen(true);
+  };
+
+  const handleProductUpdated = (updatedProduct) => {
+    setProducts(prev => prev.map(p => p.id === updatedProduct.id ? updatedProduct : p));
+    setIsEditModalOpen(false);
+    setSelectedProduct(null);
+  };
+
+  // Пагинация
+  const totalPages = Math.ceil(filteredProducts.length / productsPerPage);
+  const startIndex = (currentPage - 1) * productsPerPage;
+  const endIndex = startIndex + productsPerPage;
+  const currentProducts = filteredProducts.slice(startIndex, endIndex);
+
+  // Получаем уникальные категории для фильтра
+  const categories = [...new Set(products.map(p => p?.category).filter(Boolean))];
 
   if (error) {
     return (
@@ -88,7 +174,7 @@ export default function PriceList() {
           <h2 className="text-xl font-semibold text-gray-900">Ошибка</h2>
           <p className="text-gray-500 mt-2">{error}</p>
           <button
-            onClick={loadStocks}
+            onClick={loadProducts}
             className="mt-4 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
           >
             Попробовать снова
@@ -98,177 +184,283 @@ export default function PriceList() {
     );
   }
 
-  if (loading) {
-    return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="text-center">
-          <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
-          <p className="mt-2 text-gray-600">Загрузка...</p>
-        </div>
-      </div>
-    );
-  }
-
   return (
-    <div className="min-h-screen bg-gray-50 pb-20">
+    <div className="min-h-screen bg-gray-50">
       {/* Header */}
-      <header className="bg-white shadow-sm px-4 py-4">
-        <h1 className="text-xl font-bold text-gray-900">Прайс-лист</h1>
+      <header className="bg-white shadow-sm px-6 py-4">
+        <div className="flex items-center justify-between">
+          <h1 className="text-2xl font-bold text-gray-900">Прайс-лист</h1>
+          
+          {/* Кнопка фильтров */}
+          <button
+            onClick={() => setIsFilterModalOpen(true)}
+            className="flex items-center gap-2 px-4 py-2 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
+          >
+            <Filter size={18} />
+            Фильтры
+            {(filters.category || filters.minPrice || filters.maxPrice) && (
+              <span className="w-2 h-2 bg-blue-600 rounded-full"></span>
+            )}
+          </button>
+        </div>
       </header>
 
-      {/* Search Bar */}
-      <div className="px-4 py-4 bg-white border-b border-gray-200">
-        <div className="relative">
-          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
+      {/* Поиск */}
+      <div className="px-6 py-4 bg-white border-b">
+        <div className="relative max-w-md">
+          <Search className="absolute left-3 top-3 text-gray-400" size={20} />
           <input
             type="text"
-            placeholder="Поиск товаров по названию или артикулу..."
+            placeholder="Поиск по названию..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            className="w-full pl-10 pr-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:bg-white transition-colors"
           />
         </div>
       </div>
 
-      {/* Product List */}
-      <div className="px-4">
-        {((!stocks || stocks.length === 0) && (!products || products.length === 0)) ? (
-          <div className="text-center py-12">
-            <p className="text-gray-500">Товары не найдены</p>
+      {/* Таблица */}
+      <div className="px-6 py-4">
+        {loading ? (
+          <div className="flex items-center justify-center py-12">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
           </div>
         ) : (
-          <div className="space-y-3">
-            {/* Показываем товары из остатков */}
-            {(stocks || [])
-              .filter(stock => {
-                if (!searchQuery) return true;
-                const query = searchQuery.toLowerCase();
-                const name = stock?.product?.name || '';
-                const article = stock?.product?.article || '';
-                return name.toLowerCase().includes(query) || article.toLowerCase().includes(query);
-              })
-              .map(stock => (
-              <div key={stock?.id || Math.random()} className="bg-white rounded-lg p-4 shadow-sm">
-                <div className="flex justify-between items-start">
-                  <div className="flex-1">
-                    <h3 className="font-semibold text-gray-900">
-                      {stock?.product?.name || 'Товар не найден'}
-                    </h3>
-                    {stock?.product?.article && (
-                      <p className="text-sm text-gray-500 mt-1">Арт. {stock.product.article}</p>
+          <>
+            {/* Заголовок таблицы */}
+            <div className="bg-white rounded-lg shadow-sm overflow-hidden">
+              <div className="grid grid-cols-12 gap-4 px-6 py-3 bg-gray-50 border-b font-medium text-sm text-gray-700">
+                <div className="col-span-8">
+                  <button
+                    onClick={() => handleSort('name')}
+                    className="flex items-center gap-1 hover:text-blue-600 transition-colors"
+                  >
+                    Название
+                    {sortField === 'name' && (
+                      sortDirection === 'asc' ? <ChevronUp size={16} /> : <ChevronDown size={16} />
                     )}
-                    {stock?.product?.barcode && (
-                      <p className="text-xs text-gray-400 mt-1">ШК {stock.product.barcode}</p>
+                  </button>
+                </div>
+                <div className="col-span-2 text-right pr-6">
+                  <button
+                    onClick={() => handleSort('cost')}
+                    className="flex items-center gap-1 justify-end hover:text-blue-600 transition-colors w-full"
+                  >
+                    Закупка
+                    {sortField === 'cost' && (
+                      sortDirection === 'asc' ? <ChevronUp size={16} /> : <ChevronDown size={16} />
                     )}
-                    <div className="mt-3 flex items-baseline gap-4">
-                      <p className="text-2xl font-bold text-blue-600">
-                        {stock?.product?.price ? `${stock.product.price.toLocaleString('ru-RU')} ₽` : '—'}
-                      </p>
-                      {stock?.product?.cost && stock.product.cost !== stock.product.price && (
-                        <p className="text-sm text-gray-500">
-                          Закупка: {stock.product.cost.toLocaleString('ru-RU')} ₽
-                        </p>
-                      )}
-                    </div>
-                  </div>
-                  <div className="ml-4 text-right">
-                    <p
-                      className={`text-lg font-semibold ${
-                        stock?.quantity > 10 ? 'text-green-600' : stock?.quantity > 0 ? 'text-yellow-600' : 'text-red-600'
-                      }`}
-                    >
-                      {stock?.quantity || 0} шт
-                    </p>
-                    {stock?.warehouse && (
-                      <p className="text-xs text-gray-400 mt-2">{stock.warehouse.name}</p>
+                  </button>
+                </div>
+                <div className="col-span-2 text-right pr-6">
+                  <button
+                    onClick={() => handleSort('price')}
+                    className="flex items-center gap-1 justify-end hover:text-blue-600 transition-colors w-full"
+                  >
+                    Продажа
+                    {sortField === 'price' && (
+                      sortDirection === 'asc' ? <ChevronUp size={16} /> : <ChevronDown size={16} />
                     )}
-                  </div>
+                  </button>
                 </div>
               </div>
-            ))}
-            
-            {/* Показываем товары без остатков */}
-            {(stocks || []).length === 0 && (products || [])
-              .filter(product => {
-                if (!searchQuery) return true;
-                const query = searchQuery.toLowerCase();
-                const name = product?.name || '';
-                const article = product?.article || '';
-                return name.toLowerCase().includes(query) || article.toLowerCase().includes(query);
-              })
-              .map(product => (
-              <div key={product?.id || Math.random()} className="bg-white rounded-lg p-4 shadow-sm">
-                <div className="flex justify-between items-start">
-                  <div className="flex-1">
-                    <h3 className="font-semibold text-gray-900">
-                      {product?.name || 'Товар не найден'}
-                    </h3>
-                    {product?.article && (
-                      <p className="text-sm text-gray-500 mt-1">Арт. {product.article}</p>
-                    )}
-                    {product?.barcode && (
-                      <p className="text-xs text-gray-400 mt-1">ШК {product.barcode}</p>
-                    )}
-                    <div className="mt-3 flex items-baseline gap-4">
-                      <p className="text-2xl font-bold text-blue-600">
+
+              {/* Строки таблицы */}
+              <div className="divide-y divide-gray-100">
+                {currentProducts.map((product) => (
+                  <div
+                    key={product?.id || Math.random()}
+                    className="grid grid-cols-12 gap-4 px-6 py-3 hover:bg-gray-50 transition-colors items-center"
+                  >
+                    <div className="col-span-8 flex items-center gap-2">
+                      {userRole === 'admin' && (
+                        <button
+                          onClick={() => handleEditProduct(product)}
+                          className="p-1.5 hover:bg-gray-100 rounded-lg transition-colors flex-shrink-0"
+                          title="Редактировать"
+                        >
+                          <Edit size={16} className="text-gray-500" />
+                        </button>
+                      )}
+                      <p className="font-medium text-gray-900">{product?.name || '—'}</p>
+                    </div>
+                    <div className="col-span-2 text-right pr-6">
+                      <p className="text-gray-600">
+                        {product?.cost ? `${product.cost.toLocaleString('ru-RU')} ₽` : '—'}
+                      </p>
+                    </div>
+                    <div className="col-span-2 text-right pr-6">
+                      <p className="font-semibold text-gray-900">
                         {product?.price ? `${product.price.toLocaleString('ru-RU')} ₽` : '—'}
                       </p>
-                      {product?.cost && product.cost !== product.price && (
-                        <p className="text-sm text-gray-500">
-                          Закупка: {product.cost.toLocaleString('ru-RU')} ₽
-                        </p>
-                      )}
                     </div>
                   </div>
-                  <div className="ml-4 text-right">
-                    <p className="text-lg font-semibold text-gray-400">
-                      0 шт
-                    </p>
-                    <p className="text-xs text-gray-500">Нет в наличии</p>
-                  </div>
+                ))}
+              </div>
+
+              {filteredProducts.length === 0 && (
+                <div className="text-center py-12 text-gray-500">
+                  Товары не найдены
+                </div>
+              )}
+            </div>
+
+            {/* Пагинация */}
+            {totalPages > 1 && (
+              <div className="flex items-center justify-between mt-4">
+                <p className="text-sm text-gray-500">
+                  Показано {startIndex + 1}-{Math.min(endIndex, filteredProducts.length)} из {filteredProducts.length}
+                </p>
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+                    disabled={currentPage === 1}
+                    className="px-3 py-1 border border-gray-300 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50"
+                  >
+                    Назад
+                  </button>
+                  <span className="px-3 py-1">
+                    {currentPage} / {totalPages}
+                  </span>
+                  <button
+                    onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
+                    disabled={currentPage === totalPages}
+                    className="px-3 py-1 border border-gray-300 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50"
+                  >
+                    Вперед
+                  </button>
                 </div>
               </div>
-            ))}
-          </div>
+            )}
+          </>
         )}
       </div>
 
-      {/* Summary */}
-      {stocks && stocks.length > 0 && (
-        <div className="px-4 py-4">
-          <div className="bg-blue-50 rounded-lg p-4">
-            <div className="flex justify-between items-center">
-              <span className="text-sm font-medium text-blue-900">
-                Всего товаров: {stocks.length}
-              </span>
-              <span className="text-sm font-medium text-blue-900">
-                Общая сумма: {stocks.reduce((sum, stock) => 
-                  sum + ((stock?.product?.price || 0) * (stock?.quantity || 0)), 0
-                ).toLocaleString('ru-RU')} ₽
-              </span>
+      {/* Модальное окно фильтров */}
+      {isFilterModalOpen && (
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center">
+          <div className="bg-white rounded-xl p-6 w-full max-w-md">
+            <h2 className="text-xl font-semibold mb-4">Фильтры</h2>
+            
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Категория
+                </label>
+                <select
+                  value={filters.category}
+                  onChange={(e) => setFilters(prev => ({ ...prev, category: e.target.value }))}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                >
+                  <option value="">Все категории</option>
+                  {categories.map(cat => (
+                    <option key={cat} value={cat}>{cat}</option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Цена продажи
+                </label>
+                <div className="flex gap-2 items-center">
+                  <div className="flex-1">
+                    <input
+                      type="number"
+                      value={filters.minPrice}
+                      onChange={(e) => setFilters(prev => ({ ...prev, minPrice: e.target.value }))}
+                      placeholder="От"
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    />
+                  </div>
+                  <span className="text-gray-500">—</span>
+                  <div className="flex-1">
+                    <input
+                      type="number"
+                      value={filters.maxPrice}
+                      onChange={(e) => setFilters(prev => ({ ...prev, maxPrice: e.target.value }))}
+                      placeholder="До"
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Цена закупа
+                </label>
+                <div className="flex gap-2 items-center">
+                  <div className="flex-1">
+                    <input
+                      type="number"
+                      value={filters.minCost}
+                      onChange={(e) => setFilters(prev => ({ ...prev, minCost: e.target.value }))}
+                      placeholder="От"
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    />
+                  </div>
+                  <span className="text-gray-500">—</span>
+                  <div className="flex-1">
+                    <input
+                      type="number"
+                      value={filters.maxCost}
+                      onChange={(e) => setFilters(prev => ({ ...prev, maxCost: e.target.value }))}
+                      placeholder="До"
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Объем
+                </label>
+                <select
+                  value={filters.volume}
+                  onChange={(e) => setFilters(prev => ({ ...prev, volume: e.target.value }))}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                >
+                  <option value="">Все объемы</option>
+                  <option value="0.5л">0.5л</option>
+                  <option value="0.7л">0.7л</option>
+                  <option value="1л">1л</option>
+                  <option value="1.5л">1.5л</option>
+                  <option value="другое">Другое</option>
+                </select>
+              </div>
+            </div>
+
+            <div className="flex gap-3 mt-6">
+              <button
+                onClick={() => {
+                  setFilters({ category: '', minPrice: '', maxPrice: '', minCost: '', maxCost: '', volume: '' });
+                }}
+                className="flex-1 px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50"
+              >
+                Сбросить
+              </button>
+              <button
+                onClick={() => setIsFilterModalOpen(false)}
+                className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+              >
+                Применить
+              </button>
             </div>
           </div>
         </div>
       )}
 
-      {/* Floating Action Button - только для администратора */}
-      {userRole === 'admin' && (
-        <button
-          onClick={() => setIsAddModalOpen(true)}
-          className="fixed bottom-24 right-4 w-14 h-14 bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white rounded-full shadow-lg hover:shadow-xl transform hover:scale-110 transition-all duration-200 flex items-center justify-center z-40"
-        >
-          <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M12 4v16m8-8H4" />
-          </svg>
-        </button>
-      )}
-
-      {/* Add Product Modal - только для администратора */}
-      {userRole === 'admin' && (
-        <AddProductModal
-          isOpen={isAddModalOpen}
-          onClose={() => setIsAddModalOpen(false)}
-          onAdd={handleProductAdded}
+      {/* Модальное окно редактирования */}
+      {isEditModalOpen && selectedProduct && (
+        <EditProductModal
+          product={selectedProduct}
+          onClose={() => {
+            setIsEditModalOpen(false);
+            setSelectedProduct(null);
+          }}
+          onSave={handleProductUpdated}
         />
       )}
     </div>

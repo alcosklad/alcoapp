@@ -128,11 +128,25 @@ export const getUsers = async () => {
 // Функции для работы с товарами
 export const getProducts = async (search = '') => {
   try {
-    const filter = search ? `name ~ "${search}" || article ~ "${search}"` : '';
-    return await pb.collection('products').getFullList({
-      filter,
-      sort: 'name'
+    // Загружаем все товары (без фильтра)
+    const allProducts = await pb.collection('products').getFullList({
+      sort: 'name',
+      limit: 1000 // Загружаем больше товаров
     });
+    
+    // Если нет поиска - возвращаем все
+    if (!search) {
+      return allProducts.slice(0, 50); // Ограничиваем 50 для производительности
+    }
+    
+    // Фильтруем на клиенте без учета регистра
+    const searchLower = search.toLowerCase();
+    const filtered = allProducts.filter(product => {
+      const name = product?.name || '';
+      return name.toLowerCase().includes(searchLower);
+    });
+    
+    return filtered.slice(0, 50); // Ограничиваем 50 результатов
   } catch (error) {
     console.error('PocketBase: Error loading products:', error);
     console.error('PocketBase: Детали ошибки:', error.message, error.status);
@@ -153,11 +167,52 @@ export const createProduct = async (data) => {
   }
 };
 
+export const updateProduct = async (id, data) => {
+  try {
+    console.log('PocketBase: Обновляем товар:', id, data);
+    const result = await pb.collection('products').update(id, data);
+    console.log('PocketBase: Товар успешно обновлен:', result);
+    return result;
+  } catch (error) {
+    console.error('PocketBase: Error updating product:', error);
+    throw error;
+  }
+};
+
 // Функции для работы с приемками
 export const createReception = async (data) => {
   try {
     console.log('PocketBase: Создаем приемку:', data);
-    const result = await pb.collection('receptions').create(data);
+    console.log('PocketBase: Items в приемке:', data.items);
+    
+    // Рассчитываем суммы
+    let totalPurchaseValue = 0;
+    let totalSaleValue = 0;
+    
+    if (data.items && Array.isArray(data.items)) {
+      data.items.forEach(item => {
+        console.log('PocketBase: Обрабатываем товар:', item);
+        const purchasePrice = item.cost || item.purchase_price || 0;
+        const salePrice = item.sale_price || item.price || 0;
+        const quantity = item.quantity || 0;
+        
+        totalPurchaseValue += purchasePrice * quantity;
+        totalSaleValue += salePrice * quantity;
+        
+        console.log(`PocketBase: Товар - закуп: ${purchasePrice}, продажа: ${salePrice}, кол-во: ${quantity}`);
+      });
+    }
+    
+    console.log(`PocketBase: Итого закуп: ${totalPurchaseValue}, продажа: ${totalSaleValue}`);
+    
+    // Добавляем суммы в данные приемки
+    const receptionData = {
+      ...data,
+      total_amount: totalPurchaseValue,  
+      total_sale: totalSaleValue
+    };
+    
+    const result = await pb.collection('receptions').create(receptionData);
     console.log('PocketBase: Приемка успешно создана:', result);
     
     // Обновляем остатки на складе
@@ -175,7 +230,7 @@ export const createReception = async (data) => {
     console.error('PocketBase: Error creating reception:', error);
     console.error('PocketBase: Детали ошибки:', error.message, error.status);
     if (error.data) {
-      console.error('PocketBase: Data errors:', error.data);
+      console.error('PocketBase: Данные ошибки:', JSON.stringify(error.data, null, 2));
     }
     throw error;
   }
@@ -358,46 +413,61 @@ export const getStocks = async (warehouseId = null) => {
   }
 };
 
-// Статистика для дашборда
+// Получение статистики для дашборда
 export const getDashboardStats = async (filterId = null) => {
   try {
-    // filterId может быть warehouse или supplier
-    // Определяем тип фильтра по длине ID (у suppliers короткие ID)
-    const filter = filterId ? `supplier = "${filterId}"` : '';
+    console.log('PocketBase: Загружаем статистику...');
     
-    const stocks = await pb.collection('stocks').getFullList({
-      filter,
-      expand: 'product'
+    // Получаем все приемки
+    let receptionsFilter = '';
+    if (filterId) {
+      receptionsFilter = `warehouse = "${filterId}" OR supplier = "${filterId}"`;
+    }
+    
+    const receptions = await pb.collection('receptions').getFullList({
+      filter: receptionsFilter,
+      expand: 'supplier,warehouse'
     });
     
-    // Считаем общее количество товаров (сумма всех штук)
-    const totalProducts = stocks.reduce((sum, stock) => {
-      return sum + (stock.quantity || 0);
-    }, 0);
+    console.log(`PocketBase: Получено ${receptions.length} приемок`);
     
-    // Считаем общую сумму по цене продажи
-    const totalValue = stocks.reduce((sum, stock) => {
-      const price = stock.expand?.product?.price || 0;
-      return sum + (price * (stock.quantity || 0));
-    }, 0);
+    let totalQuantity = 0;
+    let totalPurchaseValue = 0;
     
-    console.log('📊 Dashboard stats:', {
-      filterId,
-      filter,
-      totalStocks: stocks.length,
-      totalProducts,
-      totalValue
+    receptions.forEach((reception, index) => {
+      console.log(`PocketBase: Приемка ${index + 1}:`, reception);
+      
+      // Считаем общее количество товаров
+      if (reception.items && Array.isArray(reception.items)) {
+        console.log(`PocketBase: Items в приемке ${index + 1}:`, reception.items);
+        
+        reception.items.forEach(item => {
+          const quantity = item.quantity || 0;
+          const purchasePrice = item.cost || item.purchase_price || item.price || 0;
+          
+          totalQuantity += quantity;
+          totalPurchaseValue += purchasePrice * quantity;
+          
+          console.log(`PocketBase: Товар - кол-во: ${quantity}, цена: ${purchasePrice}, сумма: ${purchasePrice * quantity}`);
+        });
+      } else {
+        console.log(`PocketBase: В приемке ${index + 1} нет items или это не массив`);
+      }
     });
+    
+    console.log(`PocketBase: ИТОГО - товаров: ${totalQuantity}, сумма закупа: ${totalPurchaseValue}`);
     
     return {
-      totalProducts,
-      totalValue
+      totalProducts: totalQuantity,
+      totalValue: totalPurchaseValue,
+      totalPurchaseValue
     };
   } catch (error) {
-    console.error('Error loading dashboard stats:', error);
+    console.error('PocketBase: Error loading dashboard stats:', error);
     return {
       totalProducts: 0,
-      totalValue: 0
+      totalValue: 0,
+      totalPurchaseValue: 0
     };
   }
 };

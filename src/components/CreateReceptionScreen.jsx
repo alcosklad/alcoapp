@@ -7,7 +7,7 @@ export default function CreateReceptionScreen({ onBack, onContinue }) {
   const [suppliers, setSuppliers] = useState([]);
   const [warehouses, setWarehouses] = useState([]);
   const [selectedSupplier, setSelectedSupplier] = useState('');
-  const [selectedWarehouse, setSelectedWarehouse] = useState('');
+  const [selectedWarehouses, setSelectedWarehouses] = useState([]); // Массив выбранных магазинов
   const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState([]);
@@ -35,10 +35,12 @@ export default function CreateReceptionScreen({ onBack, onContinue }) {
 
   const searchProducts = async (query) => {
     try {
+      console.log('🔍 Ищем товары:', query);
       const results = await getProducts(query).catch(err => {
         console.error('Ошибка поиска товаров:', err);
         return [];
       });
+      console.log('✅ Найдено товаров:', results?.length || 0);
       setSearchResults(results || []);
       setShowSearchResults(true);
     } catch (error) {
@@ -84,7 +86,7 @@ export default function CreateReceptionScreen({ onBack, onContinue }) {
         setSelectedSupplier(suppliersData[0].id);
       }
       if (warehousesData && warehousesData.length > 0) {
-        setSelectedWarehouse(warehousesData[0].id);
+        // Не выбираем автоматически, пусть пользователь выбирает
       }
     } catch (error) {
       console.error('Error loading data:', error);
@@ -95,8 +97,8 @@ export default function CreateReceptionScreen({ onBack, onContinue }) {
   };
 
   const handleContinue = () => {
-    if (!selectedSupplier || !selectedWarehouse) {
-      setError('Выберите город и магазин');
+    if (!selectedSupplier || selectedWarehouses.length === 0) {
+      setError('Выберите город и хотя бы один магазин');
       return;
     }
     
@@ -107,7 +109,7 @@ export default function CreateReceptionScreen({ onBack, onContinue }) {
     
     const dataToPass = {
       supplier: selectedSupplier,
-      warehouse: selectedWarehouse,
+      warehouses: selectedWarehouses, // Передаем массив магазинов
       date: date,
       items: selectedItems,
       totalAmount: totalAmount
@@ -180,18 +182,57 @@ export default function CreateReceptionScreen({ onBack, onContinue }) {
                 <Building size={18} className="text-gray-400" />
                 Магазин
               </label>
-              <select
-                value={selectedWarehouse}
-                onChange={(e) => setSelectedWarehouse(e.target.value)}
-                className="w-full px-4 py-3 bg-white border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors"
-              >
-                <option value="">Выберите магазин</option>
-                {(warehouses || []).map(warehouse => (
-                  <option key={warehouse?.id || Math.random()} value={warehouse?.id}>
-                    {warehouse?.name || 'Неизвестный магазин'}
-                  </option>
-                ))}
-              </select>
+              <div className="relative">
+                {/* Селект для выбора магазинов */}
+                <select
+                  value=""
+                  onChange={(e) => {
+                    if (e.target.value && !selectedWarehouses.includes(e.target.value)) {
+                      setSelectedWarehouses(prev => [...prev, e.target.value]);
+                    }
+                  }}
+                  className="w-full px-4 py-3 bg-white border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors"
+                >
+                  <option value="">Выберите магазин</option>
+                  {(warehouses || []).map(warehouse => {
+                    const isSelected = selectedWarehouses.includes(warehouse?.id);
+                    return (
+                      <option 
+                        key={warehouse?.id || Math.random()} 
+                        value={warehouse?.id}
+                        disabled={isSelected}
+                      >
+                        {warehouse?.name || 'Неизвестный магазин'}{isSelected ? ' (выбран)' : ''}
+                      </option>
+                    );
+                  })}
+                </select>
+                
+                {/* Теги выбранных магазинов */}
+                {selectedWarehouses.length > 0 && (
+                  <div className="flex flex-wrap gap-2 mt-2">
+                    {selectedWarehouses.map(warehouseId => {
+                      const warehouse = warehouses.find(w => w.id === warehouseId);
+                      return (
+                        <span
+                          key={warehouseId}
+                          className="inline-flex items-center gap-1 px-3 py-1 bg-blue-100 text-blue-700 rounded-full text-sm"
+                        >
+                          {warehouse?.name || 'Магазин'}
+                          <button
+                            onClick={() => {
+                              setSelectedWarehouses(prev => prev.filter(id => id !== warehouseId));
+                            }}
+                            className="ml-1 hover:text-blue-900"
+                          >
+                            <X size={14} />
+                          </button>
+                        </span>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
             </div>
 
             {/* Поиск товаров */}

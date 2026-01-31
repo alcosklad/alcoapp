@@ -8,7 +8,7 @@ export default function ReceptionCreate({ onBack, onSuccess, initialItems = [], 
   const [warehouses, setWarehouses] = useState([]);
   const [users, setUsers] = useState([]);
   const [selectedSupplier, setSelectedSupplier] = useState(initialData.supplier || '');
-  const [selectedWarehouse, setSelectedWarehouse] = useState(initialData.warehouse || '');
+  const [selectedWarehouses, setSelectedWarehouses] = useState(initialData.warehouses || []); // Массив магазинов
   const [selectedUser, setSelectedUser] = useState(initialData.user || '');
   const [date, setDate] = useState(initialData.date || new Date().toISOString().split('T')[0]);
   const [items, setItems] = useState(initialItems);
@@ -98,11 +98,11 @@ export default function ReceptionCreate({ onBack, onSuccess, initialItems = [], 
     console.log('🔥 Нажата кнопка Готово!');
     console.log('Данные для проверки:');
     console.log('- selectedSupplier:', selectedSupplier);
-    console.log('- selectedWarehouse:', selectedWarehouse);
+    console.log('- selectedWarehouses:', selectedWarehouses);
     console.log('- selectedUser:', selectedUser);
     console.log('- items.length:', items.length);
     
-    if (!selectedSupplier || !selectedWarehouse || items.length === 0) {
+    if (!selectedSupplier || selectedWarehouses.length === 0 || items.length === 0) {
       console.log('❌ Валидация не пройдена');
       setError('Заполните все поля и добавьте товары');
       return;
@@ -114,34 +114,35 @@ export default function ReceptionCreate({ onBack, onSuccess, initialItems = [], 
     try {
       setLoading(true);
       setError(null);
+      
+      const currentDateTime = new Date().toISOString();
+      const totalAmount = calculateTotal();
+      
       console.log('🚀 Начинаем сохранение...');
       
-      // Рассчитываем общую сумму
-      const totalAmount = items.reduce((sum, item) => {
-        return sum + (item.quantity * item.cost);
-      }, 0);
+      // Создаем приемку для каждого магазина
+      const receptionPromises = selectedWarehouses.map(warehouseId => {
+        const receptionData = {
+          supplier: selectedSupplier,
+          warehouse: warehouseId, // Каждый магазин отдельно
+          date: date,
+          datetime: currentDateTime,
+          status: 'draft',
+          items: items.map(item => ({
+            product: item.product.id,
+            quantity: item.quantity,
+            cost: item.cost
+          })),
+          totalAmount: totalAmount
+        };
+        
+        console.log('📦 Данные для сохранения:', receptionData);
+        return createReception(receptionData);
+      });
       
-      // Получаем точное время сохранения
-      const now = new Date();
-      const currentDateTime = now.toISOString();
-      
-      const receptionData = {
-        supplier: selectedSupplier,
-        warehouse: selectedWarehouse,
-        date: date,
-        datetime: currentDateTime,  // Добавляем точное время создания
-        status: 'draft',  // Правильное значение - draft
-        items: items.map(item => ({
-          product: item.product.id,
-          quantity: item.quantity,
-          cost: item.cost
-        })),
-        totalAmount: totalAmount
-      };
-      
-      console.log('📦 Данные для сохранения:', receptionData);
-      const result = await createReception(receptionData);
-      console.log('✅ Результат сохранения:', result);
+      // Ждем выполнения всех приемок
+      const results = await Promise.all(receptionPromises);
+      console.log('✅ Результат сохранения:', results);
       
       setSuccess(true);
       console.log('🎉 Вызываем onSuccess для перехода');
@@ -278,18 +279,25 @@ export default function ReceptionCreate({ onBack, onSuccess, initialItems = [], 
               <label className="block text-sm font-medium text-gray-700 mb-1">
                 Магазин
               </label>
-              <select
-                value={selectedWarehouse}
-                onChange={(e) => setSelectedWarehouse(e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-              >
-                <option value="">Выберите магазин</option>
-                {(warehouses || []).map(warehouse => (
-                  <option key={warehouse?.id || Math.random()} value={warehouse?.id}>
-                    {warehouse?.name || 'Неизвестный магазин'}
-                  </option>
-                ))}
-              </select>
+              <div className="bg-gray-50 px-3 py-2 border border-gray-300 rounded-lg">
+                {selectedWarehouses.length > 0 ? (
+                  <div className="flex flex-wrap gap-2">
+                    {selectedWarehouses.map(warehouseId => {
+                      const warehouse = warehouses.find(w => w.id === warehouseId);
+                      return (
+                        <span
+                          key={warehouseId}
+                          className="inline-flex items-center gap-1 px-2 py-1 bg-blue-100 text-blue-700 rounded text-sm"
+                        >
+                          {warehouse?.name || 'Магазин'}
+                        </span>
+                      );
+                    })}
+                  </div>
+                ) : (
+                  <span className="text-gray-500">Магазины не выбраны</span>
+                )}
+              </div>
             </div>
 
             <div>

@@ -133,9 +133,9 @@ export default function ProductSelectorModal({ isOpen, onClose, onAdd }) {
                   )}
                   
                   {/* Цена */}
-                  {product?.price && (
-                    <p className="text-sm font-bold text-blue-600">
-                      {product.price.toLocaleString('ru-RU')} ₽
+                  {product?.cost && (
+                    <p className="text-sm font-bold text-gray-900">
+                      {product.cost.toLocaleString('ru-RU')} ₽
                     </p>
                   )}
                   
