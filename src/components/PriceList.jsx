@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from 'react';
-import { Search, Filter, ChevronUp, ChevronDown, Edit } from 'lucide-react';
+import { Search, Filter, Edit2, X, ChevronLeft, ChevronRight, Plus, ChevronUp, ChevronDown } from 'lucide-react';
 import { getProducts, updateProduct } from '../lib/pocketbase';
 import pb from '../lib/pocketbase';
 import EditProductModal from './EditProductModal';
+import CreateProductModal from './CreateProductModal';
 
 export default function PriceList() {
   const [products, setProducts] = useState([]);
@@ -13,6 +14,7 @@ export default function PriceList() {
   const [isFilterModalOpen, setIsFilterModalOpen] = useState(false);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [selectedProduct, setSelectedProduct] = useState(null);
+  const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
   const [sortField, setSortField] = useState('name');
   const [sortDirection, setSortDirection] = useState('asc');
@@ -24,8 +26,12 @@ export default function PriceList() {
     maxPrice: '',
     minCost: '',
     maxCost: '',
-    volume: ''
+    volume: '',
+    city: ''
   });
+  
+  // Выбранный город
+  const [selectedCity, setSelectedCity] = useState('Все города');
   
   const productsPerPage = 50;
   
@@ -75,14 +81,22 @@ export default function PriceList() {
     
     // Фильтрация
     const filteredProducts = products.filter(product => {
+      // Фильтр по городу
+      if (selectedCity !== 'Все города' && product?.city !== selectedCity) {
+        return false;
+      }
+      
       // Фильтр по поиску
       if (searchQuery && !product?.name?.toLowerCase().includes(searchQuery.toLowerCase())) {
         return false;
       }
       
       // Фильтр по категории
-      if (filters.category && product?.category !== filters.category) {
-        return false;
+      if (filters.category) {
+        const productCategories = Array.isArray(product?.category) ? product.category : [product?.category].filter(Boolean);
+        if (!productCategories.includes(filters.category)) {
+          return false;
+        }
       }
       
       // Фильтр по цене продажи
@@ -153,14 +167,49 @@ export default function PriceList() {
     setSelectedProduct(null);
   };
 
+  const handleProductCreated = (newProduct) => {
+    setProducts(prev => [newProduct, ...prev]);
+  };
+
   // Пагинация
   const totalPages = Math.ceil(filteredProducts.length / productsPerPage);
   const startIndex = (currentPage - 1) * productsPerPage;
   const endIndex = startIndex + productsPerPage;
   const currentProducts = filteredProducts.slice(startIndex, endIndex);
 
+  // Получаем уникальные города
+  const cities = ['Все города', ...new Set(products.map(p => p?.city).filter(Boolean))];
+  
   // Получаем уникальные категории для фильтра
-  const categories = [...new Set(products.map(p => p?.category).filter(Boolean))];
+  const allCategories = products.map(p => ({
+    name: p?.name,
+    category: p?.category,
+    categoryType: typeof p?.category
+  }));
+  console.log('Products with categories:', allCategories.slice(0, 5)); // Показываем первые 5
+  
+  const categories = [...new Set(
+    products.flatMap(p => {
+      // Если категория - массив, берем все элементы
+      if (Array.isArray(p?.category)) {
+        return p.category.filter(Boolean);
+      }
+      return p?.category ? [p.category] : [];
+    })
+  )].length > 0 ? [...new Set(
+    products.flatMap(p => {
+      // Если категория - массив, берем все элементы
+      if (Array.isArray(p?.category)) {
+        return p.category.filter(Boolean);
+      }
+      return p?.category ? [p.category] : [];
+    })
+  )] : [
+    'Вино', 'Водка', 'Настойки', 'Виски', 'Коньяк', 'Ром', 'Текила', 'Джин', 'Ликер', 
+    'Брют', 'Асти', 'Просекко', 'Шампанское', 'Пиво', 'Пиво Разливное', 'Напитки', 
+    'Сигареты и Стики', 'Электронки', 'Снэки и Закуски', 'Шоколад'
+  ];
+  console.log('Categories found:', categories); // Отладка
 
   if (error) {
     return (
@@ -188,9 +237,11 @@ export default function PriceList() {
     <div className="min-h-screen bg-gray-50">
       {/* Header */}
       <header className="bg-white shadow-sm px-6 py-4">
-        <div className="flex items-center justify-between">
+        <div className="flex items-center justify-between mb-4">
           <h1 className="text-2xl font-bold text-gray-900">Прайс-лист</h1>
-          
+        </div>
+        
+        <div className="flex items-center gap-3">
           {/* Кнопка фильтров */}
           <button
             onClick={() => setIsFilterModalOpen(true)}
@@ -202,20 +253,44 @@ export default function PriceList() {
               <span className="w-2 h-2 bg-blue-600 rounded-full"></span>
             )}
           </button>
+          
+          {/* Кнопка добавления товара (только для админа) */}
+          {(userRole === 'admin' || userRole === 'superadmin') && (
+            <button
+              onClick={() => setIsCreateModalOpen(true)}
+              className="flex items-center gap-2 px-3 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+            >
+              <Plus size={18} />
+              Добавить
+            </button>
+          )}
         </div>
       </header>
 
-      {/* Поиск */}
+      {/* Поиск и выбор города */}
       <div className="px-6 py-4 bg-white border-b">
-        <div className="relative max-w-md">
-          <Search className="absolute left-3 top-3 text-gray-400" size={20} />
-          <input
-            type="text"
-            placeholder="Поиск по названию..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full pl-10 pr-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:bg-white transition-colors"
-          />
+        <div className="flex gap-4 items-center">
+          <div className="relative max-w-md flex-1">
+            <Search className="absolute left-3 top-3 text-gray-400" size={20} />
+            <input
+              type="text"
+              placeholder="Поиск по названию..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="w-full pl-10 pr-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:bg-white transition-colors"
+            />
+          </div>
+          
+          {/* Выбор города */}
+          <select
+            value={selectedCity}
+            onChange={(e) => setSelectedCity(e.target.value)}
+            className="px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+          >
+            {cities.map(city => (
+              <option key={city} value={city}>{city}</option>
+            ))}
+          </select>
         </div>
       </div>
 
@@ -279,7 +354,7 @@ export default function PriceList() {
                           className="p-1.5 hover:bg-gray-100 rounded-lg transition-colors flex-shrink-0"
                           title="Редактировать"
                         >
-                          <Edit size={16} className="text-gray-500" />
+                          <Edit2 size={16} className="text-gray-500" />
                         </button>
                       )}
                       <p className="font-medium text-gray-900">{product?.name || '—'}</p>
@@ -350,11 +425,11 @@ export default function PriceList() {
                 <select
                   value={filters.category}
                   onChange={(e) => setFilters(prev => ({ ...prev, category: e.target.value }))}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900"
                 >
                   <option value="">Все категории</option>
                   {categories.map(cat => (
-                    <option key={cat} value={cat}>{cat}</option>
+                    <option key={cat} value={cat} className="text-gray-900">{cat || 'EMPTY'}</option>
                   ))}
                 </select>
               </div>
@@ -463,6 +538,13 @@ export default function PriceList() {
           onSave={handleProductUpdated}
         />
       )}
+
+      {/* Модальное окно создания товара */}
+      <CreateProductModal
+        isOpen={isCreateModalOpen}
+        onClose={() => setIsCreateModalOpen(false)}
+        onProductCreated={handleProductCreated}
+      />
     </div>
   );
 }

@@ -1,4 +1,12 @@
-import pb from './src/lib/pocketbase.js';
+import PocketBase from 'pocketbase';
+
+// URL PocketBase для локальной разработки
+const pb = new PocketBase('http://localhost:8090');
+
+// Администраторские данные (измени если нужно)
+pb.admins.authWithPassword('admin@example.com', 'password123456').catch(() => {
+  console.log('Ошибка авторизации. Проверь данные админа в PocketBase');
+});
 
 // Функция для определения категории по названию
 function getCategoryFromName(name) {
