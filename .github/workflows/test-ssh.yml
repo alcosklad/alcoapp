@@ -1,0 +1,32 @@
+name: Test SSH Connection
+
+on:
+  workflow_dispatch:  # Ручной запуск
+
+jobs:
+  test-ssh:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Test SSH connection
+      uses: appleboy/ssh-action@master
+      with:
+        host: ${{ secrets.HOST }}
+        username: ${{ secrets.USERNAME }}
+        key: ${{ secrets.SSH_PRIVATE_KEY_LONG }}
+        port: 22
+        debug: true
+        timeout: 300s
+        command_timeout: 60s
+        script: |
+          echo "🔍 Testing connection..."
+          whoami
+          pwd
+          ls -la /var/www/
+          if [ -d "/var/www/alcoapp" ]; then
+            echo "✅ Directory exists"
+            cd /var/www/alcoapp
+            git status
+          else
+            echo "❌ Directory does not exist"
+          fi
