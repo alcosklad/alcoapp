@@ -11,6 +11,20 @@ Thumbs.db
 # PocketBase данные
 pb_data/
 pb_migrations/
+pocketbase
+*.db
+
+# CSV файлы и скрипты импорта
+*.csv
+clear-products.js
+import-*.js
+export-*.js
+assign-cities.js
+auto-categorize*.js
+simple-categorize.js
+update-products-*.js
+pocketbase-explorer.html
+all-products.json
 
 # Сборка проекта
 dist/
