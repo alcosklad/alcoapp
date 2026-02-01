@@ -1,37 +1,31 @@
-name: Deploy to Production Server
+name: Deploy to VPS
 
 on:
   push:
-    branches: [ main ]
+    branches:
+      - main
 
 jobs:
   deploy:
     runs-on: ubuntu-latest
-    
     steps:
-    - name: Deploy to server
-      uses: appleboy/ssh-action@master
-      with:
-        host: ${{ secrets.HOST }}
-        username: ${{ secrets.USERNAME }}
-        key: ${{ secrets.SSH_PRIVATE_KEY_LONG }}
-        port: 22
-        debug: true
-        timeout: 300s
-        command_timeout: 60s
-        script: |
-          set -e  # Exit on any error
-          echo "🚀 Starting deployment..."
-          cd /var/www/alcoapp
-          echo "📁 Current directory: $(pwd)"
-          echo "🧹 Cleaning untracked files..."
-          git clean -fd
-          echo "📋 Pulling latest changes..."
-          git pull origin main
-          echo "� Installing dependencies..."
-          npm ci --only=production
-          echo "🔨 Building application..."
-          npm run build
-          echo "🔄 Restarting application..."
-          pm2 reload alcoapp || pm2 start npm --name "alcoapp" -- start
-          echo "✅ Deployment completed successfully!"
+      - name: Deploy via SSH
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.HOST }}
+          username: ${{ secrets.USERNAME }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          port: 22
+          script: |
+            cd /var/www/alcoapp
+            
+            # Обновляем код
+            git fetch --all
+            git reset --hard origin/main
+            
+            # Ставим зависимости и собираем билд
+            npm install
+            npm run build
+            
+            # Перезапускаем PM2
+            pm2 restart alcoapp --update-env
