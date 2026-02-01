@@ -1,15 +1,13 @@
 import React, { useState, useEffect } from 'react';
-import { ArrowLeft, Plus, Trash2, User } from 'lucide-react';
-import { getSuppliers, getWarehouses, getUsers, createReception } from '../lib/pocketbase';
+import { ArrowLeft, Plus, Trash2 } from 'lucide-react';
+import { getSuppliers, getWarehouses, createReception } from '../lib/pocketbase';
 import ProductSelectorModal from './ProductSelectorModal';
 
 export default function ReceptionCreate({ onBack, onSuccess, initialItems = [], initialData = {} }) {
   const [suppliers, setSuppliers] = useState([]);
   const [warehouses, setWarehouses] = useState([]);
-  const [users, setUsers] = useState([]);
   const [selectedSupplier, setSelectedSupplier] = useState(initialData.supplier || '');
   const [selectedWarehouses, setSelectedWarehouses] = useState(initialData.warehouses || []); // Массив магазинов
-  const [selectedUser, setSelectedUser] = useState(initialData.user || '');
   const [date, setDate] = useState(initialData.date || new Date().toISOString().split('T')[0]);
   const [items, setItems] = useState(initialItems);
   const [isSearchOpen, setIsSearchOpen] = useState(false);
@@ -28,7 +26,7 @@ export default function ReceptionCreate({ onBack, onSuccess, initialItems = [], 
       setInitialLoading(true);
       setError(null);
       
-      const [suppliersData, warehousesData, usersData] = await Promise.all([
+      const [suppliersData, warehousesData] = await Promise.all([
         getSuppliers().catch(err => {
           console.error('Ошибка загрузки suppliers:', err);
           return [];
@@ -36,25 +34,18 @@ export default function ReceptionCreate({ onBack, onSuccess, initialItems = [], 
         getWarehouses().catch(err => {
           console.error('Ошибка загрузки warehouses:', err);
           return [];
-        }),
-        getUsers().catch(err => {
-          console.error('Ошибка загрузки users:', err);
-          return [];
         })
       ]);
       
       console.log('Suppliers получены:', suppliersData?.length || 0, 'шт');
       console.log('Warehouses получены:', warehousesData?.length || 0, 'шт');
-      console.log('Users получены:', usersData?.length || 0, 'шт');
       
       // Защита от null/undefined
       const safeSuppliers = suppliersData || [];
       const safeWarehouses = warehousesData || [];
-      const safeUsers = usersData || [];
       
       setSuppliers(safeSuppliers);
       setWarehouses(safeWarehouses);
-      setUsers(safeUsers);
       
       // Set defaults с защитой - Ждем установки массивов
       if (safeSuppliers.length > 0 && !selectedSupplier) {
@@ -99,7 +90,6 @@ export default function ReceptionCreate({ onBack, onSuccess, initialItems = [], 
     console.log('Данные для проверки:');
     console.log('- selectedSupplier:', selectedSupplier);
     console.log('- selectedWarehouses:', selectedWarehouses);
-    console.log('- selectedUser:', selectedUser);
     console.log('- items.length:', items.length);
     
     if (!selectedSupplier || selectedWarehouses.length === 0 || items.length === 0) {
@@ -107,9 +97,6 @@ export default function ReceptionCreate({ onBack, onSuccess, initialItems = [], 
       setError('Заполните все поля и добавьте товары');
       return;
     }
-    
-    // Если пользователь не выбран, используем значение по умолчанию
-    const userValue = selectedUser || 'admin';
     
     try {
       setLoading(true);
@@ -310,24 +297,6 @@ export default function ReceptionCreate({ onBack, onSuccess, initialItems = [], 
                 onChange={(e) => setDate(e.target.value)}
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
               />
-            </div>
-            
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Пользователь
-              </label>
-              <select
-                value={selectedUser}
-                onChange={(e) => setSelectedUser(e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-              >
-                <option value="">Выберите пользователя</option>
-                {(users || []).map(user => (
-                  <option key={user?.id || Math.random()} value={user?.id}>
-                    {user?.name || user?.email || 'Неизвестный пользователь'}
-                  </option>
-                ))}
-              </select>
             </div>
           </div>
         </div>
