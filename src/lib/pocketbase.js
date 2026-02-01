@@ -586,4 +586,99 @@ export const getSales = async (filters = {}) => {
   }
 };
 
+// Функции для работы со сменами
+export const getActiveShift = async (userId) => {
+  try {
+    console.log('PocketBase: Ищем активную смену для пользователя:', userId);
+    const records = await pb.collection('shifts').getFullList({
+      filter: `user = "${userId}" && status = "active"`
+    });
+    return records.length > 0 ? records[0] : null;
+  } catch (error) {
+    // Если коллекция не существует, возвращаем null
+    if (error.status === 404) {
+      console.log('PocketBase: Коллекция shifts еще не создана');
+      return null;
+    }
+    console.error('PocketBase: Error getting active shift:', error);
+    throw error;
+  }
+};
+
+export const startShift = async (userId, startTime) => {
+  try {
+    console.log('PocketBase: Начинаем смену для пользователя:', userId);
+    const shiftData = {
+      user: userId,
+      start: startTime,
+      status: 'active',
+      totalAmount: 0,
+      totalItems: 0,
+      sales: []
+    };
+    const record = await pb.collection('shifts').create(shiftData);
+    console.log('PocketBase: Смена успешно начата:', record);
+    return record;
+  } catch (error) {
+    // Если коллекция не существует, пробуем создать её на лету
+    if (error.status === 404) {
+      console.log('PocketBase: Коллекция shifts не найдена, работа без смен');
+      return null;
+    }
+    console.error('PocketBase: Error starting shift:', error);
+    throw error;
+  }
+};
+
+export const endShift = async (shiftId, endTime, totalAmount, totalItems, sales) => {
+  try {
+    console.log('PocketBase: Закрываем смену:', shiftId);
+    const record = await pb.collection('shifts').update(shiftId, {
+      end: endTime,
+      status: 'closed',
+      totalAmount: totalAmount,
+      totalItems: totalItems,
+      sales: sales
+    });
+    console.log('PocketBase: Смена успешно закрыта:', record);
+    return record;
+  } catch (error) {
+    console.error('PocketBase: Error ending shift:', error);
+    throw error;
+  }
+};
+
+export const getShifts = async (userId) => {
+  try {
+    console.log('PocketBase: Запрашиваем смены пользователя:', userId);
+    const records = await pb.collection('shifts').getFullList({
+      filter: `user = "${userId}"`,
+      sort: '-created'
+    });
+    console.log('PocketBase: Смены успешно загружены:', records.length, 'шт');
+    return records;
+  } catch (error) {
+    if (error.status === 404) {
+      console.log('PocketBase: Коллекция shifts еще не создана');
+      return [];
+    }
+    console.error('PocketBase: Error getting shifts:', error);
+    throw error;
+  }
+};
+
+export const updateUserTimezone = async (userId, timezone) => {
+  try {
+    console.log('PocketBase: Обновляем часовой пояс пользователя:', timezone);
+    const record = await pb.collection('users').update(userId, {
+      timezone: timezone
+    });
+    console.log('PocketBase: Часовой пояс обновлен:', record);
+    return record;
+  } catch (error) {
+    console.error('PocketBase: Error updating timezone:', error);
+    throw error;
+  }
+};
+
 export default pb;

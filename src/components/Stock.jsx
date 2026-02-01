@@ -1,9 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { getSuppliers, getStocksWithDetails, updateStock, createSale, createOrder } from '../lib/pocketbase';
-import pb from '../lib/pocketbase';
-import { Minus, DollarSign, ShoppingBasket, ShoppingCart, Menu, X, History } from 'lucide-react';
-import SellModal2 from './SellModal2';
+import { ShoppingCart, Search, Filter, Plus, Minus, Package } from 'lucide-react';
+import { getStocks, updateStock, createOrder, getActiveShift, startShift } from '../lib/pocketbase';
 import CartModal from './CartModal';
+import SellModal2 from './SellModal2';
 import SalesHistory from './SalesHistory';
 
 export default function Stock() {
@@ -151,6 +150,34 @@ export default function Stock() {
   // Обработчик завершения заказа из корзины
   const handleCompleteOrder = async (orderData) => {
     try {
+      // Проверяем, есть ли активная смена
+      const userId = localStorage.getItem('userId');
+      const activeShift = await getActiveShift(userId);
+      
+      if (!activeShift) {
+        // Если нет активной смены, начинаем её
+        const startTime = new Date().toISOString();
+        await startShift(userId, startTime);
+        
+        // Показываем уведомление о начале смены
+        const notification = document.createElement('div');
+        notification.className = 'fixed top-4 right-4 bg-green-500 text-white px-4 py-2 rounded-lg shadow-lg z-50 animate-pulse';
+        notification.innerHTML = `
+          <div class="flex items-center gap-2">
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+            </svg>
+            <span>Смена началась!</span>
+          </div>
+        `;
+        document.body.appendChild(notification);
+        
+        // Убираем уведомление через 3 секунды
+        setTimeout(() => {
+          notification.remove();
+        }, 3000);
+      }
+      
       // Сначала создаем заказ в базе данных
       await createOrder(orderData);
       

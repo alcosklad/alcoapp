@@ -5,7 +5,7 @@ import Dashboard from './components/Dashboard';
 import Reception from './components/Reception';
 import Stock from './components/Stock';
 import PriceList from './components/PriceList';
-import WorkerShift from './components/WorkerShift';
+import ShiftScreen from './components/ShiftScreen';
 import WorkerHistory from './components/WorkerHistory';
 import AuthScreen from './components/AuthScreen';
 import pb from './lib/pocketbase';
@@ -52,7 +52,7 @@ function App() {
       case 'pricelist':
         return <PriceList />;
       case 'shift':
-        return <WorkerShift />;
+        return <ShiftScreen />;
       case 'history':
         return <WorkerHistory />;
       default:
