@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { ArrowLeft, Clock, DollarSign, Package, X, CheckCircle } from 'lucide-react';
 import { getActiveShift, getShifts, endShift, getSales } from '../lib/pocketbase';
+import pb from '../lib/pocketbase';
 
 export default function ShiftScreen({ onBack }) {
   const [activeShift, setActiveShift] = useState(null);
@@ -10,6 +11,7 @@ export default function ShiftScreen({ onBack }) {
   const [showDetailModal, setShowDetailModal] = useState(false);
   const [selectedShift, setSelectedShift] = useState(null);
   const [closingShift, setClosingShift] = useState(false);
+  const [shiftData, setShiftData] = useState(null);
 
   useEffect(() => {
     loadData();
@@ -18,7 +20,13 @@ export default function ShiftScreen({ onBack }) {
   const loadData = async () => {
     try {
       setLoading(true);
-      const userId = localStorage.getItem('userId');
+      const userId = pb.authStore.model?.id;
+      
+      if (!userId) {
+        console.error('❌ Нет ID пользователя');
+        setLoading(false);
+        return;
+      }
       
       // Загружаем активную смену
       const active = await getActiveShift(userId);
@@ -37,7 +45,13 @@ export default function ShiftScreen({ onBack }) {
   const handleCloseShift = async () => {
     try {
       setClosingShift(true);
-      const userId = localStorage.getItem('userId');
+      const userId = pb.authStore.model?.id;
+      
+      if (!userId) {
+        console.error('❌ Нет ID пользователя');
+        return;
+      }
+      
       const currentTime = new Date().toISOString();
       
       // Получаем продажи за время смены
@@ -49,12 +63,31 @@ export default function ShiftScreen({ onBack }) {
       const totalAmount = sales.reduce((sum, sale) => sum + (sale.total || 0), 0);
       const totalItems = sales.reduce((sum, sale) => sum + (sale.items?.length || 0), 0);
       
-      // Закрываем смену
-      await endShift(activeShift.id, currentTime, totalAmount, totalItems, sales);
+      // Сохраняем данные для модального окна
+      setClosingShift(false);
+      setShiftData({
+        endTime: currentTime,
+        totalAmount,
+        totalItems,
+        sales
+      });
+      setShowCloseModal(true);
+    } catch (error) {
+      console.error('Ошибка подготовки данных смены:', error);
+      alert('Ошибка при получении данных смены');
+      setClosingShift(false);
+    }
+  };
+
+  const confirmCloseShift = async () => {
+    try {
+      setClosingShift(true);
+      await endShift(activeShift.id, shiftData.endTime, shiftData.totalAmount, shiftData.totalItems, shiftData.sales);
       
       // Обновляем данные
       setShowCloseModal(false);
       setActiveShift(null);
+      setShiftData(null);
       loadData();
       
       // Показываем уведомление
@@ -174,37 +207,113 @@ export default function ShiftScreen({ onBack }) {
       </div>
 
       {/* Close Shift Modal */}
-      {showCloseModal && (
+      {showCloseModal && shiftData && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-          <div className="bg-white rounded-xl max-w-md w-full p-6">
-            <div className="flex justify-between items-center mb-4">
-              <h3 className="text-lg font-semibold">Закрыть смену?</h3>
-              <button
-                onClick={() => setShowCloseModal(false)}
-                className="p-1 hover:bg-gray-100 rounded-lg"
-              >
-                <X size={20} className="text-gray-500" />
-              </button>
+          <div className="bg-white rounded-xl max-w-2xl w-full max-h-[80vh] overflow-y-auto">
+            <div className="sticky top-0 bg-white border-b p-6">
+              <div className="flex justify-between items-center">
+                <h3 className="text-lg font-semibold">Закрытие смены</h3>
+                <button
+                  onClick={() => {
+                    setShowCloseModal(false);
+                    setShiftData(null);
+                  }}
+                  className="p-1 hover:bg-gray-100 rounded-lg"
+                >
+                  <X size={20} className="text-gray-500" />
+                </button>
+              </div>
             </div>
             
-            <p className="text-gray-600 mb-6">
-              Вы уверены, что хотите закрыть смену? После закрытия вы сможете посмотреть статистику в истории.
-            </p>
-            
-            <div className="flex gap-3">
-              <button
-                onClick={() => setShowCloseModal(false)}
-                className="flex-1 px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50"
-              >
-                Отмена
-              </button>
-              <button
-                onClick={handleCloseShift}
-                disabled={closingShift}
-                className="flex-1 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 disabled:opacity-50"
-              >
-                {closingShift ? 'Закрытие...' : 'Закрыть смену'}
-              </button>
+            <div className="p-6">
+              {/* Summary */}
+              <div className="grid grid-cols-3 gap-4 mb-6">
+                <div className="bg-gray-50 rounded-lg p-4">
+                  <div className="flex items-center gap-2 text-gray-600 mb-1">
+                    <Clock size={16} />
+                    <span className="text-sm">Время работы</span>
+                  </div>
+                  <p className="font-semibold">
+                    {formatDuration(activeShift.start, shiftData.endTime)}
+                  </p>
+                </div>
+                
+                <div className="bg-gray-50 rounded-lg p-4">
+                  <div className="flex items-center gap-2 text-gray-600 mb-1">
+                    <Package size={16} />
+                    <span className="text-sm">Товары</span>
+                  </div>
+                  <p className="font-semibold">{shiftData.totalItems} шт</p>
+                </div>
+                
+                <div className="bg-gray-50 rounded-lg p-4">
+                  <div className="flex items-center gap-2 text-gray-600 mb-1">
+                    <DollarSign size={16} />
+                    <span className="text-sm">Сумма</span>
+                  </div>
+                  <p className="font-semibold text-green-600">
+                    {shiftData.totalAmount.toLocaleString('ru-RU')} ₽
+                  </p>
+                </div>
+              </div>
+              
+              {/* Sales List */}
+              <div className="mb-6">
+                <h4 className="font-medium text-gray-900 mb-3">Продажи за смену</h4>
+                {shiftData.sales && shiftData.sales.length > 0 ? (
+                  <div className="space-y-2 max-h-60 overflow-y-auto">
+                    {shiftData.sales.map((sale, index) => (
+                      <div key={index} className="bg-gray-50 rounded-lg p-3">
+                        <div className="flex justify-between items-start">
+                          <div>
+                            <p className="text-sm font-medium text-gray-900">
+                              {new Date(sale.created).toLocaleTimeString('ru-RU', {hour: '2-digit', minute: '2-digit'})}
+                            </p>
+                            <p className="text-xs text-gray-500">
+                              {sale.items?.length || 0} товаров
+                            </p>
+                            {sale.discount_value && (
+                              <p className="text-xs text-orange-600">
+                                Скидка: {sale.discount_value} {sale.discount_type === 'percent' ? '%' : '₽'}
+                              </p>
+                            )}
+                          </div>
+                          <div className="text-right">
+                            <p className="text-sm font-medium text-gray-900">
+                              {sale.total?.toLocaleString('ru-RU')} ₽
+                            </p>
+                            <p className="text-xs text-gray-500">
+                              {sale.payment_method === 'cash' ? 'Наличные' : 'Карта'}
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="text-gray-500 text-center py-4">Продаж не было</p>
+                )}
+              </div>
+              
+              {/* Buttons */}
+              <div className="flex gap-3">
+                <button
+                  onClick={() => {
+                    setShowCloseModal(false);
+                    setShiftData(null);
+                  }}
+                  className="flex-1 px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50"
+                >
+                  Отмена
+                </button>
+                <button
+                  onClick={confirmCloseShift}
+                  disabled={closingShift}
+                  className="flex-1 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 disabled:opacity-50"
+                >
+                  {closingShift ? 'Закрытие...' : 'Закрыть смену'}
+                </button>
+              </div>
             </div>
           </div>
         </div>

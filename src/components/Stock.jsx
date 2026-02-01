@@ -152,7 +152,12 @@ export default function Stock() {
   const handleCompleteOrder = async (orderData) => {
     try {
       // Проверяем, есть ли активная смена
-      const userId = localStorage.getItem('userId');
+      const userId = pb.authStore.model?.id;
+      if (!userId) {
+        console.error('❌ Нет ID пользователя');
+        return;
+      }
+      
       const activeShift = await getActiveShift(userId);
       
       if (!activeShift) {
@@ -162,13 +167,13 @@ export default function Stock() {
         
         // Показываем уведомление о начале смены
         const notification = document.createElement('div');
-        notification.className = 'fixed top-4 right-4 bg-green-500 text-white px-4 py-2 rounded-lg shadow-lg z-50 animate-pulse';
+        notification.className = 'fixed top-4 left-1/2 transform -translate-x-1/2 bg-green-500 text-white px-6 py-3 rounded-lg shadow-lg z-50 animate-pulse';
         notification.innerHTML = `
           <div class="flex items-center gap-2">
             <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
             </svg>
-            <span>Смена началась!</span>
+            <span class="font-medium">Смена началась!</span>
           </div>
         `;
         document.body.appendChild(notification);
