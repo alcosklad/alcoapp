@@ -116,7 +116,7 @@ export default function ReceptionCreate({ onBack, onSuccess, initialItems = [], 
       setError(null);
       
       const currentDateTime = new Date().toISOString();
-      const totalAmount = calculateTotal();
+      const totalAmount = getTotal();
       
       console.log('🚀 Начинаем сохранение...');
       
