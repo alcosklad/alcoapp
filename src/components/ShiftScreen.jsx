@@ -66,6 +66,7 @@ export default function ShiftScreen({ onBack }) {
           orders = await pb.collection('orders').getFullList({
             filter: `user = "${userId}" && created >= "${activeShift.start}"`
           });
+          console.log('PocketBase: Найдено заказов за смену:', orders.length);
         } catch (err) {
           console.log('Не удалось загрузить orders:', err);
         }
@@ -73,6 +74,12 @@ export default function ShiftScreen({ onBack }) {
       
       // Используем тот массив, где есть данные
       const salesData = sales.length > 0 ? sales : orders;
+      
+      console.log('PocketBase: Данные для смены:', {
+        shiftStart: activeShift.start,
+        salesCount: salesData.length,
+        sales: salesData
+      });
       
       // Считаем итоги
       const totalAmount = salesData.reduce((sum, sale) => sum + (sale.total || 0), 0);

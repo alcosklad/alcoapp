@@ -182,6 +182,8 @@ export default function Stock() {
         setTimeout(() => {
           notification.remove();
         }, 3000);
+      } else {
+        console.log('PocketBase: Активная смена уже существует:', activeShift);
       }
       
       // Сначала создаем заказ в базе данных
