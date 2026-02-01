@@ -427,6 +427,9 @@ export const getDashboardStats = async (filterId = null) => {
     const receptions = await pb.collection('receptions').getFullList({
       filter: receptionsFilter,
       expand: 'supplier,warehouse'
+    }).catch(err => {
+      console.log('PocketBase: Не удалось загрузить приемки, используем пустые данные');
+      return [];
     });
     
     console.log(`PocketBase: Получено ${receptions.length} приемок`);
