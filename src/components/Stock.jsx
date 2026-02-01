@@ -4,6 +4,7 @@ import { getStocks, updateStock, createOrder, getActiveShift, startShift } from 
 import CartModal from './CartModal';
 import SellModal2 from './SellModal2';
 import SalesHistory from './SalesHistory';
+import pb from '../lib/pocketbase';
 
 export default function Stock() {
   const [stocks, setStocks] = useState([]);
