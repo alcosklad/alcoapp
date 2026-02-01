@@ -282,7 +282,7 @@ export default function Stock() {
           onClick={() => setIsCartOpen(true)}
           className="fixed top-4 right-4 z-40 p-3 bg-green-600 text-white rounded-lg shadow-lg hover:bg-green-700 transition-all duration-200"
         >
-          {cartMode ? <ShoppingCart size={24} /> : <ShoppingBasket size={24} />}
+          {cartMode ? <ShoppingCart size={24} /> : <ShoppingCart size={24} />}
         </button>
       )}
 
