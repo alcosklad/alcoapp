@@ -59,8 +59,7 @@ export default function AuthScreen({ onAuth }) {
       <div className="max-w-md w-full">
         {/* Logo */}
         <div className="text-center mb-8">
-          <h1 className="text-3xl font-bold text-gray-900">AlcoApp</h1>
-          <p className="text-gray-600 mt-2">Система учета алкоголя</p>
+          <h1 className="text-3xl font-bold text-gray-900">Наш Склад</h1>
         </div>
 
         {/* Login Form */}
@@ -127,23 +126,6 @@ export default function AuthScreen({ onAuth }) {
               )}
             </button>
           </form>
-
-          {/* Test Accounts */}
-          <div className="mt-6 pt-6 border-t border-gray-100">
-            <p className="text-xs text-gray-500 mb-3">Тестовые аккаунты:</p>
-            <div className="space-y-2 text-xs">
-              <div>
-                <span className="font-medium">Администратор:</span>
-                <br />
-                admin@alcoapp.ru / admin123
-              </div>
-              <div>
-                <span className="font-medium">Оператор:</span>
-                <br />
-                operator@alcoapp.ru / operator123
-              </div>
-            </div>
-          </div>
         </div>
       </div>
     </div>

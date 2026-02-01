@@ -1,0 +1,170 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>PocketBase API Explorer</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        .section { margin: 20px 0; padding: 20px; border: 1px solid #ddd; }
+        input, textarea, select { width: 100%; padding: 10px; margin: 5px 0; }
+        button { padding: 10px 20px; background: #007bff; color: white; border: none; cursor: pointer; }
+        button:hover { background: #0056b3; }
+        pre { background: #f5f5f5; padding: 10px; overflow-x: auto; }
+        .error { color: red; }
+        .success { color: green; }
+    </style>
+</head>
+<body>
+    <h1>PocketBase API Explorer</h1>
+    
+    <div class="section">
+        <h2>Настройки</h2>
+        <input type="text" id="baseUrl" value="http://127.0.0.1:8090" placeholder="Base URL">
+        <input type="text" id="token" placeholder="Auth Token (опционально)">
+        <button onclick="saveSettings()">Сохранить</button>
+    </div>
+
+    <div class="section">
+        <h2>Авторизация</h2>
+        <input type="email" id="adminEmail" value="admin@sklad.ru" placeholder="Email">
+        <input type="password" id="adminPassword" value="326052sssS" placeholder="Password">
+        <button onclick="login()">Войти</button>
+        <pre id="authResult"></pre>
+    </div>
+
+    <div class="section">
+        <h2>Выбор коллекции</h2>
+        <select id="collection">
+            <option value="products">Products</option>
+            <option value="users">Users</option>
+            <option value="warehouses">Warehouses</option>
+            <option value="receptions">Receptions</option>
+        </select>
+        <button onclick="listRecords">Показать все записи</button>
+        <pre id="listResult"></pre>
+    </div>
+
+    <div class="section">
+        <h2>Редактировать запись</h2>
+        <input type="text" id="recordId" placeholder="ID записи">
+        <textarea id="recordData" placeholder='{"name": "Новое название", "price": 1000}' rows="5"></textarea>
+        <button onclick="updateRecord()">Обновить</button>
+        <pre id="updateResult"></pre>
+    </div>
+
+    <div class="section">
+        <h2>Создать запись</h2>
+        <textarea id="newRecordData" placeholder='{"name": "Новый товар", "price": 1000, "category": "Водка"}' rows="5"></textarea>
+        <button onclick="createRecord()">Создать</button>
+        <pre id="createResult"></pre>
+    </div>
+
+    <script>
+        let authToken = '';
+
+        function saveSettings() {
+            localStorage.setItem('pbBaseUrl', document.getElementById('baseUrl').value);
+            localStorage.setItem('pbToken', document.getElementById('token').value);
+            alert('Настройки сохранены');
+        }
+
+        function loadSettings() {
+            const baseUrl = localStorage.getItem('pbBaseUrl') || 'http://127.0.0.1:8090';
+            const token = localStorage.getItem('pbToken') || '';
+            document.getElementById('baseUrl').value = baseUrl;
+            document.getElementById('token').value = token;
+        }
+
+        async function login() {
+            const email = document.getElementById('adminEmail').value;
+            const password = document.getElementById('adminPassword').value;
+            const baseUrl = document.getElementById('baseUrl').value;
+
+            try {
+                const response = await fetch(`${baseUrl}/api/admins/auth-with-password`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ identity: email, password })
+                });
+                
+                const data = await response.json();
+                
+                if (response.ok) {
+                    authToken = data.token;
+                    document.getElementById('token').value = authToken;
+                    document.getElementById('authResult').innerHTML = '<span class="success">✅ Успешная авторизация!</span>';
+                } else {
+                    document.getElementById('authResult').innerHTML = `<span class="error">❌ Ошибка: ${data.message}</span>`;
+                }
+            } catch (error) {
+                document.getElementById('authResult').innerHTML = `<span class="error">❌ Ошибка: ${error.message}</span>`;
+            }
+        }
+
+        async function listRecords() {
+            const collection = document.getElementById('collection').value;
+            const baseUrl = document.getElementById('baseUrl').value;
+            const token = document.getElementById('token').value || authToken;
+
+            try {
+                const response = await fetch(`${baseUrl}/api/collections/${collection}/records?page=1&perPage=50`, {
+                    headers: token ? { 'Authorization': token } : {}
+                });
+                
+                const data = await response.json();
+                document.getElementById('listResult').textContent = JSON.stringify(data, null, 2);
+            } catch (error) {
+                document.getElementById('listResult').innerHTML = `<span class="error">Ошибка: ${error.message}</span>`;
+            }
+        }
+
+        async function updateRecord() {
+            const recordId = document.getElementById('recordId').value;
+            const collection = document.getElementById('collection').value;
+            const data = JSON.parse(document.getElementById('recordData').value);
+            const baseUrl = document.getElementById('baseUrl').value;
+            const token = document.getElementById('token').value || authToken;
+
+            try {
+                const response = await fetch(`${baseUrl}/api/collections/${collection}/records/${recordId}`, {
+                    method: 'PATCH',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': token
+                    },
+                    body: JSON.stringify(data)
+                });
+                
+                const result = await response.json();
+                document.getElementById('updateResult').textContent = JSON.stringify(result, null, 2);
+            } catch (error) {
+                document.getElementById('updateResult').innerHTML = `<span class="error">Ошибка: ${error.message}</span>`;
+            }
+        }
+
+        async function createRecord() {
+            const collection = document.getElementById('collection').value;
+            const data = JSON.parse(document.getElementById('newRecordData').value);
+            const baseUrl = document.getElementById('baseUrl').value;
+            const token = document.getElementById('token').value || authToken;
+
+            try {
+                const response = await fetch(`${baseUrl}/api/collections/${collection}/records`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': token
+                    },
+                    body: JSON.stringify(data)
+                });
+                
+                const result = await response.json();
+                document.getElementById('createResult').textContent = JSON.stringify(result, null, 2);
+            } catch (error) {
+                document.getElementById('createResult').innerHTML = `<span class="error">Ошибка: ${error.message}</span>`;
+            }
+        }
+
+        loadSettings();
+    </script>
+</body>
+</html>
