@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { ShoppingCart, Search, Filter, Plus, Minus, Package } from 'lucide-react';
-import { getStocks, updateStock, createOrder, getActiveShift, startShift } from '../lib/pocketbase';
+import { getStocks, updateStock, createOrder, getActiveShift, startShift, getSuppliers, getStocksWithDetails } from '../lib/pocketbase';
 import CartModal from './CartModal';
 import SellModal2 from './SellModal2';
 import SalesHistory from './SalesHistory';
