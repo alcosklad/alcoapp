@@ -63,10 +63,34 @@ export default function ShiftScreen({ onBack }) {
       let orders = [];
       if (sales.length === 0) {
         try {
+          // Пробуем более мягкий фильтр - за сегодня
+          const today = new Date().toISOString().split('T')[0];
+          const shiftDate = activeShift.start.split('T')[0];
+          
+          let filter = `user = "${userId}"`;
+          if (shiftDate === today) {
+            // Если смена сегодня, ищем за сегодня
+            filter += ` && created >= "${shiftDate}T00:00:00.000Z"`;
+          } else {
+            // Если смена в другой день, используем время начала смены
+            filter += ` && created >= "${activeShift.start}"`;
+          }
+          
           orders = await pb.collection('orders').getFullList({
-            filter: `user = "${userId}" && created >= "${activeShift.start}"`
+            filter: filter
           });
+          
+          console.log('PocketBase: Фильтр заказов:', filter);
           console.log('PocketBase: Найдено заказов за смену:', orders.length);
+          
+          // Дополнительно фильтруем по времени начала смены
+          const shiftStartTime = new Date(activeShift.start);
+          orders = orders.filter(order => {
+            const orderTime = new Date(order.created);
+            return orderTime >= shiftStartTime;
+          });
+          
+          console.log('PocketBase: После фильтрации по времени:', orders.length);
         } catch (err) {
           console.log('Не удалось загрузить orders:', err);
         }
