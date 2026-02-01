@@ -1,8 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { ArrowLeft, Clock, DollarSign, Package, X, CheckCircle } from 'lucide-react';
 import { getActiveShift, getShifts, endShift, getSales } from '../lib/pocketbase';
-import { format } from 'date-fns';
-import { ru } from 'date-fns/locale';
 
 export default function ShiftScreen({ onBack }) {
   const [activeShift, setActiveShift] = useState(null);
@@ -81,7 +79,8 @@ export default function ShiftScreen({ onBack }) {
   };
 
   const formatDate = (dateString) => {
-    return format(new Date(dateString), 'dd MMMM yyyy HH:mm', { locale: ru });
+    const date = new Date(dateString);
+    return date.toLocaleString('ru-RU');
   };
 
   if (loading) {
@@ -150,7 +149,7 @@ export default function ShiftScreen({ onBack }) {
                 <div className="flex justify-between items-start">
                   <div>
                     <p className="font-medium text-gray-900">
-                      Смена от {format(new Date(shift.start), 'dd MMMM yyyy', { locale: ru })}
+                      Смена от {new Date(shift.start).toLocaleDateString('ru-RU')}
                     </p>
                     <p className="text-sm text-gray-500">
                       {formatDate(shift.start)} - {formatDate(shift.end)}
@@ -218,7 +217,7 @@ export default function ShiftScreen({ onBack }) {
             <div className="sticky top-0 bg-white border-b p-6">
               <div className="flex justify-between items-center">
                 <h3 className="text-lg font-semibold">
-                  Смена от {format(new Date(selectedShift.start), 'dd MMMM yyyy', { locale: ru })}
+                  Смена от {new Date(selectedShift.start).toLocaleDateString('ru-RU')}
                 </h3>
                 <button
                   onClick={() => setShowDetailModal(false)}
@@ -271,7 +270,7 @@ export default function ShiftScreen({ onBack }) {
                         <div className="flex justify-between items-start">
                           <div>
                             <p className="text-sm font-medium text-gray-900">
-                              {format(new Date(sale.created), 'HH:mm')}
+                              {new Date(sale.created).toLocaleTimeString('ru-RU', {hour: '2-digit', minute: '2-digit'})}
                             </p>
                             <p className="text-xs text-gray-500">
                               {sale.items?.length || 0} товаров
