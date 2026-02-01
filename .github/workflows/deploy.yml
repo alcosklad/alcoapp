@@ -28,6 +28,10 @@ jobs:
           git clean -fd
           echo "📋 Pulling latest changes..."
           git pull origin main
-          echo "🔧 Running setup script..."
-          ./setup-production.sh
+          echo "� Installing dependencies..."
+          npm ci --only=production
+          echo "🔨 Building application..."
+          npm run build
+          echo "🔄 Restarting application..."
+          pm2 reload alcoapp || pm2 start npm --name "alcoapp" -- start
           echo "✅ Deployment completed successfully!"
