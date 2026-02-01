@@ -611,6 +611,13 @@ export const getActiveShift = async (userId) => {
 export const startShift = async (userId, startTime) => {
   try {
     console.log('PocketBase: Начинаем смену для пользователя:', userId);
+    console.log('PocketBase: Время начала смены:', startTime);
+    
+    if (!startTime) {
+      startTime = new Date().toISOString();
+      console.log('PocketBase: Используем текущее время:', startTime);
+    }
+    
     const shiftData = {
       user: userId,
       start: startTime,
@@ -619,6 +626,8 @@ export const startShift = async (userId, startTime) => {
       totalItems: 0,
       sales: []
     };
+    
+    console.log('PocketBase: Данные для создания смены:', shiftData);
     const record = await pb.collection('shifts').create(shiftData);
     console.log('PocketBase: Смена успешно начата:', record);
     return record;
