@@ -59,9 +59,24 @@ export default function ShiftScreen({ onBack }) {
         filter: `user = "${userId}" && created >= "${activeShift.start}"`
       });
       
+      // Если sales не работает, пробуем orders
+      let orders = [];
+      if (sales.length === 0) {
+        try {
+          orders = await pb.collection('orders').getFullList({
+            filter: `user = "${userId}" && created >= "${activeShift.start}"`
+          });
+        } catch (err) {
+          console.log('Не удалось загрузить orders:', err);
+        }
+      }
+      
+      // Используем тот массив, где есть данные
+      const salesData = sales.length > 0 ? sales : orders;
+      
       // Считаем итоги
-      const totalAmount = sales.reduce((sum, sale) => sum + (sale.total || 0), 0);
-      const totalItems = sales.reduce((sum, sale) => sum + (sale.items?.length || 0), 0);
+      const totalAmount = salesData.reduce((sum, sale) => sum + (sale.total || 0), 0);
+      const totalItems = salesData.reduce((sum, sale) => sum + (sale.items?.length || 0), 0);
       
       // Сохраняем данные для модального окна
       setClosingShift(false);
@@ -69,7 +84,7 @@ export default function ShiftScreen({ onBack }) {
         endTime: currentTime,
         totalAmount,
         totalItems,
-        sales
+        sales: salesData
       });
       setShowCloseModal(true);
     } catch (error) {
