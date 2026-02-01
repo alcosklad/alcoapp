@@ -24,6 +24,8 @@ jobs:
           echo "🚀 Starting deployment..."
           cd /var/www/alcoapp
           echo "📁 Current directory: $(pwd)"
+          echo "🧹 Cleaning untracked files..."
+          git clean -fd
           echo "📋 Pulling latest changes..."
           git pull origin main
           echo "🔧 Running setup script..."
