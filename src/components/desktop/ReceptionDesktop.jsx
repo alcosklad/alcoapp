@@ -16,6 +16,7 @@ export default function ReceptionDesktop() {
   const [sortField, setSortField] = useState('created');
   const [sortDir, setSortDir] = useState('desc');
   const [selectedReception, setSelectedReception] = useState(null);
+  const [showCreateModal, setShowCreateModal] = useState(false);
   const [editedItems, setEditedItems] = useState([]);
   const [hasChanges, setHasChanges] = useState(false);
   
@@ -370,7 +371,7 @@ export default function ReceptionDesktop() {
         isOpen={showCreateModal}
         onClose={() => setShowCreateModal(false)}
         suppliers={suppliers}
-        stores={stores}
+        stores={storesList}
         products={products}
         onSave={handleCreateReception}
       />
