@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+// Mobile components
 import Navigation from './components/Navigation';
 import WorkerSidebar from './components/WorkerSidebar';
 import Dashboard from './components/Dashboard';
@@ -8,6 +9,12 @@ import PriceList from './components/PriceList';
 import ShiftScreen from './components/ShiftScreen';
 import WorkerHistory from './components/WorkerHistory';
 import AuthScreen from './components/AuthScreen';
+// Desktop components
+import DesktopLayout from './layouts/DesktopLayout';
+import DashboardDesktop from './components/desktop/DashboardDesktop';
+import StockDesktop from './components/desktop/StockDesktop';
+import PriceListDesktop from './components/desktop/PriceListDesktop';
+import ReceptionDesktop from './components/desktop/ReceptionDesktop';
 import pb from './lib/pocketbase';
 
 function App() {
@@ -41,7 +48,45 @@ function App() {
     setActiveTab('dashboard');
   };
 
-  const renderContent = () => {
+  // Показываем экран авторизации если пользователь не вошел
+  if (!loading && !user) {
+    return <AuthScreen onAuth={handleAuth} />;
+  }
+
+  const isWorker = user?.role === 'worker';
+  const isDesktopUser = user?.role === 'admin' || user?.role === 'operator';
+
+  // Desktop версия для админа и оператора
+  if (isDesktopUser) {
+    const renderDesktopContent = () => {
+      switch (activeTab) {
+        case 'dashboard':
+          return <DashboardDesktop user={user} />;
+        case 'reception':
+          return <ReceptionDesktop />;
+        case 'stock':
+          return <StockDesktop />;
+        case 'pricelist':
+          return <PriceListDesktop />;
+        default:
+          return <DashboardDesktop user={user} />;
+      }
+    };
+
+    return (
+      <DesktopLayout
+        activeTab={activeTab}
+        onTabChange={setActiveTab}
+        user={user}
+        onLogout={handleLogout}
+      >
+        {renderDesktopContent()}
+      </DesktopLayout>
+    );
+  }
+
+  // Mobile версия для воркера (курьера)
+  const renderMobileContent = () => {
     switch (activeTab) {
       case 'dashboard':
         return <Dashboard user={user} onLogout={handleLogout} />;
@@ -60,16 +105,9 @@ function App() {
     }
   };
 
-  // Показываем экран авторизации если пользователь не вошел
-  if (!loading && !user) {
-    return <AuthScreen onAuth={handleAuth} />;
-  }
-
-  const isWorker = user?.role === 'worker';
-
   return (
     <div className="relative">
-      {renderContent()}
+      {renderMobileContent()}
       {!loading && user && !isWorker && (
         <Navigation 
           activeTab={activeTab} 

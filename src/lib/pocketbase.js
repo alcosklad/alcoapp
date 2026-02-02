@@ -418,59 +418,90 @@ export const getDashboardStats = async (filterId = null) => {
   try {
     console.log('PocketBase: Загружаем статистику...');
     
-    // Получаем все приемки
+    // Получаем остатки для подсчета товаров на складе и суммы продажи
+    let stocksFilter = '';
+    if (filterId) {
+      stocksFilter = `supplier = "${filterId}"`;
+    }
+    
+    const stocks = await pb.collection('stocks').getFullList({
+      filter: stocksFilter,
+      expand: 'product'
+    }).catch(() => []);
+    
+    let totalStockQuantity = 0;
+    let totalSaleValue = 0;
+    
+    stocks.forEach(stock => {
+      const quantity = stock.quantity || 0;
+      const salePrice = stock?.expand?.product?.price || 0;
+      
+      totalStockQuantity += quantity;
+      totalSaleValue += salePrice * quantity;
+    });
+    
+    // Получаем приемки для подсчета суммы закупа
     let receptionsFilter = '';
     if (filterId) {
-      receptionsFilter = `warehouse = "${filterId}" OR supplier = "${filterId}"`;
+      receptionsFilter = `supplier = "${filterId}"`;
     }
     
     const receptions = await pb.collection('receptions').getFullList({
       filter: receptionsFilter,
       expand: 'supplier,warehouse'
-    }).catch(err => {
-      console.log('PocketBase: Не удалось загрузить приемки, используем пустые данные');
-      return [];
-    });
+    }).catch(() => []);
     
-    console.log(`PocketBase: Получено ${receptions.length} приемок`);
-    
-    let totalQuantity = 0;
     let totalPurchaseValue = 0;
+    let receptionsCount = receptions.length;
     
-    receptions.forEach((reception, index) => {
-      console.log(`PocketBase: Приемка ${index + 1}:`, reception);
-      
-      // Считаем общее количество товаров
+    receptions.forEach(reception => {
       if (reception.items && Array.isArray(reception.items)) {
-        console.log(`PocketBase: Items в приемке ${index + 1}:`, reception.items);
-        
         reception.items.forEach(item => {
           const quantity = item.quantity || 0;
           const purchasePrice = item.cost || item.purchase_price || item.price || 0;
-          
-          totalQuantity += quantity;
           totalPurchaseValue += purchasePrice * quantity;
-          
-          console.log(`PocketBase: Товар - кол-во: ${quantity}, цена: ${purchasePrice}, сумма: ${purchasePrice * quantity}`);
         });
-      } else {
-        console.log(`PocketBase: В приемке ${index + 1} нет items или это не массив`);
       }
     });
     
-    console.log(`PocketBase: ИТОГО - товаров: ${totalQuantity}, сумма закупа: ${totalPurchaseValue}`);
+    // Получаем товары с долгим сроком хранения (неликвид)
+    const thirtyDaysAgo = new Date();
+    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+    
+    const sales = await pb.collection('sales').getFullList({
+      sort: '-created'
+    }).catch(() => []);
+    
+    // Находим товары, которые не продавались больше 30 дней
+    const soldProductIds = new Set();
+    sales.forEach(sale => {
+      const saleDate = new Date(sale.created);
+      if (saleDate > thirtyDaysAgo) {
+        soldProductIds.add(sale.product);
+      }
+    });
+    
+    const staleProducts = stocks.filter(stock => {
+      return stock.quantity > 0 && !soldProductIds.has(stock.product);
+    });
     
     return {
-      totalProducts: totalQuantity,
-      totalValue: totalPurchaseValue,
-      totalPurchaseValue
+      totalProducts: totalStockQuantity,
+      totalSaleValue,
+      totalPurchaseValue,
+      receptionsCount,
+      staleProductsCount: staleProducts.length,
+      staleProducts: staleProducts.slice(0, 10) // Первые 10 для показа
     };
   } catch (error) {
     console.error('PocketBase: Error loading dashboard stats:', error);
     return {
       totalProducts: 0,
-      totalValue: 0,
-      totalPurchaseValue: 0
+      totalSaleValue: 0,
+      totalPurchaseValue: 0,
+      receptionsCount: 0,
+      staleProductsCount: 0,
+      staleProducts: []
     };
   }
 };
