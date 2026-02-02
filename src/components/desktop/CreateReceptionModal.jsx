@@ -9,6 +9,19 @@ export default function CreateReceptionModal({
   products,
   onSave 
 }) {
+  // Статичный список магазинов (пока коллекция stores не создана в PocketBase)
+  const defaultStores = [
+    { id: 'kb', name: 'КБ' },
+    { id: 'bristol', name: 'Бристоль' },
+    { id: 'lenta', name: 'Лента' },
+    { id: 'magnit', name: 'Магнит' },
+    { id: 'perekrestok', name: 'Перекрёсток' },
+    { id: 'pyaterochka', name: 'Пятёрочка' },
+    { id: 'diksi', name: 'Дикси' }
+  ];
+
+  const storesList = stores && stores.length > 0 ? stores : defaultStores;
+
   const [formData, setFormData] = useState({
     supplier: '',
     selectedStores: [],
@@ -34,12 +47,19 @@ export default function CreateReceptionModal({
     }
   }, [productSearch, products]);
 
-  const handleStoreToggle = (storeId) => {
+  const handleAddStore = (storeId) => {
+    if (!formData.selectedStores.includes(storeId)) {
+      setFormData(prev => ({
+        ...prev,
+        selectedStores: [...prev.selectedStores, storeId]
+      }));
+    }
+  };
+
+  const handleRemoveStore = (storeId) => {
     setFormData(prev => ({
       ...prev,
-      selectedStores: prev.selectedStores.includes(storeId)
-        ? prev.selectedStores.filter(id => id !== storeId)
-        : [...prev.selectedStores, storeId]
+      selectedStores: prev.selectedStores.filter(id => id !== storeId)
     }));
   };
 
@@ -157,8 +177,8 @@ export default function CreateReceptionModal({
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50" onClick={onClose}>
-      <div className="bg-white rounded-lg w-full max-w-4xl mx-4 max-h-[90vh] overflow-hidden flex flex-col" onClick={(e) => e.stopPropagation()}>
+    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4" onClick={onClose}>
+      <div className="bg-white rounded-lg w-full max-w-6xl h-[95vh] overflow-hidden flex flex-col" onClick={(e) => e.stopPropagation()}>
         {/* Заголовок */}
         <div className="flex items-center justify-between p-4 border-b border-gray-200">
           <h2 className="text-lg font-semibold text-gray-900">Создать новую приёмку</h2>
@@ -194,21 +214,45 @@ export default function CreateReceptionModal({
             <label className="block text-sm font-medium text-gray-700 mb-1">
               Магазины <span className="text-red-500">*</span>
             </label>
-            <div className="flex flex-wrap gap-2">
-              {stores.map(store => (
-                <button
-                  key={store.id}
-                  onClick={() => handleStoreToggle(store.id)}
-                  className={`px-3 py-1 rounded text-xs border transition-colors ${
-                    formData.selectedStores.includes(store.id)
-                      ? 'bg-blue-600 text-white border-blue-600'
-                      : 'bg-white text-gray-700 border-gray-300 hover:border-blue-500'
-                  }`}
-                >
+            <select
+              onChange={(e) => {
+                if (e.target.value) {
+                  handleAddStore(e.target.value);
+                  e.target.value = '';
+                }
+              }}
+              className="w-full px-3 py-2 border border-gray-300 rounded text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 mb-2"
+            >
+              <option value="">Выберите магазин для добавления</option>
+              {storesList.filter(store => !formData.selectedStores.includes(store.id)).map(store => (
+                <option key={store.id} value={store.id}>
                   {store.name}
-                </button>
+                </option>
               ))}
-            </div>
+            </select>
+            
+            {/* Выбранные магазины */}
+            {formData.selectedStores.length > 0 && (
+              <div className="flex flex-wrap gap-2">
+                {formData.selectedStores.map(storeId => {
+                  const store = storesList.find(s => s.id === storeId);
+                  return (
+                    <div
+                      key={storeId}
+                      className="flex items-center gap-1 px-2 py-1 bg-blue-100 text-blue-700 rounded text-xs"
+                    >
+                      <span>{store?.name || storeId}</span>
+                      <button
+                        onClick={() => handleRemoveStore(storeId)}
+                        className="hover:bg-blue-200 rounded p-0.5"
+                      >
+                        <X size={12} />
+                      </button>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
             {errors.stores && <p className="text-xs text-red-500 mt-1">{errors.stores}</p>}
           </div>
 
