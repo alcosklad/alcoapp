@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { Search, ChevronUp, ChevronDown, RefreshCw, Plus, Eye, X, Trash2, Edit } from 'lucide-react';
-import { getReceptions, getSuppliers, getStores, getProducts, createReception, updateReception, deleteReception } from '../../lib/pocketbase';
+import { Search, ChevronUp, ChevronDown, RefreshCw, Plus, Eye, X, Trash2, Minus } from 'lucide-react';
+import { getReceptions, getSuppliers, getProducts, createReception, updateReception, deleteReception } from '../../lib/pocketbase';
 import { format } from 'date-fns';
 import { ru } from 'date-fns/locale';
 import pb from '../../lib/pocketbase';
@@ -9,7 +9,6 @@ import CreateReceptionModal from './CreateReceptionModal';
 export default function ReceptionDesktop() {
   const [receptions, setReceptions] = useState([]);
   const [suppliers, setSuppliers] = useState([]);
-  const [stores, setStores] = useState([]);
   const [products, setProducts] = useState([]);
   const [selectedSupplier, setSelectedSupplier] = useState('');
   const [loading, setLoading] = useState(true);
@@ -17,16 +16,14 @@ export default function ReceptionDesktop() {
   const [sortField, setSortField] = useState('created');
   const [sortDir, setSortDir] = useState('desc');
   const [selectedReception, setSelectedReception] = useState(null);
-  const [showCreateModal, setShowCreateModal] = useState(false);
-  const [showEditModal, setShowEditModal] = useState(false);
-  const [isEditMode, setIsEditMode] = useState(false);
-  const [editedReception, setEditedReception] = useState(null);
+  const [editedItems, setEditedItems] = useState([]);
+  const [hasChanges, setHasChanges] = useState(false);
   
   const userRole = pb.authStore.model?.role;
   const isAdmin = userRole === 'admin';
 
   // Статичный список магазинов
-  const defaultStores = [
+  const storesList = [
     { id: 'kb', name: 'КБ' },
     { id: 'bristol', name: 'Бристоль' },
     { id: 'lenta', name: 'Лента' },
@@ -36,11 +33,8 @@ export default function ReceptionDesktop() {
     { id: 'diksi', name: 'Дикси' }
   ];
 
-  const storesList = stores && stores.length > 0 ? stores : defaultStores;
-
   useEffect(() => {
     loadSuppliers();
-    loadStores();
     loadProducts();
     loadReceptions();
   }, []);
@@ -55,15 +49,6 @@ export default function ReceptionDesktop() {
       setSuppliers(data || []);
     } catch (error) {
       console.error('Error loading suppliers:', error);
-    }
-  };
-
-  const loadStores = async () => {
-    try {
-      const data = await getStores().catch(() => []);
-      setStores(data || []);
-    } catch (error) {
-      console.error('Error loading stores:', error);
     }
   };
 
@@ -126,7 +111,7 @@ export default function ReceptionDesktop() {
     try {
       setLoading(true);
       await deleteReception(receptionId);
-      setSelectedReception(null);
+      handleCloseModal();
       await loadReceptions();
       alert('Приёмка удалена');
     } catch (error) {
@@ -137,34 +122,50 @@ export default function ReceptionDesktop() {
     }
   };
 
-  const handleStartEdit = () => {
-    setIsEditMode(true);
-    setEditedReception({
-      ...selectedReception,
-      items: [...selectedReception.items]
-    });
+  const handleOpenReception = (reception) => {
+    setSelectedReception(reception);
+    setEditedItems(JSON.parse(JSON.stringify(reception.items || [])));
+    setHasChanges(false);
   };
 
-  const handleCancelEdit = () => {
-    setIsEditMode(false);
-    setEditedReception(null);
+  const handleCloseDetails = () => {
+    setSelectedReception(null);
+    setEditedItems([]);
+    setHasChanges(false);
   };
 
-  const handleSaveEdit = async () => {
+  const handleQuantityChange = (itemIndex, delta) => {
+    const newItems = [...editedItems];
+    newItems[itemIndex].quantity = Math.max(1, newItems[itemIndex].quantity + delta);
+    setEditedItems(newItems);
+    setHasChanges(true);
+  };
+
+  const handleRemoveItem = (itemIndex) => {
+    if (editedItems.length <= 1) {
+      alert('Нельзя удалить последний товар из приёмки');
+      return;
+    }
+    const newItems = editedItems.filter((_, idx) => idx !== itemIndex);
+    setEditedItems(newItems);
+    setHasChanges(true);
+  };
+
+  const handleSaveChanges = async () => {
     try {
       setLoading(true);
-      const totalAmount = editedReception.items.reduce((sum, item) => 
+      const totalAmount = editedItems.reduce((sum, item) => 
         sum + (item.cost * item.quantity), 0
       );
 
-      await updateReception(editedReception.id, {
-        items: editedReception.items,
-        total_amount: totalAmount,
-        stores: editedReception.stores
+      await updateReception(selectedReception.id, {
+        items: editedItems,
+        total_amount: totalAmount
       });
 
-      setIsEditMode(false);
       setSelectedReception(null);
+      setEditedItems([]);
+      setHasChanges(false);
       await loadReceptions();
       alert('Приёмка обновлена! Остатки пересчитаны.');
     } catch (error) {
@@ -173,39 +174,6 @@ export default function ReceptionDesktop() {
     } finally {
       setLoading(false);
     }
-  };
-
-  const handleEditQuantityChange = (itemIndex, delta) => {
-    setEditedReception(prev => ({
-      ...prev,
-      items: prev.items.map((item, idx) => 
-        idx === itemIndex 
-          ? { ...item, quantity: Math.max(1, item.quantity + delta) }
-          : item
-      )
-    }));
-  };
-
-  const handleEditCostChange = (itemIndex, value) => {
-    setEditedReception(prev => ({
-      ...prev,
-      items: prev.items.map((item, idx) => 
-        idx === itemIndex 
-          ? { ...item, cost: parseFloat(value) || 0 }
-          : item
-      )
-    }));
-  };
-
-  const handleRemoveEditItem = (itemIndex) => {
-    if (editedReception.items.length <= 1) {
-      alert('Нельзя удалить последний товар из приёмки');
-      return;
-    }
-    setEditedReception(prev => ({
-      ...prev,
-      items: prev.items.filter((_, idx) => idx !== itemIndex)
-    }));
   };
 
   const filteredReceptions = receptions
@@ -381,7 +349,7 @@ export default function ReceptionDesktop() {
                       </td>
                       <td className="px-3 py-1.5 text-center">
                         <button
-                          onClick={() => setSelectedReception(reception)}
+                          onClick={() => handleOpenReception(reception)}
                           className="inline-flex items-center gap-1 px-2 py-1 text-blue-600 hover:bg-blue-50 rounded text-xs"
                         >
                           <Eye size={14} />
@@ -409,8 +377,8 @@ export default function ReceptionDesktop() {
 
       {/* Модалка с деталями приёмки */}
       {selectedReception && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4" onClick={() => { setSelectedReception(null); setIsEditMode(false); }}>
-          <div className="bg-white rounded-lg w-full max-w-5xl h-[90vh] overflow-hidden flex flex-col" onClick={(e) => e.stopPropagation()}>
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4" onClick={handleCloseDetails}>
+          <div className="bg-white rounded-lg w-full max-w-4xl max-h-[90vh] overflow-hidden flex flex-col" onClick={(e) => e.stopPropagation()}>
             {/* Заголовок */}
             <div className="flex items-center justify-between p-4 border-b border-gray-200">
               <div>
@@ -422,25 +390,16 @@ export default function ReceptionDesktop() {
                 </p>
               </div>
               <div className="flex items-center gap-2">
-                {isAdmin && !isEditMode && (
-                  <>
-                    <button
-                      onClick={handleStartEdit}
-                      className="p-1 text-blue-600 hover:bg-blue-50 rounded"
-                      title="Редактировать приёмку"
-                    >
-                      <Edit size={16} />
-                    </button>
-                    <button
-                      onClick={() => handleDeleteReception(selectedReception.id)}
-                      className="p-1 text-red-600 hover:bg-red-50 rounded"
-                      title="Удалить приёмку"
-                    >
-                      <Trash2 size={16} />
-                    </button>
-                  </>
+                {isAdmin && (
+                  <button
+                    onClick={() => handleDeleteReception(selectedReception.id)}
+                    className="p-1 text-red-600 hover:bg-red-50 rounded"
+                    title="Удалить приёмку"
+                  >
+                    <Trash2 size={16} />
+                  </button>
                 )}
-                <button onClick={() => { setSelectedReception(null); setIsEditMode(false); }} className="text-gray-400 hover:text-gray-600">
+                <button onClick={handleCloseDetails} className="text-gray-400 hover:text-gray-600">
                   <X size={20} />
                 </button>
               </div>
@@ -469,32 +428,21 @@ export default function ReceptionDesktop() {
               <div className="grid grid-cols-3 gap-4 p-4 bg-gray-50 rounded">
                 <div>
                   <p className="text-xs text-gray-500">Товаров</p>
-                  <p className="text-base font-semibold">
-                    {(isEditMode ? editedReception.items : selectedReception.items)?.length || 0} шт
-                  </p>
+                  <p className="text-base font-semibold">{editedItems.length} шт</p>
                 </div>
                 <div>
                   <p className="text-xs text-gray-500">Сумма закупа</p>
                   <p className="text-base font-semibold">
-                    {isEditMode 
-                      ? editedReception.items.reduce((sum, item) => sum + (item.cost * item.quantity), 0).toLocaleString('ru-RU')
-                      : (selectedReception.total_amount || 0).toLocaleString('ru-RU')
-                    } ₽
+                    {editedItems.reduce((sum, item) => sum + (item.cost * item.quantity), 0).toLocaleString('ru-RU')} ₽
                   </p>
                 </div>
                 <div>
                   <p className="text-xs text-gray-500">Сумма продажи</p>
                   <p className="text-base font-semibold text-green-600">
-                    {isEditMode
-                      ? editedReception.items.reduce((sum, item) => {
-                          const product = products.find(p => p.id === item.product);
-                          return sum + ((product?.price || 0) * item.quantity);
-                        }, 0).toLocaleString('ru-RU')
-                      : selectedReception.items.reduce((sum, item) => {
-                          const product = products.find(p => p.id === item.product);
-                          return sum + ((product?.price || 0) * item.quantity);
-                        }, 0).toLocaleString('ru-RU')
-                    } ₽
+                    {editedItems.reduce((sum, item) => {
+                      const product = products.find(p => p.id === item.product);
+                      return sum + ((product?.price || 0) * item.quantity);
+                    }, 0).toLocaleString('ru-RU')} ₽
                   </p>
                 </div>
               </div>
@@ -502,93 +450,51 @@ export default function ReceptionDesktop() {
               {/* Список товаров */}
               <div>
                 <h4 className="text-sm font-medium text-gray-700 mb-2">Товары в приёмке:</h4>
-                {(isEditMode ? editedReception.items : selectedReception.items) && (isEditMode ? editedReception.items : selectedReception.items).length > 0 ? (
-                  <div className="border border-gray-200 rounded overflow-hidden">
-                    <table className="w-full text-xs">
-                      <thead className="bg-gray-50">
-                        <tr>
-                          <th className="text-left px-3 py-2 font-medium text-gray-600">Товар</th>
-                          <th className="text-left px-3 py-2 font-medium text-gray-600">Артикул</th>
-                          <th className="text-center px-3 py-2 font-medium text-gray-600">Количество</th>
-                          <th className="text-right px-3 py-2 font-medium text-gray-600">Цена закупа</th>
-                          <th className="text-right px-3 py-2 font-medium text-gray-600">Сумма закупа</th>
-                          <th className="text-right px-3 py-2 font-medium text-gray-600">Цена продажи</th>
-                          <th className="text-right px-3 py-2 font-medium text-gray-600">Сумма продажи</th>
-                          {isEditMode && <th className="w-10 px-3 py-2"></th>}
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {(isEditMode ? editedReception.items : selectedReception.items).map((item, idx) => {
-                          const cost = item.cost || 0;
-                          const quantity = item.quantity || 0;
-                          const totalCost = cost * quantity;
-                          const product = products.find(p => p.id === item.product);
-                          const salePrice = product?.price || 0;
-                          const totalSale = salePrice * quantity;
+                {editedItems && editedItems.length > 0 ? (
+                  <div className="space-y-2">
+                    {editedItems.map((item, idx) => {
+                      const quantity = item.quantity || 0;
+                      
+                      return (
+                        <div key={idx} className="flex items-center gap-3 p-3 bg-gray-50 rounded border border-gray-200">
+                          <div className="flex-1">
+                            <p className="text-sm font-medium text-gray-900">{item.name || 'Товар'}</p>
+                          </div>
                           
-                          return (
-                            <tr key={idx} className="border-t border-gray-100">
-                              <td className="px-3 py-2">{item.name || 'Товар'}</td>
-                              <td className="px-3 py-2 text-gray-600">{item.article || '—'}</td>
-                              <td className="px-3 py-2">
-                                {isEditMode ? (
-                                  <div className="flex items-center justify-center gap-1">
-                                    <button
-                                      onClick={() => handleEditQuantityChange(idx, -1)}
-                                      className="p-1 hover:bg-gray-100 rounded"
-                                    >
-                                      <Minus size={14} />
-                                    </button>
-                                    <span className="w-8 text-center">{quantity}</span>
-                                    <button
-                                      onClick={() => handleEditQuantityChange(idx, 1)}
-                                      className="p-1 hover:bg-gray-100 rounded"
-                                    >
-                                      <Plus size={14} />
-                                    </button>
-                                  </div>
-                                ) : (
-                                  <div className="text-center">{quantity} шт</div>
-                                )}
-                              </td>
-                              <td className="px-3 py-2 text-right">
-                                {isEditMode ? (
-                                  <input
-                                    type="number"
-                                    value={cost}
-                                    onChange={(e) => handleEditCostChange(idx, e.target.value)}
-                                    className="w-20 px-2 py-1 border border-gray-300 rounded text-right text-xs"
-                                    min="0"
-                                    step="0.01"
-                                  />
-                                ) : (
-                                  <span>{cost.toLocaleString('ru-RU')} ₽</span>
-                                )}
-                              </td>
-                              <td className="px-3 py-2 text-right font-medium">
-                                {totalCost.toLocaleString('ru-RU')} ₽
-                              </td>
-                              <td className="px-3 py-2 text-right text-gray-600">
-                                {salePrice.toLocaleString('ru-RU')} ₽
-                              </td>
-                              <td className="px-3 py-2 text-right font-medium text-green-600">
-                                {totalSale.toLocaleString('ru-RU')} ₽
-                              </td>
-                              {isEditMode && (
-                                <td className="px-3 py-2">
-                                  <button
-                                    onClick={() => handleRemoveEditItem(idx)}
-                                    className="p-1 text-red-600 hover:bg-red-50 rounded"
-                                  >
-                                    <Trash2 size={14} />
-                                  </button>
-                                </td>
-                              )}
-                            </tr>
-                          );
-                        })}
-                      </tbody>
-                    </table>
+                          {isAdmin && (
+                            <>
+                              <div className="flex items-center gap-1 bg-white rounded border border-gray-300">
+                                <button
+                                  onClick={() => handleQuantityChange(idx, -1)}
+                                  className="p-1.5 hover:bg-gray-100 rounded-l"
+                                >
+                                  <Minus size={16} />
+                                </button>
+                                <span className="px-3 text-sm font-medium">{quantity}</span>
+                                <button
+                                  onClick={() => handleQuantityChange(idx, 1)}
+                                  className="p-1.5 hover:bg-gray-100 rounded-r"
+                                >
+                                  <Plus size={16} />
+                                </button>
+                              </div>
+                              
+                              <button
+                                onClick={() => handleRemoveItem(idx)}
+                                className="p-1.5 text-red-600 hover:bg-red-50 rounded"
+                                title="Удалить товар"
+                              >
+                                <Trash2 size={16} />
+                              </button>
+                            </>
+                          )}
+                          
+                          {!isAdmin && (
+                            <span className="text-sm text-gray-600">{quantity} шт</span>
+                          )}
+                        </div>
+                      );
+                    })}
                   </div>
                 ) : (
                   <p className="text-sm text-gray-500">Нет товаров</p>
@@ -596,18 +502,12 @@ export default function ReceptionDesktop() {
               </div>
             </div>
 
-            {/* Футер с кнопками */}
-            {isEditMode && (
-              <div className="flex items-center justify-end gap-2 p-4 border-t border-gray-200">
+            {/* Футер с кнопкой сохранения */}
+            {isAdmin && hasChanges && (
+              <div className="flex items-center justify-end p-4 border-t border-gray-200 bg-gray-50">
                 <button
-                  onClick={handleCancelEdit}
-                  className="px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 rounded"
-                >
-                  Отмена
-                </button>
-                <button
-                  onClick={handleSaveEdit}
-                  className="px-4 py-2 text-sm bg-blue-600 text-white rounded hover:bg-blue-700"
+                  onClick={handleSaveChanges}
+                  className="px-6 py-2 text-sm bg-blue-600 text-white rounded hover:bg-blue-700 font-medium"
                 >
                   Сохранить изменения
                 </button>
