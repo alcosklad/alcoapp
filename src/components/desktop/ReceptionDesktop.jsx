@@ -1,21 +1,32 @@
 import React, { useState, useEffect } from 'react';
-import { Search, ChevronUp, ChevronDown, RefreshCw, Plus, Eye } from 'lucide-react';
-import { getReceptions, getSuppliers } from '../../lib/pocketbase';
+import { Search, ChevronUp, ChevronDown, RefreshCw, Plus, Eye, X, Trash2, Edit } from 'lucide-react';
+import { getReceptions, getSuppliers, getStores, getProducts, createReception, updateReception, deleteReception } from '../../lib/pocketbase';
 import { format } from 'date-fns';
 import { ru } from 'date-fns/locale';
+import pb from '../../lib/pocketbase';
+import CreateReceptionModal from './CreateReceptionModal';
 
 export default function ReceptionDesktop() {
   const [receptions, setReceptions] = useState([]);
   const [suppliers, setSuppliers] = useState([]);
+  const [stores, setStores] = useState([]);
+  const [products, setProducts] = useState([]);
   const [selectedSupplier, setSelectedSupplier] = useState('');
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [sortField, setSortField] = useState('created');
   const [sortDir, setSortDir] = useState('desc');
   const [selectedReception, setSelectedReception] = useState(null);
+  const [showCreateModal, setShowCreateModal] = useState(false);
+  const [showEditModal, setShowEditModal] = useState(false);
+  
+  const userRole = pb.authStore.model?.role;
+  const isAdmin = userRole === 'admin';
 
   useEffect(() => {
     loadSuppliers();
+    loadStores();
+    loadProducts();
     loadReceptions();
   }, []);
 
@@ -29,6 +40,24 @@ export default function ReceptionDesktop() {
       setSuppliers(data || []);
     } catch (error) {
       console.error('Error loading suppliers:', error);
+    }
+  };
+
+  const loadStores = async () => {
+    try {
+      const data = await getStores().catch(() => []);
+      setStores(data || []);
+    } catch (error) {
+      console.error('Error loading stores:', error);
+    }
+  };
+
+  const loadProducts = async () => {
+    try {
+      const data = await getProducts().catch(() => []);
+      setProducts(data || []);
+    } catch (error) {
+      console.error('Error loading products:', error);
     }
   };
 
@@ -56,6 +85,39 @@ export default function ReceptionDesktop() {
     } else {
       setSortField(field);
       setSortDir('asc');
+    }
+  };
+
+  const handleCreateReception = async (receptionData) => {
+    try {
+      setLoading(true);
+      await createReception(receptionData);
+      setShowCreateModal(false);
+      await loadReceptions();
+      alert('Приёмка успешно создана! Остатки обновлены.');
+    } catch (error) {
+      console.error('Error creating reception:', error);
+      alert('Ошибка при создании приёмки: ' + error.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleDeleteReception = async (receptionId) => {
+    if (!window.confirm('Вы уверены, что хотите удалить эту приёмку? Остатки будут пересчитаны.')) {
+      return;
+    }
+
+    try {
+      setLoading(true);
+      await deleteReception(receptionId);
+      await loadReceptions();
+      alert('Приёмка удалена');
+    } catch (error) {
+      console.error('Error deleting reception:', error);
+      alert('Ошибка при удалении приёмки: ' + error.message);
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -138,6 +200,16 @@ export default function ReceptionDesktop() {
         >
           <RefreshCw size={16} className={loading ? 'animate-spin' : ''} />
         </button>
+
+        {isAdmin && (
+          <button
+            onClick={() => setShowCreateModal(true)}
+            className="flex items-center gap-1 px-3 py-1 bg-blue-600 text-white rounded text-xs hover:bg-blue-700"
+          >
+            <Plus size={14} />
+            Создать приёмку
+          </button>
+        )}
 
         <span className="text-xs text-gray-500 ml-auto">
           Найдено: {filteredReceptions.length}
@@ -238,6 +310,16 @@ export default function ReceptionDesktop() {
         </div>
       </div>
 
+      {/* Модальное окно создания приёмки */}
+      <CreateReceptionModal
+        isOpen={showCreateModal}
+        onClose={() => setShowCreateModal(false)}
+        suppliers={suppliers}
+        stores={stores}
+        products={products}
+        onSave={handleCreateReception}
+      />
+
       {/* Модалка с деталями приёмки */}
       {selectedReception && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50" onClick={() => setSelectedReception(null)}>
@@ -251,9 +333,20 @@ export default function ReceptionDesktop() {
                   Город: {selectedReception?.expand?.supplier?.name || '—'}
                 </p>
               </div>
-              <button onClick={() => setSelectedReception(null)} className="text-gray-400 hover:text-gray-600">
-                ✕
-              </button>
+              <div className="flex items-center gap-2">
+                {isAdmin && (
+                  <button
+                    onClick={() => handleDeleteReception(selectedReception.id)}
+                    className="p-1 text-red-600 hover:bg-red-50 rounded"
+                    title="Удалить приёмку"
+                  >
+                    <Trash2 size={16} />
+                  </button>
+                )}
+                <button onClick={() => setSelectedReception(null)} className="text-gray-400 hover:text-gray-600">
+                  ✕
+                </button>
+              </div>
             </div>
 
             {/* Общая информация */}

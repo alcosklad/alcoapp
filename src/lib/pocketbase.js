@@ -62,6 +62,21 @@ export const getSuppliers = async () => {
   }
 };
 
+// Функции для работы с магазинами
+export const getStores = async () => {
+  try {
+    console.log('PocketBase: Запрашиваем stores...');
+    const stores = await pb.collection('stores').getFullList({
+      sort: 'name'
+    });
+    console.log('PocketBase: Stores успешно загружены:', stores.length, 'шт');
+    return stores;
+  } catch (error) {
+    console.error('PocketBase: Error loading stores:', error);
+    return [];
+  }
+};
+
 // Функции для работы со складами
 export const getWarehouses = async () => {
   try {
