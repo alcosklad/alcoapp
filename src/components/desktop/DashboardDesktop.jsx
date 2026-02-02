@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { getDashboardStats, getSuppliers } from '../../lib/pocketbase';
-import { Package, TrendingUp, ShoppingCart, AlertTriangle, FileText } from 'lucide-react';
+import { Package, TrendingUp, ShoppingCart, AlertTriangle, FileText, Calendar, Clock } from 'lucide-react';
 import pb from '../../lib/pocketbase';
 
 export default function DashboardDesktop({ user }) {
@@ -10,7 +10,11 @@ export default function DashboardDesktop({ user }) {
     totalPurchaseValue: 0,
     receptionsCount: 0,
     staleProductsCount: 0,
-    staleProducts: []
+    staleProducts: [],
+    salesDay: { count: 0, totalAmount: 0 },
+    salesWeek: { count: 0, totalAmount: 0 },
+    salesMonth: { count: 0, totalAmount: 0 },
+    salesHalfYear: { count: 0, totalAmount: 0 }
   });
   const [suppliers, setSuppliers] = useState([]);
   const [selectedSupplier, setSelectedSupplier] = useState('');
@@ -91,40 +95,83 @@ export default function DashboardDesktop({ user }) {
       </div>
 
       {/* Карточки статистики */}
-      <div className="grid grid-cols-2 lg:grid-cols-5 gap-3">
-        <StatCard
-          icon={Package}
-          label="Товаров на складе"
-          value={`${stats.totalProducts.toLocaleString('ru-RU')} шт`}
-          color="blue"
-        />
-        <StatCard
-          icon={ShoppingCart}
-          label="Сумма продажи"
-          value={`${stats.totalSaleValue.toLocaleString('ru-RU')} ₽`}
-          color="green"
-        />
-        <StatCard
-          icon={TrendingUp}
-          label="Сумма закупа"
-          value={`${stats.totalPurchaseValue.toLocaleString('ru-RU')} ₽`}
-          color="purple"
-        />
-        <StatCard
-          icon={FileText}
-          label="Приёмок за месяц"
-          value={stats.receptionsCount}
-          color="indigo"
-        />
-        <StatCard
-          icon={AlertTriangle}
-          label="Неликвид (>30 дней)"
-          value={stats.staleProductsCount}
-          color="orange"
-          clickable={stats.staleProductsCount > 0}
-          onClick={() => setShowStaleProducts(true)}
-        />
-      </div>
+      {userRole === 'admin' ? (
+        // Карточки для админа
+        <div className="grid grid-cols-2 lg:grid-cols-5 gap-3">
+          <StatCard
+            icon={Package}
+            label="Товаров на складе"
+            value={`${stats.totalProducts.toLocaleString('ru-RU')} шт`}
+            color="blue"
+          />
+          <StatCard
+            icon={ShoppingCart}
+            label="Сумма продажи"
+            value={`${stats.totalSaleValue.toLocaleString('ru-RU')} ₽`}
+            color="green"
+          />
+          <StatCard
+            icon={TrendingUp}
+            label="Сумма закупа"
+            value={`${stats.totalPurchaseValue.toLocaleString('ru-RU')} ₽`}
+            color="purple"
+          />
+          <StatCard
+            icon={FileText}
+            label="Приёмок за месяц"
+            value={stats.receptionsCount}
+            color="indigo"
+          />
+          <StatCard
+            icon={AlertTriangle}
+            label="Неликвид (>30 дней)"
+            value={stats.staleProductsCount}
+            color="orange"
+            clickable={stats.staleProductsCount > 0}
+            onClick={() => setShowStaleProducts(true)}
+          />
+        </div>
+      ) : (
+        // Карточки для оператора
+        <div className="grid grid-cols-2 lg:grid-cols-3 gap-3">
+          <StatCard
+            icon={Package}
+            label="Товаров на складе"
+            value={`${stats.totalProducts.toLocaleString('ru-RU')} шт`}
+            color="blue"
+          />
+          <StatCard
+            icon={ShoppingCart}
+            label="Сумма продажи"
+            value={`${stats.totalSaleValue.toLocaleString('ru-RU')} ₽`}
+            color="green"
+          />
+          <StatCard
+            icon={Clock}
+            label="Продаж за день"
+            value={stats.salesDay.count}
+            color="indigo"
+          />
+          <StatCard
+            icon={Calendar}
+            label="Продаж за неделю"
+            value={stats.salesWeek.count}
+            color="purple"
+          />
+          <StatCard
+            icon={Calendar}
+            label="Продаж за месяц"
+            value={stats.salesMonth.count}
+            color="orange"
+          />
+          <StatCard
+            icon={Calendar}
+            label="Продаж за полгода"
+            value={stats.salesHalfYear.count}
+            color="pink"
+          />
+        </div>
+      )}
 
       {/* Модалка с неликвидом */}
       {showStaleProducts && (
@@ -168,6 +215,7 @@ function StatCard({ icon: Icon, label, value, color, clickable, onClick }) {
     purple: 'bg-purple-50 text-purple-600',
     orange: 'bg-orange-50 text-orange-600',
     indigo: 'bg-indigo-50 text-indigo-600',
+    pink: 'bg-pink-50 text-pink-600',
   };
 
   return (

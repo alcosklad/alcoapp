@@ -413,6 +413,49 @@ export const getStocks = async (warehouseId = null) => {
   }
 };
 
+// Получение статистики продаж за период
+export const getSalesStats = async (period = 'day', filterId = null) => {
+  try {
+    const now = new Date();
+    let startDate = new Date();
+    
+    switch (period) {
+      case 'day':
+        startDate.setHours(0, 0, 0, 0);
+        break;
+      case 'week':
+        startDate.setDate(now.getDate() - 7);
+        break;
+      case 'month':
+        startDate.setMonth(now.getMonth() - 1);
+        break;
+      case 'halfyear':
+        startDate.setMonth(now.getMonth() - 6);
+        break;
+      default:
+        startDate.setHours(0, 0, 0, 0);
+    }
+    
+    let filter = `created >= "${startDate.toISOString()}"`;
+    if (filterId) {
+      filter += ` && supplier = "${filterId}"`;
+    }
+    
+    const sales = await pb.collection('sales').getFullList({
+      filter,
+      sort: '-created'
+    }).catch(() => []);
+    
+    return {
+      count: sales.length,
+      totalAmount: sales.reduce((sum, sale) => sum + (sale.total_price || 0), 0)
+    };
+  } catch (error) {
+    console.error('PocketBase: Error loading sales stats:', error);
+    return { count: 0, totalAmount: 0 };
+  }
+};
+
 // Получение статистики для дашборда
 export const getDashboardStats = async (filterId = null) => {
   try {
@@ -485,13 +528,25 @@ export const getDashboardStats = async (filterId = null) => {
       return stock.quantity > 0 && !soldProductIds.has(stock.product);
     });
     
+    // Получаем статистику продаж за разные периоды
+    const [salesDay, salesWeek, salesMonth, salesHalfYear] = await Promise.all([
+      getSalesStats('day', filterId),
+      getSalesStats('week', filterId),
+      getSalesStats('month', filterId),
+      getSalesStats('halfyear', filterId)
+    ]);
+    
     return {
       totalProducts: totalStockQuantity,
       totalSaleValue,
       totalPurchaseValue,
       receptionsCount,
       staleProductsCount: staleProducts.length,
-      staleProducts: staleProducts.slice(0, 10) // Первые 10 для показа
+      staleProducts: staleProducts.slice(0, 10),
+      salesDay,
+      salesWeek,
+      salesMonth,
+      salesHalfYear
     };
   } catch (error) {
     console.error('PocketBase: Error loading dashboard stats:', error);
@@ -501,7 +556,11 @@ export const getDashboardStats = async (filterId = null) => {
       totalPurchaseValue: 0,
       receptionsCount: 0,
       staleProductsCount: 0,
-      staleProducts: []
+      staleProducts: [],
+      salesDay: { count: 0, totalAmount: 0 },
+      salesWeek: { count: 0, totalAmount: 0 },
+      salesMonth: { count: 0, totalAmount: 0 },
+      salesHalfYear: { count: 0, totalAmount: 0 }
     };
   }
 };
