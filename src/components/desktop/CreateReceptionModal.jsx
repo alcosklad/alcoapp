@@ -77,7 +77,7 @@ export default function CreateReceptionModal({
         )
       }));
     } else {
-      // Добавляем новый товар
+      // Добавляем новый товар с ценой закупа из поля cost
       setFormData(prev => ({
         ...prev,
         items: [...prev.items, {
@@ -86,7 +86,7 @@ export default function CreateReceptionModal({
           name: product.name,
           article: product.article,
           quantity: 1,
-          cost: product.purchasePrice || 0
+          cost: product.cost || 0
         }]
       }));
     }
