@@ -452,50 +452,65 @@ export default function ReceptionDesktop() {
               <div>
                 <h4 className="text-sm font-medium text-gray-700 mb-2">Товары в приёмке:</h4>
                 {editedItems && editedItems.length > 0 ? (
-                  <div className="space-y-2">
-                    {editedItems.map((item, idx) => {
-                      const quantity = item.quantity || 0;
-                      
-                      return (
-                        <div key={idx} className="flex items-center gap-3 p-3 bg-gray-50 rounded border border-gray-200">
-                          <div className="flex-1">
-                            <p className="text-sm font-medium text-gray-900">{item.name || 'Товар'}</p>
-                          </div>
+                  <div className="border border-gray-200 rounded overflow-hidden">
+                    <table className="w-full text-xs">
+                      <thead className="bg-gray-50">
+                        <tr>
+                          <th className="text-left px-3 py-2 font-medium text-gray-600">Товар</th>
+                          <th className="text-center px-3 py-2 font-medium text-gray-600">Количество</th>
+                          <th className="text-right px-3 py-2 font-medium text-gray-600">Цена за шт</th>
+                          <th className="text-right px-3 py-2 font-medium text-gray-600">Сумма</th>
+                          {isAdmin && <th className="w-10 px-3 py-2"></th>}
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {editedItems.map((item, idx) => {
+                          const cost = item.cost || 0;
+                          const quantity = item.quantity || 0;
+                          const total = cost * quantity;
                           
-                          {isAdmin && (
-                            <>
-                              <div className="flex items-center gap-1 bg-white rounded border border-gray-300">
-                                <button
-                                  onClick={() => handleQuantityChange(idx, -1)}
-                                  className="p-1.5 hover:bg-gray-100 rounded-l"
-                                >
-                                  <Minus size={16} />
-                                </button>
-                                <span className="px-3 text-sm font-medium">{quantity}</span>
-                                <button
-                                  onClick={() => handleQuantityChange(idx, 1)}
-                                  className="p-1.5 hover:bg-gray-100 rounded-r"
-                                >
-                                  <Plus size={16} />
-                                </button>
-                              </div>
-                              
-                              <button
-                                onClick={() => handleRemoveItem(idx)}
-                                className="p-1.5 text-red-600 hover:bg-red-50 rounded"
-                                title="Удалить товар"
-                              >
-                                <Trash2 size={16} />
-                              </button>
-                            </>
-                          )}
-                          
-                          {!isAdmin && (
-                            <span className="text-sm text-gray-600">{quantity} шт</span>
-                          )}
-                        </div>
-                      );
-                    })}
+                          return (
+                            <tr key={idx} className="border-t border-gray-100">
+                              <td className="px-3 py-2">{item.name || 'Товар'}</td>
+                              <td className="px-3 py-2">
+                                {isAdmin ? (
+                                  <div className="flex items-center justify-center gap-1">
+                                    <button
+                                      onClick={() => handleQuantityChange(idx, -1)}
+                                      className="p-0.5 hover:bg-gray-100 rounded"
+                                    >
+                                      <Minus size={12} />
+                                    </button>
+                                    <span className="w-8 text-center">{quantity}</span>
+                                    <button
+                                      onClick={() => handleQuantityChange(idx, 1)}
+                                      className="p-0.5 hover:bg-gray-100 rounded"
+                                    >
+                                      <Plus size={12} />
+                                    </button>
+                                  </div>
+                                ) : (
+                                  <div className="text-center">{quantity} шт</div>
+                                )}
+                              </td>
+                              <td className="px-3 py-2 text-right">{cost.toLocaleString('ru-RU')} ₽</td>
+                              <td className="px-3 py-2 text-right font-medium">{total.toLocaleString('ru-RU')} ₽</td>
+                              {isAdmin && (
+                                <td className="px-3 py-2">
+                                  <button
+                                    onClick={() => handleRemoveItem(idx)}
+                                    className="p-0.5 text-red-600 hover:bg-red-50 rounded"
+                                    title="Удалить товар"
+                                  >
+                                    <Trash2 size={12} />
+                                  </button>
+                                </td>
+                              )}
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
                   </div>
                 ) : (
                   <p className="text-sm text-gray-500">Нет товаров</p>
