@@ -20,6 +20,7 @@ export default function StockDesktop() {
   // Modal
   const [selectedStock, setSelectedStock] = useState(null);
   const [modalData, setModalData] = useState(null);
+  const [targetCityId, setTargetCityId] = useState('');
 
   useEffect(() => {
     loadSuppliers();
@@ -191,11 +192,13 @@ export default function StockDesktop() {
       quantity: stock.quantity || 0,
       supplier: stock.supplier || selectedSupplier
     });
+    setTargetCityId('');
   };
 
   const closeModal = () => {
     setSelectedStock(null);
     setModalData(null);
+    setTargetCityId('');
   };
 
   const saveModal = async () => {
@@ -243,10 +246,10 @@ export default function StockDesktop() {
   };
 
   const handleAddToCity = async () => {
-    if (!selectedStock || !modalData) return;
-    
-    const targetCity = prompt('Введите ID города для добавления товара:');
-    if (!targetCity) return;
+    if (!selectedStock || !modalData || !targetCityId) {
+      alert('Выберите город для добавления товара');
+      return;
+    }
 
     try {
       const product = selectedStock?.expand?.product || selectedStock?.product;
@@ -254,12 +257,13 @@ export default function StockDesktop() {
 
       await pb.collection('stocks').create({
         product: productId,
-        supplier: targetCity,
+        supplier: targetCityId,
         quantity: 1,
         cost: Number(modalData.cost) || 0
       });
 
       alert('Товар добавлен в другой город');
+      setTargetCityId('');
     } catch (error) {
       console.error('Error adding to city:', error);
       alert('Ошибка: ' + error.message);
@@ -606,14 +610,33 @@ export default function StockDesktop() {
                 </div>
               </div>
 
-              {/* Кнопка добавить в другой город */}
-              <button
-                onClick={handleAddToCity}
-                className="w-full flex items-center justify-center gap-2 px-4 py-2 text-sm text-blue-600 border border-blue-300 rounded hover:bg-blue-50"
-              >
-                <Plus size={16} />
-                Добавить в другой город
-              </button>
+              {/* Добавить в другой город */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Добавить в другой город</label>
+                <div className="flex gap-2">
+                  <select
+                    value={targetCityId}
+                    onChange={(e) => setTargetCityId(e.target.value)}
+                    className="flex-1 px-3 py-2 border border-gray-300 rounded text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  >
+                    <option value="">Выберите город</option>
+                    {suppliers
+                      .filter(s => s.id !== modalData.supplier)
+                      .map(s => (
+                        <option key={s.id} value={s.id}>{s.name}</option>
+                      ))
+                    }
+                  </select>
+                  <button
+                    onClick={handleAddToCity}
+                    disabled={!targetCityId}
+                    className="flex items-center gap-2 px-4 py-2 text-sm text-white bg-blue-600 hover:bg-blue-700 rounded disabled:bg-gray-300 disabled:cursor-not-allowed"
+                  >
+                    <Plus size={16} />
+                    Добавить
+                  </button>
+                </div>
+              </div>
             </div>
 
             <div className="flex items-center justify-between p-4 border-t border-gray-200 bg-gray-50">
