@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Search, ChevronUp, ChevronDown, RefreshCw, X, Trash2, Check, Plus } from 'lucide-react';
+import { Search, ChevronUp, ChevronDown, RefreshCw, X, Trash2, Check, Plus, PackagePlus } from 'lucide-react';
 import { getStocksWithDetails, getSuppliers, updateProduct, deleteProduct, updateStock } from '../../lib/pocketbase';
 import pb from '../../lib/pocketbase';
 
@@ -21,6 +21,17 @@ export default function StockDesktop() {
   const [selectedStock, setSelectedStock] = useState(null);
   const [modalData, setModalData] = useState(null);
   const [targetCityId, setTargetCityId] = useState('');
+  
+  // Create product modal
+  const [showCreateModal, setShowCreateModal] = useState(false);
+  const [createData, setCreateData] = useState({
+    name: '',
+    article: '',
+    cost: '',
+    price: '',
+    quantity: '',
+    supplier: ''
+  });
 
   useEffect(() => {
     loadSuppliers();
@@ -270,6 +281,63 @@ export default function StockDesktop() {
     }
   };
 
+  // Create product modal handlers
+  const openCreateModal = () => {
+    setCreateData({
+      name: '',
+      article: '',
+      cost: '',
+      price: '',
+      quantity: '1',
+      supplier: selectedSupplier
+    });
+    setShowCreateModal(true);
+  };
+
+  const closeCreateModal = () => {
+    setShowCreateModal(false);
+    setCreateData({
+      name: '',
+      article: '',
+      cost: '',
+      price: '',
+      quantity: '',
+      supplier: ''
+    });
+  };
+
+  const handleCreateProduct = async () => {
+    if (!createData.name || !createData.cost || !createData.price || !createData.quantity || !createData.supplier) {
+      alert('Заполните все обязательные поля');
+      return;
+    }
+
+    try {
+      // Create product
+      const newProduct = await pb.collection('products').create({
+        name: createData.name,
+        article: createData.article || '',
+        cost: Number(createData.cost) || 0,
+        price: Number(createData.price) || 0
+      });
+
+      // Create stock record
+      await pb.collection('stocks').create({
+        product: newProduct.id,
+        supplier: createData.supplier,
+        quantity: Number(createData.quantity) || 1,
+        cost: Number(createData.cost) || 0
+      });
+
+      alert('Товар успешно создан');
+      closeCreateModal();
+      await loadStocks();
+    } catch (error) {
+      console.error('Error creating product:', error);
+      alert('Ошибка создания товара: ' + error.message);
+    }
+  };
+
   // Calculate totals
   const totals = filteredStocks.reduce((acc, stock) => {
     const purchasePrice = stock?.cost ?? stock?.purchase_price ?? stock?.expand?.product?.cost ?? 0;
@@ -333,6 +401,15 @@ export default function StockDesktop() {
           title="Обновить"
         >
           <RefreshCw size={16} className={loading ? 'animate-spin' : ''} />
+        </button>
+
+        <button
+          onClick={openCreateModal}
+          className="flex items-center gap-1 px-3 py-1 text-xs text-white bg-green-600 hover:bg-green-700 rounded"
+          title="Создать товар"
+        >
+          <PackagePlus size={16} />
+          Создать товар
         </button>
 
         <span className="text-xs text-gray-500 ml-auto">
@@ -662,6 +739,109 @@ export default function StockDesktop() {
                   Сохранить
                 </button>
               </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Модальное окно создания товара */}
+      {showCreateModal && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4" onClick={closeCreateModal}>
+          <div className="bg-white rounded-lg w-full max-w-md overflow-hidden" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center justify-between p-4 border-b border-gray-200">
+              <h2 className="text-lg font-semibold text-gray-900">Создать товар</h2>
+              <button onClick={closeCreateModal} className="text-gray-400 hover:text-gray-600">
+                <X size={20} />
+              </button>
+            </div>
+
+            <div className="p-4 space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Название *</label>
+                <input
+                  type="text"
+                  value={createData.name}
+                  onChange={(e) => setCreateData({ ...createData, name: e.target.value })}
+                  className="w-full px-3 py-2 border border-gray-300 rounded text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  placeholder="Введите название товара"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Артикул</label>
+                <input
+                  type="text"
+                  value={createData.article}
+                  onChange={(e) => setCreateData({ ...createData, article: e.target.value })}
+                  className="w-full px-3 py-2 border border-gray-300 rounded text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  placeholder="Артикул товара"
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Цена закупа (₽) *</label>
+                  <input
+                    type="number"
+                    value={createData.cost}
+                    onChange={(e) => setCreateData({ ...createData, cost: e.target.value })}
+                    className="w-full px-3 py-2 border border-gray-300 rounded text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    placeholder="0"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Цена продажи (₽) *</label>
+                  <input
+                    type="number"
+                    value={createData.price}
+                    onChange={(e) => setCreateData({ ...createData, price: e.target.value })}
+                    className="w-full px-3 py-2 border border-gray-300 rounded text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    placeholder="0"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Количество *</label>
+                  <input
+                    type="number"
+                    value={createData.quantity}
+                    onChange={(e) => setCreateData({ ...createData, quantity: e.target.value })}
+                    className="w-full px-3 py-2 border border-gray-300 rounded text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    placeholder="1"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Город *</label>
+                  <select
+                    value={createData.supplier}
+                    onChange={(e) => setCreateData({ ...createData, supplier: e.target.value })}
+                    className="w-full px-3 py-2 border border-gray-300 rounded text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  >
+                    <option value="">Выберите город</option>
+                    {suppliers.map(s => (
+                      <option key={s.id} value={s.id}>{s.name}</option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+            </div>
+
+            <div className="flex items-center justify-end gap-2 p-4 border-t border-gray-200 bg-gray-50">
+              <button
+                onClick={closeCreateModal}
+                className="px-4 py-2 text-sm text-gray-600 hover:bg-gray-100 rounded"
+              >
+                Отмена
+              </button>
+              <button
+                onClick={handleCreateProduct}
+                className="flex items-center gap-2 px-4 py-2 text-sm text-white bg-green-600 hover:bg-green-700 rounded"
+              >
+                <PackagePlus size={16} />
+                Создать
+              </button>
             </div>
           </div>
         </div>
