@@ -143,42 +143,9 @@ export const getUsers = async () => {
 // Функции для работы с товарами
 export const getProducts = async (search = '') => {
   try {
-<<<<<<< /Users/rostislavkomkov/Desktop/alcoapp/src/lib/pocketbase.js
-<<<<<<< /Users/rostislavkomkov/Desktop/alcoapp/src/lib/pocketbase.js
-    // Загружаем все товары (без фильтра)
-    const allProducts = await pb.collection('products').getFullList({
-      sort: 'name',
-      limit: 1000 // Загружаем больше товаров
-    });
-    
-    // Если нет поиска - возвращаем все
-    if (!search) {
-      return allProducts.slice(0, 50); // Ограничиваем 50 для производительности
-    }
-    
-    // Фильтруем на клиенте без учета регистра
-    const searchLower = search.toLowerCase();
-    const filtered = allProducts.filter(product => {
-      const name = product?.name || '';
-      return name.toLowerCase().includes(searchLower);
-    });
-    
-    return filtered.slice(0, 50); // Ограничиваем 50 результатов
-=======
-    console.log(`PocketBase: Loading products page ${page}, city: ${city}, search: ${search}`);
-    
-    let filter = '';
-    const filters = [];
-
-    // Фильтр по поиску
-    if (search) {
-      filters.push(`(name ~ "${search}" || article ~ "${search}")`);
-    }
-=======
     // Загружаем все товары
     const allProducts = await pb.collection('products').getFullList({
       sort: 'name'
->>>>>>> /Users/rostislavkomkov/.windsurf/worktrees/alcoapp/alcoapp-eb6df20a/src/lib/pocketbase.js
     });
     
     // Если нет поиска - возвращаем все товары
@@ -194,7 +161,6 @@ export const getProducts = async (search = '') => {
     });
     
     return filtered;
->>>>>>> /Users/rostislavkomkov/.windsurf/worktrees/alcoapp/alcoapp-eb6df20a/src/lib/pocketbase.js
   } catch (error) {
     console.error('PocketBase: Error loading products:', error);
     console.error('PocketBase: Детали ошибки:', error.message, error.status);
@@ -283,7 +249,8 @@ export const createReception = async (data) => {
       console.log('PocketBase: Город (warehouse):', data.supplier);
       for (const item of items) {
         console.log(`PocketBase: Добавляем товар ${item.product} (${item.name}), кол-во: ${item.quantity}`);
-        await updateStock(item.product, data.supplier, item.quantity, data.supplier);
+        const purchasePrice = item.cost ?? item.purchase_price ?? null;
+        await updateStock(item.product, null, item.quantity, data.supplier, purchasePrice);
       }
       console.log('PocketBase: ✅ Все остатки успешно обновлены');
     } else {
@@ -302,12 +269,18 @@ export const createReception = async (data) => {
 };
 
 // Функция для обновления остатков
-export const updateStock = async (productId, warehouseId, quantity, supplierId = null) => {
+export const updateStock = async (productId, warehouseId, quantity, supplierId = null, cost = null) => {
   try {
-    console.log(`🔍 Ищем остаток для товара ${productId} на складе ${warehouseId}`);
+    console.log(`🔍 Ищем остаток для товара ${productId} (warehouse=${warehouseId}, supplier=${supplierId})`);
     
     // Ищем существующую запись остатка (без supplier в фильтре)
-    let filterQuery = `product = "${productId}" && warehouse = "${warehouseId}"`;
+    const filterParts = [`product = "${productId}"`];
+    if (supplierId) {
+      filterParts.push(`supplier = "${supplierId}"`);
+    } else if (warehouseId) {
+      filterParts.push(`warehouse = "${warehouseId}"`);
+    }
+    const filterQuery = filterParts.join(' && ');
     
     console.log(`📋 Фильтр поиска: ${filterQuery}`);
     
@@ -326,6 +299,10 @@ export const updateStock = async (productId, warehouseId, quantity, supplierId =
       
       // Обновляем существующий остаток
       const updateData = { quantity: newQuantity };
+      if (cost !== null && cost !== undefined) {
+        updateData.cost = Number(cost);
+      }
+
       // Если передан supplierId, обновляем и его
       if (supplierId) {
         updateData.supplier = supplierId;
@@ -336,7 +313,19 @@ export const updateStock = async (productId, warehouseId, quantity, supplierId =
         await pb.collection('stocks').delete(existingStock.id);
         console.log(`PocketBase: Остаток удален (количество 0): ${productId} на складе ${warehouseId}`);
       } else {
-        const updatedStock = await pb.collection('stocks').update(existingStock.id, updateData);
+        let updatedStock;
+        try {
+          updatedStock = await pb.collection('stocks').update(existingStock.id, updateData);
+        } catch (e) {
+          if (cost !== null && cost !== undefined) {
+            const fallbackData = { ...updateData };
+            delete fallbackData.cost;
+            fallbackData.purchase_price = Number(cost);
+            updatedStock = await pb.collection('stocks').update(existingStock.id, fallbackData);
+          } else {
+            throw e;
+          }
+        }
         console.log(`PocketBase: Остаток обновлен: ${productId} на складе ${warehouseId}, новое количество: ${updatedStock.quantity}`);
       }
     } else {
@@ -351,9 +340,29 @@ export const updateStock = async (productId, warehouseId, quantity, supplierId =
         supplier: supplierId,
         quantity: quantity
       };
+
+      if (warehouseId) {
+        newStockData.warehouse = warehouseId;
+      }
+
+      if (cost !== null && cost !== undefined) {
+        newStockData.cost = Number(cost);
+      }
       
       console.log('PocketBase: Создаем новый остаток с данными:', newStockData);
-      const newStock = await pb.collection('stocks').create(newStockData);
+      let newStock;
+      try {
+        newStock = await pb.collection('stocks').create(newStockData);
+      } catch (e) {
+        if (cost !== null && cost !== undefined) {
+          const fallbackData = { ...newStockData };
+          delete fallbackData.cost;
+          fallbackData.purchase_price = Number(cost);
+          newStock = await pb.collection('stocks').create(fallbackData);
+        } else {
+          throw e;
+        }
+      }
       console.log(`PocketBase: Создан новый остаток: ${productId} для города ${supplierId}, количество: ${newStock.quantity}`);
     }
   } catch (error) {
@@ -656,21 +665,51 @@ export const updateReception = async (id, data) => {
           
           if (existingStock) {
             // Обновляем существующий остаток - устанавливаем точное значение
-            await pb.collection('stocks').update(existingStock.id, {
+            const purchasePrice = item.cost ?? item.purchase_price ?? existingStock.cost;
+            const salePrice = item.sale_price || item.price || existingStock.price;
+            const updateData = {
               quantity: item.quantity,
-              cost: item.cost || existingStock.cost,
-              price: item.sale_price || item.price || existingStock.price
-            });
+              cost: purchasePrice,
+              price: salePrice
+            };
+            try {
+              await pb.collection('stocks').update(existingStock.id, updateData);
+            } catch (e) {
+              if (purchasePrice !== null && purchasePrice !== undefined) {
+                const fallbackData = {
+                  quantity: item.quantity,
+                  purchase_price: purchasePrice,
+                  price: salePrice
+                };
+                await pb.collection('stocks').update(existingStock.id, fallbackData);
+              } else {
+                throw e;
+              }
+            }
             console.log(`PocketBase: ✅ Остаток обновлён: ${item.name}, новое количество: ${item.quantity}`);
           } else {
             // Создаём новый остаток
-            await pb.collection('stocks').create({
+            const purchasePrice = item.cost ?? item.purchase_price ?? 0;
+            const salePrice = item.sale_price || item.price || 0;
+            const createData = {
               product: item.product,
               supplier: oldReception.supplier,
               quantity: item.quantity,
-              cost: item.cost || 0,
-              price: item.sale_price || item.price || 0
-            });
+              cost: purchasePrice,
+              price: salePrice
+            };
+            try {
+              await pb.collection('stocks').create(createData);
+            } catch (e) {
+              const fallbackData = {
+                product: item.product,
+                supplier: oldReception.supplier,
+                quantity: item.quantity,
+                purchase_price: purchasePrice,
+                price: salePrice
+              };
+              await pb.collection('stocks').create(fallbackData);
+            }
             console.log(`PocketBase: ✅ Создан новый остаток: ${item.name}, количество: ${item.quantity}`);
           }
         } catch (error) {

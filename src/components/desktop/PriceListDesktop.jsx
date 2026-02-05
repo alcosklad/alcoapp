@@ -1,22 +1,6 @@
 import React, { useState, useEffect } from 'react';
-<<<<<<< /Users/rostislavkomkov/Desktop/alcoapp/src/components/desktop/PriceListDesktop.jsx
-<<<<<<< /Users/rostislavkomkov/Desktop/alcoapp/src/components/desktop/PriceListDesktop.jsx
-<<<<<<< /Users/rostislavkomkov/Desktop/alcoapp/src/components/desktop/PriceListDesktop.jsx
-import { Search, ChevronUp, ChevronDown, RefreshCw, Edit2, Check, X } from 'lucide-react';
-=======
-import { Search, ChevronUp, ChevronDown, RefreshCw, Edit2, Check, X, ChevronLeft, ChevronRight } from 'lucide-react';
->>>>>>> /Users/rostislavkomkov/.windsurf/worktrees/alcoapp/alcoapp-eb6df20a/src/components/desktop/PriceListDesktop.jsx
-=======
-import { Search, ChevronUp, ChevronDown, RefreshCw, Edit2, Check, X, ChevronLeft, ChevronRight, Plus } from 'lucide-react';
-<<<<<<< /Users/rostislavkomkov/Desktop/alcoapp/src/components/desktop/PriceListDesktop.jsx
->>>>>>> /Users/rostislavkomkov/.windsurf/worktrees/alcoapp/alcoapp-eb6df20a/src/components/desktop/PriceListDesktop.jsx
-=======
->>>>>>> /Users/rostislavkomkov/.windsurf/worktrees/alcoapp/alcoapp-eb6df20a/src/components/desktop/PriceListDesktop.jsx
-import { getProducts, updateProduct } from '../../lib/pocketbase';
-=======
 import { Search, ChevronUp, ChevronDown, RefreshCw, Edit2, Check, X, ChevronLeft, ChevronRight, Plus, Trash2 } from 'lucide-react';
 import { getProducts, updateProduct, deleteProduct } from '../../lib/pocketbase';
->>>>>>> /Users/rostislavkomkov/.windsurf/worktrees/alcoapp/alcoapp-eb6df20a/src/components/desktop/PriceListDesktop.jsx
 import pb from '../../lib/pocketbase';
 import CreateProductModal from '../CreateProductModal';
 
@@ -32,15 +16,7 @@ export default function PriceListDesktop() {
   const [editValues, setEditValues] = useState({});
   const [currentPage, setCurrentPage] = useState(1);
   const productsPerPage = 50;
-<<<<<<< /Users/rostislavkomkov/Desktop/alcoapp/src/components/desktop/PriceListDesktop.jsx
-=======
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
-<<<<<<< /Users/rostislavkomkov/Desktop/alcoapp/src/components/desktop/PriceListDesktop.jsx
-  const [totalPages, setTotalPages] = useState(1);
-  const [totalItems, setTotalItems] = useState(0);
->>>>>>> /Users/rostislavkomkov/.windsurf/worktrees/alcoapp/alcoapp-eb6df20a/src/components/desktop/PriceListDesktop.jsx
-=======
->>>>>>> /Users/rostislavkomkov/.windsurf/worktrees/alcoapp/alcoapp-eb6df20a/src/components/desktop/PriceListDesktop.jsx
 
   const userRole = pb.authStore.model?.role;
   const canEdit = userRole === 'admin';
@@ -68,17 +44,6 @@ export default function PriceListDesktop() {
     'Волгоград',
     'Воронеж'
   ];
-<<<<<<< /Users/rostislavkomkov/Desktop/alcoapp/src/components/desktop/PriceListDesktop.jsx
-
-  useEffect(() => {
-    loadProducts();
-  }, []);
-<<<<<<< /Users/rostislavkomkov/Desktop/alcoapp/src/components/desktop/PriceListDesktop.jsx
-
-  useEffect(() => {
-    filterByCity();
-  }, [selectedCity, allProducts]);
-=======
 
   useEffect(() => {
     filterByCity();
@@ -90,66 +55,16 @@ export default function PriceListDesktop() {
   }, [searchQuery]);
 
   useEffect(() => {
-<<<<<<< /Users/rostislavkomkov/Desktop/alcoapp/src/components/desktop/PriceListDesktop.jsx
-    const timer = setTimeout(() => {
-      if (page === 1) {
-        loadProducts();
-      } else {
-        setPage(1);
-      }
-    }, 500);
-    return () => clearTimeout(timer);
-=======
-
-  useEffect(() => {
-    filterByCity();
-    setCurrentPage(1);
-  }, [selectedCity, allProducts]);
-
-  useEffect(() => {
-    setCurrentPage(1);
->>>>>>> /Users/rostislavkomkov/.windsurf/worktrees/alcoapp/alcoapp-eb6df20a/src/components/desktop/PriceListDesktop.jsx
-  }, [searchQuery]);
->>>>>>> /Users/rostislavkomkov/.windsurf/worktrees/alcoapp/alcoapp-eb6df20a/src/components/desktop/PriceListDesktop.jsx
-=======
     loadProducts();
   }, []);
->>>>>>> /Users/rostislavkomkov/.windsurf/worktrees/alcoapp/alcoapp-eb6df20a/src/components/desktop/PriceListDesktop.jsx
 
   const loadProducts = async () => {
     try {
       setLoading(true);
-<<<<<<< /Users/rostislavkomkov/Desktop/alcoapp/src/components/desktop/PriceListDesktop.jsx
-<<<<<<< /Users/rostislavkomkov/Desktop/alcoapp/src/components/desktop/PriceListDesktop.jsx
-<<<<<<< /Users/rostislavkomkov/Desktop/alcoapp/src/components/desktop/PriceListDesktop.jsx
-<<<<<<< /Users/rostislavkomkov/Desktop/alcoapp/src/components/desktop/PriceListDesktop.jsx
-<<<<<<< /Users/rostislavkomkov/Desktop/alcoapp/src/components/desktop/PriceListDesktop.jsx
-      const data = await getProducts().catch(() => []);
-      setAllProducts(data || []);
-=======
-      const data = await getProducts(page, 50, searchQuery, selectedCity);
-      setProducts(data.items || []);
-      setTotalItems(data.totalItems || 0);
-      setTotalPages(data.totalPages || 1);
->>>>>>> /Users/rostislavkomkov/.windsurf/worktrees/alcoapp/alcoapp-eb6df20a/src/components/desktop/PriceListDesktop.jsx
-=======
-      const data = await getProducts().catch(() => []);
-      setAllProducts(data || []);
->>>>>>> /Users/rostislavkomkov/.windsurf/worktrees/alcoapp/alcoapp-eb6df20a/src/components/desktop/PriceListDesktop.jsx
-=======
-      const data = await getProducts().catch(() => []);
-      setAllProducts(data || []);
->>>>>>> /Users/rostislavkomkov/.windsurf/worktrees/alcoapp/alcoapp-eb6df20a/src/components/desktop/PriceListDesktop.jsx
-=======
-      const data = await getProducts().catch(() => ({ items: [] }));
-      setAllProducts(data.items || []);
->>>>>>> /Users/rostislavkomkov/.windsurf/worktrees/alcoapp/alcoapp-eb6df20a/src/components/desktop/PriceListDesktop.jsx
-=======
       const data = await getProducts().catch(() => []);
       // Поддержка обоих форматов: массив (getFullList) или объект с items (getList)
       const items = Array.isArray(data) ? data : (data?.items || []);
       setAllProducts(items);
->>>>>>> /Users/rostislavkomkov/.windsurf/worktrees/alcoapp/alcoapp-eb6df20a/src/components/desktop/PriceListDesktop.jsx
     } catch (error) {
       console.error('Error loading products:', error);
     } finally {
@@ -157,13 +72,6 @@ export default function PriceListDesktop() {
     }
   };
 
-<<<<<<< /Users/rostislavkomkov/Desktop/alcoapp/src/components/desktop/PriceListDesktop.jsx
-<<<<<<< /Users/rostislavkomkov/Desktop/alcoapp/src/components/desktop/PriceListDesktop.jsx
-<<<<<<< /Users/rostislavkomkov/Desktop/alcoapp/src/components/desktop/PriceListDesktop.jsx
-=======
->>>>>>> /Users/rostislavkomkov/.windsurf/worktrees/alcoapp/alcoapp-eb6df20a/src/components/desktop/PriceListDesktop.jsx
-=======
->>>>>>> /Users/rostislavkomkov/.windsurf/worktrees/alcoapp/alcoapp-eb6df20a/src/components/desktop/PriceListDesktop.jsx
   const filterByCity = () => {
     if (selectedCity === 'Все города') {
       setProducts(allProducts);
@@ -174,17 +82,6 @@ export default function PriceListDesktop() {
       });
       setProducts(filtered);
     }
-<<<<<<< /Users/rostislavkomkov/Desktop/alcoapp/src/components/desktop/PriceListDesktop.jsx
-<<<<<<< /Users/rostislavkomkov/Desktop/alcoapp/src/components/desktop/PriceListDesktop.jsx
-=======
-  const handleCityChange = (e) => {
-    setSelectedCity(e.target.value);
-    setPage(1);
->>>>>>> /Users/rostislavkomkov/.windsurf/worktrees/alcoapp/alcoapp-eb6df20a/src/components/desktop/PriceListDesktop.jsx
-=======
->>>>>>> /Users/rostislavkomkov/.windsurf/worktrees/alcoapp/alcoapp-eb6df20a/src/components/desktop/PriceListDesktop.jsx
-=======
->>>>>>> /Users/rostislavkomkov/.windsurf/worktrees/alcoapp/alcoapp-eb6df20a/src/components/desktop/PriceListDesktop.jsx
   };
 
   const handleSort = (field) => {
@@ -203,35 +100,17 @@ export default function PriceListDesktop() {
 
   const saveEdit = async (productId) => {
     try {
-<<<<<<< /Users/rostislavkomkov/Desktop/alcoapp/src/components/desktop/PriceListDesktop.jsx
-<<<<<<< /Users/rostislavkomkov/Desktop/alcoapp/src/components/desktop/PriceListDesktop.jsx
-      await updateProduct(productId, {
-=======
-=======
->>>>>>> /Users/rostislavkomkov/.windsurf/worktrees/alcoapp/alcoapp-eb6df20a/src/components/desktop/PriceListDesktop.jsx
       const updatedProduct = await updateProduct(productId, {
         name: editValues.name,
->>>>>>> /Users/rostislavkomkov/.windsurf/worktrees/alcoapp/alcoapp-eb6df20a/src/components/desktop/PriceListDesktop.jsx
         cost: Number(editValues.purchasePrice),
         price: Number(editValues.price),
       });
       
-<<<<<<< /Users/rostislavkomkov/Desktop/alcoapp/src/components/desktop/PriceListDesktop.jsx
-      // Обновляем товар в списке без перезагрузки
-=======
->>>>>>> /Users/rostislavkomkov/.windsurf/worktrees/alcoapp/alcoapp-eb6df20a/src/components/desktop/PriceListDesktop.jsx
       setAllProducts(prev => 
         prev.map(p => p.id === productId ? { ...p, ...updatedProduct } : p)
       );
       
       setEditingId(null);
-<<<<<<< /Users/rostislavkomkov/Desktop/alcoapp/src/components/desktop/PriceListDesktop.jsx
-<<<<<<< /Users/rostislavkomkov/Desktop/alcoapp/src/components/desktop/PriceListDesktop.jsx
-      loadProducts();
-=======
->>>>>>> /Users/rostislavkomkov/.windsurf/worktrees/alcoapp/alcoapp-eb6df20a/src/components/desktop/PriceListDesktop.jsx
-=======
->>>>>>> /Users/rostislavkomkov/.windsurf/worktrees/alcoapp/alcoapp-eb6df20a/src/components/desktop/PriceListDesktop.jsx
     } catch (error) {
       console.error('Error updating product:', error);
       alert('Ошибка сохранения');
@@ -241,43 +120,14 @@ export default function PriceListDesktop() {
   const startEdit = (product) => {
     setEditingId(product.id);
     setEditValues({
-<<<<<<< /Users/rostislavkomkov/Desktop/alcoapp/src/components/desktop/PriceListDesktop.jsx
-<<<<<<< /Users/rostislavkomkov/Desktop/alcoapp/src/components/desktop/PriceListDesktop.jsx
-=======
       name: product.name || '',
->>>>>>> /Users/rostislavkomkov/.windsurf/worktrees/alcoapp/alcoapp-eb6df20a/src/components/desktop/PriceListDesktop.jsx
-=======
-      name: product.name,
->>>>>>> /Users/rostislavkomkov/.windsurf/worktrees/alcoapp/alcoapp-eb6df20a/src/components/desktop/PriceListDesktop.jsx
       purchasePrice: product.cost || product.purchasePrice || 0,
       price: product.price || 0,
     });
   };
 
-<<<<<<< /Users/rostislavkomkov/Desktop/alcoapp/src/components/desktop/PriceListDesktop.jsx
-<<<<<<< /Users/rostislavkomkov/Desktop/alcoapp/src/components/desktop/PriceListDesktop.jsx
   const handleProductCreated = (newProduct) => {
     setAllProducts(prev => [newProduct, ...prev]);
-=======
-  const handleCreateProduct = async (productData) => {
-    try {
-      setLoading(true);
-      await createProduct(productData);
-      setIsCreateModalOpen(false);
-      // Перезагружаем список, чтобы увидеть новый товар (особенно если он попадает под текущий фильтр города)
-      loadProducts(selectedCity, searchQuery, sortField, sortDir, page);
-      alert('Товар успешно создан');
-    } catch (error) {
-      console.error('Error creating product:', error);
-      alert('Ошибка при создании товара');
-    } finally {
-      setLoading(false);
-    }
->>>>>>> /Users/rostislavkomkov/.windsurf/worktrees/alcoapp/alcoapp-eb6df20a/src/components/desktop/PriceListDesktop.jsx
-=======
-  const handleProductCreated = (newProduct) => {
-    setAllProducts(prev => [newProduct, ...prev]);
->>>>>>> /Users/rostislavkomkov/.windsurf/worktrees/alcoapp/alcoapp-eb6df20a/src/components/desktop/PriceListDesktop.jsx
   };
 
   const handleDeleteProduct = async (productId, productName) => {

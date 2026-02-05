@@ -30,98 +30,10 @@ export default function ReceptionDesktop() {
     { id: 'am', name: 'АМ' },
     { id: 'kant', name: 'Кант/Бутыль' },
     { id: 'metro', name: 'Метро' },
-<<<<<<< /Users/rostislavkomkov/Desktop/alcoapp/src/components/desktop/ReceptionDesktop.jsx
-<<<<<<< /Users/rostislavkomkov/Desktop/alcoapp/src/components/desktop/ReceptionDesktop.jsx
-<<<<<<< /Users/rostislavkomkov/Desktop/alcoapp/src/components/desktop/ReceptionDesktop.jsx
-<<<<<<< /Users/rostislavkomkov/Desktop/alcoapp/src/components/desktop/ReceptionDesktop.jsx
-<<<<<<< /Users/rostislavkomkov/Desktop/alcoapp/src/components/desktop/ReceptionDesktop.jsx
-<<<<<<< /Users/rostislavkomkov/Desktop/alcoapp/src/components/desktop/ReceptionDesktop.jsx
-<<<<<<< /Users/rostislavkomkov/Desktop/alcoapp/src/components/desktop/ReceptionDesktop.jsx
-<<<<<<< /Users/rostislavkomkov/Desktop/alcoapp/src/components/desktop/ReceptionDesktop.jsx
-<<<<<<< /Users/rostislavkomkov/Desktop/alcoapp/src/components/desktop/ReceptionDesktop.jsx
-<<<<<<< /Users/rostislavkomkov/Desktop/alcoapp/src/components/desktop/ReceptionDesktop.jsx
-<<<<<<< /Users/rostislavkomkov/Desktop/alcoapp/src/components/desktop/ReceptionDesktop.jsx
-<<<<<<< /Users/rostislavkomkov/Desktop/alcoapp/src/components/desktop/ReceptionDesktop.jsx
-<<<<<<< /Users/rostislavkomkov/Desktop/alcoapp/src/components/desktop/ReceptionDesktop.jsx
-<<<<<<< /Users/rostislavkomkov/Desktop/alcoapp/src/components/desktop/ReceptionDesktop.jsx
-<<<<<<< /Users/rostislavkomkov/Desktop/alcoapp/src/components/desktop/ReceptionDesktop.jsx
-    { id: 'pyaterochka', name: 'Пятёрочка' }
-=======
-=======
->>>>>>> /Users/rostislavkomkov/.windsurf/worktrees/alcoapp/alcoapp-eb6df20a/src/components/desktop/ReceptionDesktop.jsx
-=======
->>>>>>> /Users/rostislavkomkov/.windsurf/worktrees/alcoapp/alcoapp-eb6df20a/src/components/desktop/ReceptionDesktop.jsx
-=======
->>>>>>> /Users/rostislavkomkov/.windsurf/worktrees/alcoapp/alcoapp-eb6df20a/src/components/desktop/ReceptionDesktop.jsx
-=======
->>>>>>> /Users/rostislavkomkov/.windsurf/worktrees/alcoapp/alcoapp-eb6df20a/src/components/desktop/ReceptionDesktop.jsx
-=======
->>>>>>> /Users/rostislavkomkov/.windsurf/worktrees/alcoapp/alcoapp-eb6df20a/src/components/desktop/ReceptionDesktop.jsx
-=======
->>>>>>> /Users/rostislavkomkov/.windsurf/worktrees/alcoapp/alcoapp-eb6df20a/src/components/desktop/ReceptionDesktop.jsx
-=======
->>>>>>> /Users/rostislavkomkov/.windsurf/worktrees/alcoapp/alcoapp-eb6df20a/src/components/desktop/ReceptionDesktop.jsx
-=======
->>>>>>> /Users/rostislavkomkov/.windsurf/worktrees/alcoapp/alcoapp-eb6df20a/src/components/desktop/ReceptionDesktop.jsx
-=======
->>>>>>> /Users/rostislavkomkov/.windsurf/worktrees/alcoapp/alcoapp-eb6df20a/src/components/desktop/ReceptionDesktop.jsx
-=======
->>>>>>> /Users/rostislavkomkov/.windsurf/worktrees/alcoapp/alcoapp-eb6df20a/src/components/desktop/ReceptionDesktop.jsx
-=======
->>>>>>> /Users/rostislavkomkov/.windsurf/worktrees/alcoapp/alcoapp-eb6df20a/src/components/desktop/ReceptionDesktop.jsx
-=======
->>>>>>> /Users/rostislavkomkov/.windsurf/worktrees/alcoapp/alcoapp-eb6df20a/src/components/desktop/ReceptionDesktop.jsx
-=======
->>>>>>> /Users/rostislavkomkov/.windsurf/worktrees/alcoapp/alcoapp-eb6df20a/src/components/desktop/ReceptionDesktop.jsx
-=======
->>>>>>> /Users/rostislavkomkov/.windsurf/worktrees/alcoapp/alcoapp-eb6df20a/src/components/desktop/ReceptionDesktop.jsx
     { id: 'pyaterochka', name: 'Пятёрочка' },
     { id: 'kb', name: 'КБ' },
     { id: 'bristol', name: 'Бристоль' },
     { id: 'perekrestok', name: 'Перекрёсток' }
-<<<<<<< /Users/rostislavkomkov/Desktop/alcoapp/src/components/desktop/ReceptionDesktop.jsx
-<<<<<<< /Users/rostislavkomkov/Desktop/alcoapp/src/components/desktop/ReceptionDesktop.jsx
-<<<<<<< /Users/rostislavkomkov/Desktop/alcoapp/src/components/desktop/ReceptionDesktop.jsx
-<<<<<<< /Users/rostislavkomkov/Desktop/alcoapp/src/components/desktop/ReceptionDesktop.jsx
-<<<<<<< /Users/rostislavkomkov/Desktop/alcoapp/src/components/desktop/ReceptionDesktop.jsx
-<<<<<<< /Users/rostislavkomkov/Desktop/alcoapp/src/components/desktop/ReceptionDesktop.jsx
-<<<<<<< /Users/rostislavkomkov/Desktop/alcoapp/src/components/desktop/ReceptionDesktop.jsx
-<<<<<<< /Users/rostislavkomkov/Desktop/alcoapp/src/components/desktop/ReceptionDesktop.jsx
-<<<<<<< /Users/rostislavkomkov/Desktop/alcoapp/src/components/desktop/ReceptionDesktop.jsx
-<<<<<<< /Users/rostislavkomkov/Desktop/alcoapp/src/components/desktop/ReceptionDesktop.jsx
-<<<<<<< /Users/rostislavkomkov/Desktop/alcoapp/src/components/desktop/ReceptionDesktop.jsx
-<<<<<<< /Users/rostislavkomkov/Desktop/alcoapp/src/components/desktop/ReceptionDesktop.jsx
-<<<<<<< /Users/rostislavkomkov/Desktop/alcoapp/src/components/desktop/ReceptionDesktop.jsx
-<<<<<<< /Users/rostislavkomkov/Desktop/alcoapp/src/components/desktop/ReceptionDesktop.jsx
->>>>>>> /Users/rostislavkomkov/.windsurf/worktrees/alcoapp/alcoapp-eb6df20a/src/components/desktop/ReceptionDesktop.jsx
-=======
->>>>>>> /Users/rostislavkomkov/.windsurf/worktrees/alcoapp/alcoapp-eb6df20a/src/components/desktop/ReceptionDesktop.jsx
-=======
->>>>>>> /Users/rostislavkomkov/.windsurf/worktrees/alcoapp/alcoapp-eb6df20a/src/components/desktop/ReceptionDesktop.jsx
-=======
->>>>>>> /Users/rostislavkomkov/.windsurf/worktrees/alcoapp/alcoapp-eb6df20a/src/components/desktop/ReceptionDesktop.jsx
-=======
->>>>>>> /Users/rostislavkomkov/.windsurf/worktrees/alcoapp/alcoapp-eb6df20a/src/components/desktop/ReceptionDesktop.jsx
-=======
->>>>>>> /Users/rostislavkomkov/.windsurf/worktrees/alcoapp/alcoapp-eb6df20a/src/components/desktop/ReceptionDesktop.jsx
-=======
->>>>>>> /Users/rostislavkomkov/.windsurf/worktrees/alcoapp/alcoapp-eb6df20a/src/components/desktop/ReceptionDesktop.jsx
-=======
->>>>>>> /Users/rostislavkomkov/.windsurf/worktrees/alcoapp/alcoapp-eb6df20a/src/components/desktop/ReceptionDesktop.jsx
-=======
->>>>>>> /Users/rostislavkomkov/.windsurf/worktrees/alcoapp/alcoapp-eb6df20a/src/components/desktop/ReceptionDesktop.jsx
-=======
->>>>>>> /Users/rostislavkomkov/.windsurf/worktrees/alcoapp/alcoapp-eb6df20a/src/components/desktop/ReceptionDesktop.jsx
-=======
->>>>>>> /Users/rostislavkomkov/.windsurf/worktrees/alcoapp/alcoapp-eb6df20a/src/components/desktop/ReceptionDesktop.jsx
-=======
->>>>>>> /Users/rostislavkomkov/.windsurf/worktrees/alcoapp/alcoapp-eb6df20a/src/components/desktop/ReceptionDesktop.jsx
-=======
->>>>>>> /Users/rostislavkomkov/.windsurf/worktrees/alcoapp/alcoapp-eb6df20a/src/components/desktop/ReceptionDesktop.jsx
-=======
->>>>>>> /Users/rostislavkomkov/.windsurf/worktrees/alcoapp/alcoapp-eb6df20a/src/components/desktop/ReceptionDesktop.jsx
-=======
->>>>>>> /Users/rostislavkomkov/.windsurf/worktrees/alcoapp/alcoapp-eb6df20a/src/components/desktop/ReceptionDesktop.jsx
   ];
 
   useEffect(() => {

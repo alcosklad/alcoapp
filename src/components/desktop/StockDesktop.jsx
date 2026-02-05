@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { Search, ChevronUp, ChevronDown, RefreshCw } from 'lucide-react';
-import { getStocksWithDetails, getSuppliers } from '../../lib/pocketbase';
+import { Search, ChevronUp, ChevronDown, RefreshCw, X, Trash2, Check, Plus } from 'lucide-react';
+import { getStocksWithDetails, getSuppliers, updateProduct, deleteProduct, updateStock } from '../../lib/pocketbase';
 import pb from '../../lib/pocketbase';
 
 export default function StockDesktop() {
@@ -12,6 +12,14 @@ export default function StockDesktop() {
   const [selectedCategory, setSelectedCategory] = useState('');
   const [sortField, setSortField] = useState('name');
   const [sortDir, setSortDir] = useState('asc');
+  
+  // Inline editing
+  const [editingCell, setEditingCell] = useState(null); // { stockId, field }
+  const [editValue, setEditValue] = useState('');
+  
+  // Modal
+  const [selectedStock, setSelectedStock] = useState(null);
+  const [modalData, setModalData] = useState(null);
 
   useEffect(() => {
     loadSuppliers();
@@ -92,8 +100,8 @@ export default function StockDesktop() {
           bVal = b?.quantity || 0;
           break;
         case 'purchasePrice':
-          aVal = a?.expand?.product?.purchasePrice || a?.product?.purchasePrice || 0;
-          bVal = b?.expand?.product?.purchasePrice || b?.product?.purchasePrice || 0;
+          aVal = a?.cost ?? a?.purchase_price ?? a?.expand?.product?.cost ?? a?.product?.cost ?? 0;
+          bVal = b?.cost ?? b?.purchase_price ?? b?.expand?.product?.cost ?? b?.product?.cost ?? 0;
           break;
         case 'price':
           aVal = a?.expand?.product?.price || a?.product?.price || 0;
@@ -114,6 +122,162 @@ export default function StockDesktop() {
     if (sortField !== field) return null;
     return sortDir === 'asc' ? <ChevronUp size={14} /> : <ChevronDown size={14} />;
   };
+
+  // Inline editing handlers
+  const startEditing = (stockId, field, currentValue) => {
+    setEditingCell({ stockId, field });
+    setEditValue(String(currentValue || ''));
+  };
+
+  const cancelEditing = () => {
+    setEditingCell(null);
+    setEditValue('');
+  };
+
+  const saveInlineEdit = async () => {
+    if (!editingCell) return;
+    
+    const { stockId, field } = editingCell;
+    const stock = stocks.find(s => s.id === stockId);
+    if (!stock) return;
+
+    try {
+      const product = stock?.expand?.product || stock?.product;
+      const productId = product?.id || stock.product;
+
+      if (field === 'name' || field === 'price' || field === 'cost') {
+        // Update product
+        const updateData = {};
+        if (field === 'name') updateData.name = editValue;
+        if (field === 'price') updateData.price = Number(editValue) || 0;
+        if (field === 'cost') updateData.cost = Number(editValue) || 0;
+        
+        await updateProduct(productId, updateData);
+      } else if (field === 'quantity') {
+        // Update stock quantity
+        const newQty = Number(editValue) || 0;
+        const diff = newQty - (stock.quantity || 0);
+        if (diff !== 0) {
+          await pb.collection('stocks').update(stockId, { quantity: newQty });
+        }
+      }
+
+      await loadStocks();
+    } catch (error) {
+      console.error('Error saving:', error);
+      alert('Ошибка сохранения: ' + error.message);
+    } finally {
+      cancelEditing();
+    }
+  };
+
+  const handleKeyDown = (e) => {
+    if (e.key === 'Enter') {
+      saveInlineEdit();
+    } else if (e.key === 'Escape') {
+      cancelEditing();
+    }
+  };
+
+  // Modal handlers
+  const openModal = (stock) => {
+    const product = stock?.expand?.product || stock?.product || {};
+    setSelectedStock(stock);
+    setModalData({
+      name: product.name || '',
+      article: product.article || '',
+      cost: stock?.cost ?? stock?.purchase_price ?? product?.cost ?? 0,
+      price: product.price || 0,
+      quantity: stock.quantity || 0,
+      supplier: stock.supplier || selectedSupplier
+    });
+  };
+
+  const closeModal = () => {
+    setSelectedStock(null);
+    setModalData(null);
+  };
+
+  const saveModal = async () => {
+    if (!selectedStock || !modalData) return;
+
+    try {
+      const product = selectedStock?.expand?.product || selectedStock?.product;
+      const productId = product?.id || selectedStock.product;
+
+      // Update product (name, price, cost)
+      await updateProduct(productId, {
+        name: modalData.name,
+        article: modalData.article,
+        cost: Number(modalData.cost) || 0,
+        price: Number(modalData.price) || 0
+      });
+
+      // Update stock quantity and cost
+      await pb.collection('stocks').update(selectedStock.id, {
+        quantity: Number(modalData.quantity) || 0,
+        cost: Number(modalData.cost) || 0
+      });
+
+      await loadStocks();
+      closeModal();
+    } catch (error) {
+      console.error('Error saving:', error);
+      alert('Ошибка сохранения: ' + error.message);
+    }
+  };
+
+  const handleDeleteStock = async () => {
+    if (!selectedStock) return;
+    
+    if (!confirm('Удалить этот товар из остатков?')) return;
+
+    try {
+      await pb.collection('stocks').delete(selectedStock.id);
+      await loadStocks();
+      closeModal();
+    } catch (error) {
+      console.error('Error deleting:', error);
+      alert('Ошибка удаления: ' + error.message);
+    }
+  };
+
+  const handleAddToCity = async () => {
+    if (!selectedStock || !modalData) return;
+    
+    const targetCity = prompt('Введите ID города для добавления товара:');
+    if (!targetCity) return;
+
+    try {
+      const product = selectedStock?.expand?.product || selectedStock?.product;
+      const productId = product?.id || selectedStock.product;
+
+      await pb.collection('stocks').create({
+        product: productId,
+        supplier: targetCity,
+        quantity: 1,
+        cost: Number(modalData.cost) || 0
+      });
+
+      alert('Товар добавлен в другой город');
+    } catch (error) {
+      console.error('Error adding to city:', error);
+      alert('Ошибка: ' + error.message);
+    }
+  };
+
+  // Calculate totals
+  const totals = filteredStocks.reduce((acc, stock) => {
+    const purchasePrice = stock?.cost ?? stock?.purchase_price ?? stock?.expand?.product?.cost ?? 0;
+    const salePrice = stock?.expand?.product?.price || stock?.product?.price || 0;
+    const qty = stock?.quantity || 0;
+    
+    return {
+      totalPurchase: acc.totalPurchase + (purchasePrice * qty),
+      totalSale: acc.totalSale + (salePrice * qty),
+      totalQty: acc.totalQty + qty
+    };
+  }, { totalPurchase: 0, totalSale: 0, totalQty: 0 });
 
   return (
     <div className="space-y-4">
@@ -180,14 +344,6 @@ export default function StockDesktop() {
               <tr className="bg-gray-50 border-b border-gray-200">
                 <th 
                   className="text-left px-3 py-2 font-medium text-gray-600 cursor-pointer hover:bg-gray-100"
-                  onClick={() => handleSort('article')}
-                >
-                  <div className="flex items-center gap-1">
-                    Артикул <SortIcon field="article" />
-                  </div>
-                </th>
-                <th 
-                  className="text-left px-3 py-2 font-medium text-gray-600 cursor-pointer hover:bg-gray-100"
                   onClick={() => handleSort('name')}
                 >
                   <div className="flex items-center gap-1">
@@ -199,7 +355,7 @@ export default function StockDesktop() {
                   onClick={() => handleSort('quantity')}
                 >
                   <div className="flex items-center justify-end gap-1">
-                    Остаток <SortIcon field="quantity" />
+                    Кол-во <SortIcon field="quantity" />
                   </div>
                 </th>
                 <th 
@@ -207,7 +363,7 @@ export default function StockDesktop() {
                   onClick={() => handleSort('purchasePrice')}
                 >
                   <div className="flex items-center justify-end gap-1">
-                    Закуп <SortIcon field="purchasePrice" />
+                    Закуп/шт <SortIcon field="purchasePrice" />
                   </div>
                 </th>
                 <th 
@@ -215,15 +371,21 @@ export default function StockDesktop() {
                   onClick={() => handleSort('price')}
                 >
                   <div className="flex items-center justify-end gap-1">
-                    Продажа <SortIcon field="price" />
+                    Продажа/шт <SortIcon field="price" />
                   </div>
+                </th>
+                <th className="text-right px-3 py-2 font-medium text-gray-600">
+                  Сумма закупа
+                </th>
+                <th className="text-right px-3 py-2 font-medium text-gray-600">
+                  Сумма продажи
                 </th>
               </tr>
             </thead>
             <tbody>
               {loading ? (
                 <tr>
-                  <td colSpan={5} className="px-3 py-6 text-center text-gray-500">
+                  <td colSpan={6} className="px-3 py-6 text-center text-gray-500">
                     <div className="flex items-center justify-center gap-2">
                       <RefreshCw size={14} className="animate-spin" />
                       Загрузка...
@@ -232,43 +394,255 @@ export default function StockDesktop() {
                 </tr>
               ) : filteredStocks.length === 0 ? (
                 <tr>
-                  <td colSpan={5} className="px-3 py-6 text-center text-gray-500">
+                  <td colSpan={6} className="px-3 py-6 text-center text-gray-500">
                     {searchQuery || selectedCategory ? 'Ничего не найдено' : 'Нет данных'}
                   </td>
                 </tr>
               ) : (
-                filteredStocks.map((stock) => {
-                  const product = stock?.expand?.product || stock?.product || {};
-                  const quantity = stock?.quantity || 0;
+                <>
+                  {filteredStocks.map((stock) => {
+                    const product = stock?.expand?.product || stock?.product || {};
+                    const quantity = stock?.quantity || 0;
+                    const purchasePrice = stock?.cost ?? stock?.purchase_price ?? product?.cost ?? 0;
+                    const salePrice = product?.price || 0;
+                    const totalPurchase = purchasePrice * quantity;
+                    const totalSale = salePrice * quantity;
+                    const isEditing = (field) => editingCell?.stockId === stock.id && editingCell?.field === field;
+                    
+                    return (
+                      <tr 
+                        key={stock.id} 
+                        className="border-b border-gray-100 hover:bg-gray-50 cursor-pointer"
+                        onClick={() => openModal(stock)}
+                      >
+                        {/* Наименование */}
+                        <td 
+                          className="px-3 py-1.5"
+                          onDoubleClick={(e) => { e.stopPropagation(); startEditing(stock.id, 'name', product.name); }}
+                        >
+                          {isEditing('name') ? (
+                            <input
+                              type="text"
+                              value={editValue}
+                              onChange={(e) => setEditValue(e.target.value)}
+                              onKeyDown={handleKeyDown}
+                              onBlur={saveInlineEdit}
+                              onClick={(e) => e.stopPropagation()}
+                              className="w-full px-1 py-0.5 border border-blue-400 rounded text-xs focus:outline-none"
+                              autoFocus
+                            />
+                          ) : (
+                            <span className="hover:text-blue-600">{product.name || 'Без названия'}</span>
+                          )}
+                        </td>
+                        
+                        {/* Количество */}
+                        <td 
+                          className={`px-3 py-1.5 text-right font-medium ${quantity <= 3 && quantity > 0 ? 'text-red-400' : ''}`}
+                          onDoubleClick={(e) => { e.stopPropagation(); startEditing(stock.id, 'quantity', quantity); }}
+                        >
+                          {isEditing('quantity') ? (
+                            <input
+                              type="number"
+                              value={editValue}
+                              onChange={(e) => setEditValue(e.target.value)}
+                              onKeyDown={handleKeyDown}
+                              onBlur={saveInlineEdit}
+                              onClick={(e) => e.stopPropagation()}
+                              className="w-16 px-1 py-0.5 border border-blue-400 rounded text-xs text-right focus:outline-none"
+                              autoFocus
+                            />
+                          ) : (
+                            <span className="hover:text-blue-600">{quantity} шт</span>
+                          )}
+                        </td>
+                        
+                        {/* Закуп за штуку */}
+                        <td 
+                          className="px-3 py-1.5 text-right text-gray-600"
+                          onDoubleClick={(e) => { e.stopPropagation(); startEditing(stock.id, 'cost', purchasePrice); }}
+                        >
+                          {isEditing('cost') ? (
+                            <input
+                              type="number"
+                              value={editValue}
+                              onChange={(e) => setEditValue(e.target.value)}
+                              onKeyDown={handleKeyDown}
+                              onBlur={saveInlineEdit}
+                              onClick={(e) => e.stopPropagation()}
+                              className="w-20 px-1 py-0.5 border border-blue-400 rounded text-xs text-right focus:outline-none"
+                              autoFocus
+                            />
+                          ) : (
+                            <span className="hover:text-blue-600">{purchasePrice.toLocaleString('ru-RU')} ₽</span>
+                          )}
+                        </td>
+                        
+                        {/* Продажа за штуку */}
+                        <td 
+                          className="px-3 py-1.5 text-right"
+                          onDoubleClick={(e) => { e.stopPropagation(); startEditing(stock.id, 'price', salePrice); }}
+                        >
+                          {isEditing('price') ? (
+                            <input
+                              type="number"
+                              value={editValue}
+                              onChange={(e) => setEditValue(e.target.value)}
+                              onKeyDown={handleKeyDown}
+                              onBlur={saveInlineEdit}
+                              onClick={(e) => e.stopPropagation()}
+                              className="w-20 px-1 py-0.5 border border-blue-400 rounded text-xs text-right focus:outline-none"
+                              autoFocus
+                            />
+                          ) : (
+                            <span className="hover:text-blue-600">{salePrice.toLocaleString('ru-RU')} ₽</span>
+                          )}
+                        </td>
+                        
+                        {/* Сумма закупа */}
+                        <td className="px-3 py-1.5 text-right text-gray-500">
+                          {totalPurchase.toLocaleString('ru-RU')} ₽
+                        </td>
+                        
+                        {/* Сумма продажи */}
+                        <td className="px-3 py-1.5 text-right font-medium text-green-700">
+                          {totalSale.toLocaleString('ru-RU')} ₽
+                        </td>
+                      </tr>
+                    );
+                  })}
                   
-                  return (
-                    <tr 
-                      key={stock.id} 
-                      className="border-b border-gray-100 hover:bg-gray-50"
-                    >
-                      <td className="px-3 py-1.5 font-mono text-xs text-gray-600">
-                        {product.article || '—'}
-                      </td>
-                      <td className="px-3 py-1.5">
-                        {product.name || 'Без названия'}
-                      </td>
-                      <td className={`px-3 py-1.5 text-right font-medium ${quantity < 3 ? 'text-red-600' : ''}`}>
-                        {quantity} шт
-                      </td>
-                      <td className="px-3 py-1.5 text-right text-gray-600">
-                        {(product.purchasePrice || 0).toLocaleString('ru-RU')} ₽
-                      </td>
-                      <td className="px-3 py-1.5 text-right font-medium">
-                        {(product.price || 0).toLocaleString('ru-RU')} ₽
-                      </td>
-                    </tr>
-                  );
-                })
+                  {/* Итоговая строка */}
+                  <tr className="bg-gray-50 border-t-2 border-gray-300">
+                    <td className="px-3 py-2 font-medium text-gray-700">Итого</td>
+                    <td className="px-3 py-2 text-right font-medium text-gray-700">{totals.totalQty} шт</td>
+                    <td className="px-3 py-2"></td>
+                    <td className="px-3 py-2"></td>
+                    <td className="px-3 py-2 text-right font-medium text-gray-700">{totals.totalPurchase.toLocaleString('ru-RU')} ₽</td>
+                    <td className="px-3 py-2 text-right font-semibold text-green-700">{totals.totalSale.toLocaleString('ru-RU')} ₽</td>
+                  </tr>
+                </>
               )}
             </tbody>
           </table>
         </div>
       </div>
+
+      {/* Модальное окно редактирования */}
+      {selectedStock && modalData && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4" onClick={closeModal}>
+          <div className="bg-white rounded-lg w-full max-w-md overflow-hidden" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center justify-between p-4 border-b border-gray-200">
+              <h2 className="text-lg font-semibold text-gray-900">Редактировать товар</h2>
+              <button onClick={closeModal} className="text-gray-400 hover:text-gray-600">
+                <X size={20} />
+              </button>
+            </div>
+
+            <div className="p-4 space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Название</label>
+                <input
+                  type="text"
+                  value={modalData.name}
+                  onChange={(e) => setModalData({ ...modalData, name: e.target.value })}
+                  className="w-full px-3 py-2 border border-gray-300 rounded text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Артикул</label>
+                <input
+                  type="text"
+                  value={modalData.article}
+                  onChange={(e) => setModalData({ ...modalData, article: e.target.value })}
+                  className="w-full px-3 py-2 border border-gray-300 rounded text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Количество</label>
+                  <input
+                    type="number"
+                    value={modalData.quantity}
+                    onChange={(e) => setModalData({ ...modalData, quantity: e.target.value })}
+                    className="w-full px-3 py-2 border border-gray-300 rounded text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Город</label>
+                  <select
+                    value={modalData.supplier}
+                    onChange={(e) => setModalData({ ...modalData, supplier: e.target.value })}
+                    className="w-full px-3 py-2 border border-gray-300 rounded text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    disabled
+                  >
+                    {suppliers.map(s => (
+                      <option key={s.id} value={s.id}>{s.name}</option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Цена закупа (₽)</label>
+                  <input
+                    type="number"
+                    value={modalData.cost}
+                    onChange={(e) => setModalData({ ...modalData, cost: e.target.value })}
+                    className="w-full px-3 py-2 border border-gray-300 rounded text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Цена продажи (₽)</label>
+                  <input
+                    type="number"
+                    value={modalData.price}
+                    onChange={(e) => setModalData({ ...modalData, price: e.target.value })}
+                    className="w-full px-3 py-2 border border-gray-300 rounded text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  />
+                </div>
+              </div>
+
+              {/* Кнопка добавить в другой город */}
+              <button
+                onClick={handleAddToCity}
+                className="w-full flex items-center justify-center gap-2 px-4 py-2 text-sm text-blue-600 border border-blue-300 rounded hover:bg-blue-50"
+              >
+                <Plus size={16} />
+                Добавить в другой город
+              </button>
+            </div>
+
+            <div className="flex items-center justify-between p-4 border-t border-gray-200 bg-gray-50">
+              <button
+                onClick={handleDeleteStock}
+                className="flex items-center gap-2 px-4 py-2 text-sm text-red-600 hover:bg-red-50 rounded"
+              >
+                <Trash2 size={16} />
+                Удалить
+              </button>
+              <div className="flex gap-2">
+                <button
+                  onClick={closeModal}
+                  className="px-4 py-2 text-sm text-gray-600 hover:bg-gray-100 rounded"
+                >
+                  Отмена
+                </button>
+                <button
+                  onClick={saveModal}
+                  className="flex items-center gap-2 px-4 py-2 text-sm text-white bg-blue-600 hover:bg-blue-700 rounded"
+                >
+                  <Check size={16} />
+                  Сохранить
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

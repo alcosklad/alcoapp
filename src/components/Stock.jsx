@@ -240,7 +240,8 @@ export default function Stock() {
   
   // Считаем суммы
   const totalPurchaseValue = filteredStocks.reduce((sum, stock) => {
-    return sum + ((stock?.purchase_price || 0) * (stock?.quantity || 0));
+    const purchasePrice = stock?.cost ?? stock?.purchase_price ?? 0;
+    return sum + (purchasePrice * (stock?.quantity || 0));
   }, 0);
   
   const totalSaleValue = filteredStocks.reduce((sum, stock) => {
