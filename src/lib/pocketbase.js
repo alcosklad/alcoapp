@@ -143,6 +143,8 @@ export const getUsers = async () => {
 // Функции для работы с товарами
 export const getProducts = async (search = '') => {
   try {
+<<<<<<< /Users/rostislavkomkov/Desktop/alcoapp/src/lib/pocketbase.js
+<<<<<<< /Users/rostislavkomkov/Desktop/alcoapp/src/lib/pocketbase.js
     // Загружаем все товары (без фильтра)
     const allProducts = await pb.collection('products').getFullList({
       sort: 'name',
@@ -162,6 +164,37 @@ export const getProducts = async (search = '') => {
     });
     
     return filtered.slice(0, 50); // Ограничиваем 50 результатов
+=======
+    console.log(`PocketBase: Loading products page ${page}, city: ${city}, search: ${search}`);
+    
+    let filter = '';
+    const filters = [];
+
+    // Фильтр по поиску
+    if (search) {
+      filters.push(`(name ~ "${search}" || article ~ "${search}")`);
+    }
+=======
+    // Загружаем все товары
+    const allProducts = await pb.collection('products').getFullList({
+      sort: 'name'
+>>>>>>> /Users/rostislavkomkov/.windsurf/worktrees/alcoapp/alcoapp-eb6df20a/src/lib/pocketbase.js
+    });
+    
+    // Если нет поиска - возвращаем все товары
+    if (!search) {
+      return allProducts;
+    }
+    
+    // Фильтруем на клиенте без учета регистра
+    const searchLower = search.toLowerCase();
+    const filtered = allProducts.filter(product => {
+      const name = product?.name || '';
+      return name.toLowerCase().includes(searchLower);
+    });
+    
+    return filtered;
+>>>>>>> /Users/rostislavkomkov/.windsurf/worktrees/alcoapp/alcoapp-eb6df20a/src/lib/pocketbase.js
   } catch (error) {
     console.error('PocketBase: Error loading products:', error);
     console.error('PocketBase: Детали ошибки:', error.message, error.status);
@@ -190,6 +223,18 @@ export const updateProduct = async (id, data) => {
     return result;
   } catch (error) {
     console.error('PocketBase: Error updating product:', error);
+    throw error;
+  }
+};
+
+export const deleteProduct = async (id) => {
+  try {
+    console.log('PocketBase: Удаляем товар:', id);
+    await pb.collection('products').delete(id);
+    console.log('PocketBase: Товар успешно удален');
+    return true;
+  } catch (error) {
+    console.error('PocketBase: Error deleting product:', error);
     throw error;
   }
 };
@@ -231,13 +276,18 @@ export const createReception = async (data) => {
     console.log('PocketBase: Приемка успешно создана:', result);
     
     // Обновляем остатки на складе
-    if (data.items && data.warehouse && data.supplier) {
+    if (data.items && data.supplier) {
       // items теперь массив, не нужно парсить JSON
       const items = data.items;
       console.log('PocketBase: Обновляем остатки для', items.length, 'товаров');
+      console.log('PocketBase: Город (warehouse):', data.supplier);
       for (const item of items) {
-        await updateStock(item.product, data.warehouse, item.quantity, data.supplier);
+        console.log(`PocketBase: Добавляем товар ${item.product} (${item.name}), кол-во: ${item.quantity}`);
+        await updateStock(item.product, data.supplier, item.quantity, data.supplier);
       }
+      console.log('PocketBase: ✅ Все остатки успешно обновлены');
+    } else {
+      console.warn('PocketBase: ⚠️ Остатки НЕ обновлены! items:', !!data.items, 'supplier:', !!data.supplier);
     }
     
     return result;
@@ -298,15 +348,13 @@ export const updateStock = async (productId, warehouseId, quantity, supplierId =
       
       const newStockData = {
         product: productId,
-        warehouse: warehouseId,
+        supplier: supplierId,
         quantity: quantity
       };
-      // Если передан supplierId, добавляем его
-      if (supplierId) {
-        newStockData.supplier = supplierId;
-      }
+      
+      console.log('PocketBase: Создаем новый остаток с данными:', newStockData);
       const newStock = await pb.collection('stocks').create(newStockData);
-      console.log(`PocketBase: Создан новый остаток: ${productId} на складе ${warehouseId}, количество: ${newStock.quantity}`);
+      console.log(`PocketBase: Создан новый остаток: ${productId} для города ${supplierId}, количество: ${newStock.quantity}`);
     }
   } catch (error) {
     console.error('PocketBase: Error updating stock:', error);
@@ -584,8 +632,55 @@ export const getDashboardStats = async (filterId = null) => {
 export const updateReception = async (id, data) => {
   try {
     console.log('PocketBase: Обновляем приемку:', id, data);
+    
+    // Получаем старую версию приёмки
+    const oldReception = await pb.collection('receptions').getOne(id);
+    console.log('PocketBase: Старая приёмка:', oldReception);
+    
+    // Обновляем приёмку
     const result = await pb.collection('receptions').update(id, data);
     console.log('PocketBase: Приемка успешно обновлена:', result);
+    
+    // Синхронизируем остатки с приёмкой
+    if (data.items && oldReception.supplier) {
+      console.log('PocketBase: Синхронизируем остатки с приёмкой...');
+      
+      // Для каждого товара в приёмке устанавливаем точное количество в остатках
+      for (const item of data.items) {
+        const filterQuery = `product = "${item.product}" && supplier = "${oldReception.supplier}"`;
+        console.log(`PocketBase: Синхронизируем товар ${item.product} (${item.name}), количество: ${item.quantity}`);
+        
+        try {
+          // Ищем существующую запись
+          const existingStock = await pb.collection('stocks').getFirstListItem(filterQuery).catch(() => null);
+          
+          if (existingStock) {
+            // Обновляем существующий остаток - устанавливаем точное значение
+            await pb.collection('stocks').update(existingStock.id, {
+              quantity: item.quantity,
+              cost: item.cost || existingStock.cost,
+              price: item.sale_price || item.price || existingStock.price
+            });
+            console.log(`PocketBase: ✅ Остаток обновлён: ${item.name}, новое количество: ${item.quantity}`);
+          } else {
+            // Создаём новый остаток
+            await pb.collection('stocks').create({
+              product: item.product,
+              supplier: oldReception.supplier,
+              quantity: item.quantity,
+              cost: item.cost || 0,
+              price: item.sale_price || item.price || 0
+            });
+            console.log(`PocketBase: ✅ Создан новый остаток: ${item.name}, количество: ${item.quantity}`);
+          }
+        } catch (error) {
+          console.error(`PocketBase: Ошибка синхронизации товара ${item.product}:`, error);
+        }
+      }
+      
+      console.log('PocketBase: ✅ Все остатки синхронизированы с приёмкой');
+    }
+    
     return result;
   } catch (error) {
     console.error('PocketBase: Error updating reception:', error);

@@ -81,9 +81,12 @@ export default function PriceList() {
     
     // Фильтрация
     const filteredProducts = products.filter(product => {
-      // Фильтр по городу
-      if (selectedCity !== 'Все города' && product?.city !== selectedCity) {
-        return false;
+      // Фильтр по городу (работаем с массивом cities)
+      if (selectedCity !== 'Все города') {
+        const productCities = product?.cities || [];
+        if (!productCities.includes(selectedCity)) {
+          return false;
+        }
       }
       
       // Фильтр по поиску
@@ -177,8 +180,10 @@ export default function PriceList() {
   const endIndex = startIndex + productsPerPage;
   const currentProducts = filteredProducts.slice(startIndex, endIndex);
 
-  // Получаем уникальные города
-  const cities = ['Все города', ...new Set(products.map(p => p?.city).filter(Boolean))];
+  // Получаем уникальные города из массива cities
+  const allCities = products.flatMap(p => p?.cities || []);
+  const uniqueCities = [...new Set(allCities)].sort();
+  const cities = ['Все города', ...uniqueCities];
   
   // Получаем уникальные категории для фильтра
   const allCategories = products.map(p => ({
