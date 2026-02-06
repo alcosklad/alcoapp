@@ -12,25 +12,27 @@ export default function WorkerHistory() {
     loadOrdersHistory();
   }, []);
 
+  const ruMonths = {'января': '01', 'февраля': '02', 'марта': '03', 'апреля': '04', 'мая': '05', 'июня': '06',
+                    'июля': '07', 'августа': '08', 'сентября': '09', 'октября': '10', 'ноября': '11', 'декабря': '12'};
+
+  const parseLocalTime = (localTime) => {
+    if (!localTime) return new Date(0);
+    const replaced = localTime.replace(/(\d+)\s+(\w+)\s+(\d+),\s+(\d+):(\d+)/, 
+      (match, day, month, year, hours, minutes) => {
+        const m = ruMonths[month];
+        if (!m) return match;
+        return `${year}-${m}-${day.padStart(2, '0')}T${hours.padStart(2, '0')}:${minutes.padStart(2, '0')}:00`;
+      });
+    const parsed = new Date(replaced);
+    return isNaN(parsed.getTime()) ? new Date(0) : parsed;
+  };
+
   const loadOrdersHistory = async () => {
     try {
       const data = await getOrders();
-      // Сортируем по local_time (новые первые)
       const sorted = data.sort((a, b) => {
         if (a.local_time && b.local_time) {
-          const dateA = new Date(a.local_time.replace(/(\d+)\s+(\w+)\s+(\d+),\s+(\d+):(\d+)/, 
-            (match, day, month, year, hours, minutes) => {
-              const months = {'января': '01', 'февраля': '02', 'марта': '03', 'апреля': '04', 'мая': '05', 'июня': '06',
-                             'июля': '07', 'августа': '08', 'сентября': '09', 'октября': '10', 'ноября': '11', 'декабря': '12'};
-              return `${year}-${months[month]}-${day.padStart(2, '0')}T${hours.padStart(2, '0')}:${minutes.padStart(2, '0')}:00`;
-            }));
-          const dateB = new Date(b.local_time.replace(/(\d+)\s+(\w+)\s+(\d+),\s+(\d+):(\d+)/, 
-            (match, day, month, year, hours, minutes) => {
-              const months = {'января': '01', 'февраля': '02', 'марта': '03', 'апреля': '04', 'мая': '05', 'июня': '06',
-                             'июля': '07', 'августа': '08', 'сентября': '09', 'октября': '10', 'ноября': '11', 'декабря': '12'};
-              return `${year}-${months[month]}-${day.padStart(2, '0')}T${hours.padStart(2, '0')}:${minutes.padStart(2, '0')}:00`;
-            }));
-          return dateB - dateA;
+          return parseLocalTime(b.local_time) - parseLocalTime(a.local_time);
         }
         return new Date(b.created_date) - new Date(a.created_date);
       });

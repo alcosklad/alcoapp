@@ -25,13 +25,15 @@ export default function ReceptionDesktop() {
 
   // Статичный список магазинов
   const storesList = [
-    { id: 'kb', name: 'КБ' },
-    { id: 'bristol', name: 'Бристоль' },
     { id: 'lenta', name: 'Лента' },
     { id: 'magnit', name: 'Магнит' },
-    { id: 'perekrestok', name: 'Перекрёсток' },
+    { id: 'am', name: 'АМ' },
+    { id: 'kant', name: 'Кант/Бутыль' },
+    { id: 'metro', name: 'Метро' },
     { id: 'pyaterochka', name: 'Пятёрочка' },
-    { id: 'diksi', name: 'Дикси' }
+    { id: 'kb', name: 'КБ' },
+    { id: 'bristol', name: 'Бристоль' },
+    { id: 'perekrestok', name: 'Перекрёсток' }
   ];
 
   useEffect(() => {
@@ -105,6 +107,9 @@ export default function ReceptionDesktop() {
   };
 
   const handleDeleteReception = async (receptionId) => {
+    console.log('handleDeleteReception вызвана с ID:', receptionId);
+    console.log('selectedReception:', selectedReception);
+    
     if (!window.confirm('Вы уверены, что хотите удалить эту приёмку? Остатки будут пересчитаны.')) {
       return;
     }
@@ -112,7 +117,7 @@ export default function ReceptionDesktop() {
     try {
       setLoading(true);
       await deleteReception(receptionId);
-      handleCloseModal();
+      setSelectedReception(null);
       await loadReceptions();
       alert('Приёмка удалена');
     } catch (error) {
@@ -328,7 +333,7 @@ export default function ReceptionDesktop() {
                 </tr>
               ) : (
                 filteredReceptions.map((reception) => {
-                  const itemsCount = reception.items?.length || 0;
+                  const itemsCount = reception.items?.reduce((sum, item) => sum + (item.quantity || 0), 0) || 0;
                   const totalAmount = reception.total_amount || 0;
                   
                   return (
@@ -429,7 +434,7 @@ export default function ReceptionDesktop() {
               <div className="grid grid-cols-3 gap-4 p-4 bg-gray-50 rounded">
                 <div>
                   <p className="text-xs text-gray-500">Товаров</p>
-                  <p className="text-base font-semibold">{editedItems.length} шт</p>
+                  <p className="text-base font-semibold">{editedItems.reduce((sum, item) => sum + (item.quantity || 0), 0)} шт</p>
                 </div>
                 <div>
                   <p className="text-xs text-gray-500">Сумма закупа</p>

@@ -1,6 +1,6 @@
-import React, { useState, useEffect } from 'react';
-import { ShoppingCart, Search, Filter, Plus, Minus, Package } from 'lucide-react';
-import { getStocks, updateStock, createOrder, getActiveShift, startShift, getSuppliers, getStocksWithDetails } from '../lib/pocketbase';
+import React, { useState, useEffect, useMemo } from 'react';
+import { ShoppingCart, Search, Filter, Plus, Minus, Package, X, History } from 'lucide-react';
+import { getStocks, updateStock, createOrder, createSale, getActiveShift, startShift, getSuppliers, getStocksWithDetails } from '../lib/pocketbase';
 import CartModal from './CartModal';
 import SellModal2 from './SellModal2';
 import SalesHistory from './SalesHistory';
@@ -57,14 +57,10 @@ export default function Stock() {
     try {
       setLoading(true);
       setError(null);
-      console.log('🔍 Stock: Загружаем остатки для supplier:', selectedSupplier);
       const data = await getStocksWithDetails(selectedSupplier || null).catch(err => {
         console.error('Error loading stocks:', err);
         return [];
       });
-      console.log('📊 Stock: Получены данные:', data);
-      console.log('📊 Stock: Первый элемент:', data[0]);
-      console.log('📊 Stock: expand.product первого элемента:', data[0]?.expand?.product);
       setStocks(data || []);
     } catch (error) {
       console.error('Error loading stocks:', error);
@@ -223,7 +219,7 @@ export default function Stock() {
     }
   };
 
-  const filteredStocks = stocks.filter(stock => {
+  const filteredStocks = useMemo(() => stocks.filter(stock => {
     if (!searchQuery) return true;
     const searchLower = searchQuery.toLowerCase();
     const productName = stock?.expand?.product?.name || stock?.product?.name || '';
@@ -232,7 +228,7 @@ export default function Stock() {
       productName.toLowerCase().includes(searchLower) ||
       productArticle.toLowerCase().includes(searchLower)
     );
-  });
+  }), [stocks, searchQuery]);
 
   const totalItems = filteredStocks.length;
   const totalQuantity = filteredStocks.reduce((sum, stock) => sum + (stock?.quantity || 0), 0);
@@ -240,7 +236,8 @@ export default function Stock() {
   
   // Считаем суммы
   const totalPurchaseValue = filteredStocks.reduce((sum, stock) => {
-    return sum + ((stock?.purchase_price || 0) * (stock?.quantity || 0));
+    const purchasePrice = stock?.cost ?? stock?.purchase_price ?? 0;
+    return sum + (purchasePrice * (stock?.quantity || 0));
   }, 0);
   
   const totalSaleValue = filteredStocks.reduce((sum, stock) => {
@@ -440,15 +437,6 @@ export default function Stock() {
           ) : (
             <div className="divide-y divide-gray-100">
               {filteredStocks.map(stock => {
-                console.log('🎨 Stock: Отрисовка карточки:', {
-                  id: stock.id,
-                  productName: stock.product?.name,
-                  expandName: stock.expand?.product?.name,
-                  price: stock.product?.price,
-                  expandPrice: stock.expand?.product?.price,
-                  quantity: stock.quantity
-                });
-                
                 const totalSum = (stock?.quantity || 0) * (stock?.expand?.product?.price || 0);
                 const price = stock?.expand?.product?.price || 0;
                 return (

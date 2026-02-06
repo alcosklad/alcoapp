@@ -11,13 +11,15 @@ export default function CreateReceptionModal({
 }) {
   // Статичный список магазинов (пока коллекция stores не создана в PocketBase)
   const defaultStores = [
-    { id: 'kb', name: 'КБ' },
-    { id: 'bristol', name: 'Бристоль' },
     { id: 'lenta', name: 'Лента' },
     { id: 'magnit', name: 'Магнит' },
-    { id: 'perekrestok', name: 'Перекрёсток' },
+    { id: 'am', name: 'АМ' },
+    { id: 'kant', name: 'Кант/Бутыль' },
+    { id: 'metro', name: 'Метро' },
     { id: 'pyaterochka', name: 'Пятёрочка' },
-    { id: 'diksi', name: 'Дикси' }
+    { id: 'kb', name: 'КБ' },
+    { id: 'bristol', name: 'Бристоль' },
+    { id: 'perekrestok', name: 'Перекрёсток' }
   ];
 
   const storesList = stores && stores.length > 0 ? stores : defaultStores;

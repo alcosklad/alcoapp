@@ -50,3 +50,9 @@ yarn-error.log*
 # Временные файлы
 *.tmp
 *.temp
+
+# Sensitive files
+admin_token.txt
+
+# Backup files
+*.bak

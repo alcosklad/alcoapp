@@ -7,6 +7,14 @@ export default function CartModal({ isOpen, onClose, stocks, onCompleteOrder }) 
   const [discountValue, setDiscountValue] = useState('');
   const [paymentMethod, setPaymentMethod] = useState('cash'); // 'cash', 'transfer', 'prepaid'
   const [isSelecting, setIsSelecting] = useState(true);
+  const [stocksSnapshot, setStocksSnapshot] = useState([]);
+
+  // Фиксируем снапшот остатков при открытии модалки
+  useEffect(() => {
+    if (isOpen && stocks) {
+      setStocksSnapshot(JSON.parse(JSON.stringify(stocks)));
+    }
+  }, [isOpen]);
 
   // Добавить товар в корзину
   const addToCart = (stock) => {
@@ -160,7 +168,7 @@ export default function CartModal({ isOpen, onClose, stocks, onCompleteOrder }) 
           {isSelecting ? (
             /* Режим выбора товаров */
             <div className="space-y-2">
-              {stocks.map(stock => (
+              {stocksSnapshot.map(stock => (
                 <button
                   key={stock.id}
                   onClick={() => addToCart(stock)}

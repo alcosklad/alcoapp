@@ -4,7 +4,7 @@ import { LogOut, User } from 'lucide-react';
 import pb from '../lib/pocketbase';
 
 export default function Dashboard({ user, onLogout }) {
-  const [stats, setStats] = useState({ totalProducts: 0, totalValue: 0 });
+  const [stats, setStats] = useState({ totalProducts: 0, totalPurchaseValue: 0, totalSaleValue: 0 });
   const [warehouses, setWarehouses] = useState([]);
   const [selectedWarehouse, setSelectedWarehouse] = useState('');
   const [loading, setLoading] = useState(true);
@@ -36,12 +36,12 @@ export default function Dashboard({ user, onLogout }) {
         }),
         getDashboardStats(statsFilter).catch(err => {
           console.error('Error loading stats:', err);
-          return { totalProducts: 0, totalValue: 0 };
+          return { totalProducts: 0, totalPurchaseValue: 0, totalSaleValue: 0 };
         })
       ]);
       
       setWarehouses(warehousesData || []);
-      setStats(statsData || { totalProducts: 0, totalValue: 0 });
+      setStats(statsData || { totalProducts: 0, totalPurchaseValue: 0, totalSaleValue: 0 });
     } catch (error) {
       console.error('Error loading dashboard:', error);
       setError('Ошибка загрузки данных');
@@ -152,7 +152,7 @@ export default function Dashboard({ user, onLogout }) {
                 <div>
                   <p className="text-gray-500 text-sm">Общая сумма закупа</p>
                   <p className="text-3xl font-bold text-gray-900 mt-1">
-                    {stats.totalValue.toLocaleString('ru-RU')} ₽
+                    {(stats.totalPurchaseValue || 0).toLocaleString('ru-RU')} ₽
                   </p>
                 </div>
                 <div className="bg-orange-100 p-3 rounded-lg">
@@ -171,7 +171,7 @@ export default function Dashboard({ user, onLogout }) {
                 <div>
                   <p className="text-gray-500 text-sm">Общая сумма склада</p>
                   <p className="text-3xl font-bold text-gray-900 mt-1">
-                    {stats.totalValue.toLocaleString('ru-RU')} ₽
+                    {(stats.totalSaleValue || 0).toLocaleString('ru-RU')} ₽
                   </p>
                 </div>
                 <div className="bg-green-100 p-3 rounded-lg">

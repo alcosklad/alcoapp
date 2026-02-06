@@ -16,6 +16,7 @@ import StockDesktop from './components/desktop/StockDesktop';
 import PriceListDesktop from './components/desktop/PriceListDesktop';
 import ReceptionDesktop from './components/desktop/ReceptionDesktop';
 import pb from './lib/pocketbase';
+import ErrorBoundary from './components/ErrorBoundary';
 
 function App() {
   const [activeTab, setActiveTab] = useState('dashboard');
@@ -125,4 +126,12 @@ function App() {
   );
 }
 
-export default App;
+function AppWithErrorBoundary() {
+  return (
+    <ErrorBoundary>
+      <App />
+    </ErrorBoundary>
+  );
+}
+
+export default AppWithErrorBoundary;
