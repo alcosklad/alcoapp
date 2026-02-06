@@ -58,7 +58,7 @@ export default function PriceListDesktop() {
   const startEdit = (product) => {
     setEditingId(product.id);
     setEditValues({
-      purchasePrice: product.purchasePrice || 0,
+      purchasePrice: product.cost || 0,
       price: product.price || 0,
     });
   };
@@ -71,7 +71,7 @@ export default function PriceListDesktop() {
   const saveEdit = async (productId) => {
     try {
       await updateProduct(productId, {
-        purchasePrice: Number(editValues.purchasePrice),
+        cost: Number(editValues.purchasePrice),
         price: Number(editValues.price),
       });
       setEditingId(null);
@@ -106,8 +106,8 @@ export default function PriceListDesktop() {
           bVal = b?.category || '';
           break;
         case 'purchasePrice':
-          aVal = a?.purchasePrice || 0;
-          bVal = b?.purchasePrice || 0;
+          aVal = a?.cost || 0;
+          bVal = b?.cost || 0;
           break;
         case 'price':
           aVal = a?.price || 0;
@@ -268,7 +268,7 @@ export default function PriceListDesktop() {
                           />
                         ) : (
                           <span className="text-gray-600">
-                            {(product.purchasePrice || 0).toLocaleString('ru-RU')} ₽
+                            {(product.cost || 0).toLocaleString('ru-RU')} ₽
                           </span>
                         )}
                       </td>
