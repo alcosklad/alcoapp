@@ -92,12 +92,28 @@ export default function StockDesktop() {
           bVal = b?.quantity || 0;
           break;
         case 'purchasePrice':
-          aVal = a?.expand?.product?.purchasePrice || a?.product?.purchasePrice || 0;
-          bVal = b?.expand?.product?.purchasePrice || b?.product?.purchasePrice || 0;
+          aVal = a?.expand?.product?.cost || a?.product?.cost || 0;
+          bVal = b?.expand?.product?.cost || b?.product?.cost || 0;
           break;
         case 'price':
           aVal = a?.expand?.product?.price || a?.product?.price || 0;
           bVal = b?.expand?.product?.price || b?.product?.price || 0;
+          break;
+        case 'category':
+          aVal = a?.expand?.product?.category || a?.product?.category || '';
+          bVal = b?.expand?.product?.category || b?.product?.category || '';
+          break;
+        case 'volume':
+          aVal = a?.expand?.product?.volume || a?.product?.volume || '';
+          bVal = b?.expand?.product?.volume || b?.product?.volume || '';
+          break;
+        case 'margin':
+          aVal = (a?.expand?.product?.price || a?.product?.price || 0) - (a?.expand?.product?.cost || a?.product?.cost || 0);
+          bVal = (b?.expand?.product?.price || b?.product?.price || 0) - (b?.expand?.product?.cost || b?.product?.cost || 0);
+          break;
+        case 'stockValue':
+          aVal = (a?.quantity || 0) * (a?.expand?.product?.price || a?.product?.price || 0);
+          bVal = (b?.quantity || 0) * (b?.expand?.product?.price || b?.product?.price || 0);
           break;
         default:
           aVal = '';
@@ -114,6 +130,18 @@ export default function StockDesktop() {
     if (sortField !== field) return null;
     return sortDir === 'asc' ? <ChevronUp size={14} /> : <ChevronDown size={14} />;
   };
+
+  // Итоги
+  const totalQuantity = filteredStocks.reduce((sum, s) => sum + (s?.quantity || 0), 0);
+  const totalCostValue = filteredStocks.reduce((sum, s) => {
+    const product = s?.expand?.product || s?.product || {};
+    return sum + ((product.cost || 0) * (s?.quantity || 0));
+  }, 0);
+  const totalSaleValue = filteredStocks.reduce((sum, s) => {
+    const product = s?.expand?.product || s?.product || {};
+    return sum + ((product.price || 0) * (s?.quantity || 0));
+  }, 0);
+  const totalMargin = totalSaleValue - totalCostValue;
 
   return (
     <div className="space-y-4">
@@ -195,6 +223,22 @@ export default function StockDesktop() {
                   </div>
                 </th>
                 <th 
+                  className="text-left px-3 py-2 font-medium text-gray-600 cursor-pointer hover:bg-gray-100"
+                  onClick={() => handleSort('category')}
+                >
+                  <div className="flex items-center gap-1">
+                    Категория <SortIcon field="category" />
+                  </div>
+                </th>
+                <th 
+                  className="text-left px-3 py-2 font-medium text-gray-600 cursor-pointer hover:bg-gray-100"
+                  onClick={() => handleSort('volume')}
+                >
+                  <div className="flex items-center gap-1">
+                    Объём <SortIcon field="volume" />
+                  </div>
+                </th>
+                <th 
                   className="text-right px-3 py-2 font-medium text-gray-600 cursor-pointer hover:bg-gray-100"
                   onClick={() => handleSort('quantity')}
                 >
@@ -218,12 +262,28 @@ export default function StockDesktop() {
                     Продажа <SortIcon field="price" />
                   </div>
                 </th>
+                <th 
+                  className="text-right px-3 py-2 font-medium text-gray-600 cursor-pointer hover:bg-gray-100"
+                  onClick={() => handleSort('margin')}
+                >
+                  <div className="flex items-center justify-end gap-1">
+                    Маржа <SortIcon field="margin" />
+                  </div>
+                </th>
+                <th 
+                  className="text-right px-3 py-2 font-medium text-gray-600 cursor-pointer hover:bg-gray-100"
+                  onClick={() => handleSort('stockValue')}
+                >
+                  <div className="flex items-center justify-end gap-1">
+                    Сумма <SortIcon field="stockValue" />
+                  </div>
+                </th>
               </tr>
             </thead>
             <tbody>
               {loading ? (
                 <tr>
-                  <td colSpan={5} className="px-3 py-6 text-center text-gray-500">
+                  <td colSpan={9} className="px-3 py-6 text-center text-gray-500">
                     <div className="flex items-center justify-center gap-2">
                       <RefreshCw size={14} className="animate-spin" />
                       Загрузка...
@@ -232,38 +292,66 @@ export default function StockDesktop() {
                 </tr>
               ) : filteredStocks.length === 0 ? (
                 <tr>
-                  <td colSpan={5} className="px-3 py-6 text-center text-gray-500">
+                  <td colSpan={9} className="px-3 py-6 text-center text-gray-500">
                     {searchQuery || selectedCategory ? 'Ничего не найдено' : 'Нет данных'}
                   </td>
                 </tr>
               ) : (
-                filteredStocks.map((stock) => {
-                  const product = stock?.expand?.product || stock?.product || {};
-                  const quantity = stock?.quantity || 0;
-                  
-                  return (
-                    <tr 
-                      key={stock.id} 
-                      className="border-b border-gray-100 hover:bg-gray-50"
-                    >
-                      <td className="px-3 py-1.5 font-mono text-xs text-gray-600">
-                        {product.article || '—'}
-                      </td>
-                      <td className="px-3 py-1.5">
-                        {product.name || 'Без названия'}
-                      </td>
-                      <td className={`px-3 py-1.5 text-right font-medium ${quantity < 3 ? 'text-red-600' : ''}`}>
-                        {quantity} шт
-                      </td>
-                      <td className="px-3 py-1.5 text-right text-gray-600">
-                        {(product.purchasePrice || 0).toLocaleString('ru-RU')} ₽
-                      </td>
-                      <td className="px-3 py-1.5 text-right font-medium">
-                        {(product.price || 0).toLocaleString('ru-RU')} ₽
-                      </td>
-                    </tr>
-                  );
-                })
+                <>
+                  {filteredStocks.map((stock) => {
+                    const product = stock?.expand?.product || stock?.product || {};
+                    const quantity = stock?.quantity || 0;
+                    const cost = product.cost || 0;
+                    const price = product.price || 0;
+                    const margin = price - cost;
+                    const stockValue = quantity * price;
+                    const category = Array.isArray(product.category) ? product.category[0] : (product.category || '');
+                    
+                    return (
+                      <tr 
+                        key={stock.id} 
+                        className="border-b border-gray-100 hover:bg-gray-50"
+                      >
+                        <td className="px-3 py-1.5 font-mono text-xs text-gray-600">
+                          {product.article || '—'}
+                        </td>
+                        <td className="px-3 py-1.5">
+                          {product.name || 'Без названия'}
+                        </td>
+                        <td className="px-3 py-1.5 text-gray-600">
+                          {category || '—'}
+                        </td>
+                        <td className="px-3 py-1.5 text-gray-600">
+                          {product.volume || '—'}
+                        </td>
+                        <td className={`px-3 py-1.5 text-right font-medium ${quantity < 3 ? 'text-red-600' : ''}`}>
+                          {quantity} шт
+                        </td>
+                        <td className="px-3 py-1.5 text-right text-gray-600">
+                          {cost.toLocaleString('ru-RU')} ₽
+                        </td>
+                        <td className="px-3 py-1.5 text-right font-medium">
+                          {price.toLocaleString('ru-RU')} ₽
+                        </td>
+                        <td className={`px-3 py-1.5 text-right font-medium ${margin > 0 ? 'text-green-600' : 'text-red-600'}`}>
+                          {margin.toLocaleString('ru-RU')} ₽
+                        </td>
+                        <td className="px-3 py-1.5 text-right font-medium">
+                          {stockValue.toLocaleString('ru-RU')} ₽
+                        </td>
+                      </tr>
+                    );
+                  })}
+                  {/* Строка итогов */}
+                  <tr className="bg-gray-100 border-t-2 border-gray-300 font-semibold text-xs">
+                    <td colSpan={4} className="px-3 py-2 text-right text-gray-700">Итого:</td>
+                    <td className="px-3 py-2 text-right text-gray-900">{totalQuantity} шт</td>
+                    <td className="px-3 py-2 text-right text-gray-600">{totalCostValue.toLocaleString('ru-RU')} ₽</td>
+                    <td className="px-3 py-2 text-right text-gray-900">{totalSaleValue.toLocaleString('ru-RU')} ₽</td>
+                    <td className={`px-3 py-2 text-right ${totalMargin > 0 ? 'text-green-700' : 'text-red-700'}`}>{totalMargin.toLocaleString('ru-RU')} ₽</td>
+                    <td className="px-3 py-2 text-right text-gray-900">{totalSaleValue.toLocaleString('ru-RU')} ₽</td>
+                  </tr>
+                </>
               )}
             </tbody>
           </table>
