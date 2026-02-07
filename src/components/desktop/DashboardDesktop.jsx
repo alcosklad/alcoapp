@@ -188,15 +188,26 @@ export default function DashboardDesktop({ user }) {
                 <p className="text-gray-500 text-sm">Нет товаров</p>
               ) : (
                 stats.staleProducts.map((stock, idx) => (
-                  <div key={idx} className="flex items-center justify-between p-3 bg-gray-50 rounded text-sm">
-                    <div>
-                      <p className="font-medium text-gray-900">{stock?.expand?.product?.name || 'Товар'}</p>
-                      <p className="text-xs text-gray-500">Артикул: {stock?.expand?.product?.article || '—'}</p>
+                  <div key={idx} className="p-3 bg-gray-50 rounded text-sm">
+                    <div className="flex items-center justify-between mb-1">
+                      <div>
+                        <p className="font-medium text-gray-900">{stock?.expand?.product?.name || 'Товар'}</p>
+                        <p className="text-xs text-gray-500">Артикул: {stock?.expand?.product?.article || '—'}</p>
+                      </div>
+                      <div className="text-right">
+                        <p className="text-gray-900">{stock.quantity} шт</p>
+                        <p className="text-xs text-gray-500">{(stock?.expand?.product?.price || 0).toLocaleString('ru-RU')} ₽</p>
+                      </div>
                     </div>
-                    <div className="text-right">
-                      <p className="text-gray-900">{stock.quantity} шт</p>
-                      <p className="text-xs text-gray-500">{(stock?.expand?.product?.price || 0).toLocaleString('ru-RU')} ₽</p>
-                    </div>
+                    {stock._cityBreakdown && stock._cityBreakdown.length > 0 && (
+                      <div className="flex flex-wrap gap-1.5 mt-2 pt-2 border-t border-gray-200">
+                        {stock._cityBreakdown.map((city, ci) => (
+                          <span key={ci} className="inline-flex items-center gap-1 px-2 py-0.5 bg-white rounded text-xs text-gray-600 border border-gray-200">
+                            {city.supplierName}: <strong>{city.quantity}</strong>
+                          </span>
+                        ))}
+                      </div>
+                    )}
                   </div>
                 ))
               )}

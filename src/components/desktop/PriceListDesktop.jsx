@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { Search, ChevronUp, ChevronDown, RefreshCw, Edit2, Check, X } from 'lucide-react';
 import { getProducts, updateProduct, getSuppliers } from '../../lib/pocketbase';
 import pb from '../../lib/pocketbase';
@@ -23,7 +23,7 @@ export default function PriceListDesktop() {
 
   useEffect(() => {
     loadProducts();
-  }, [selectedSupplier]);
+  }, []);
 
   const loadSuppliers = async () => {
     try {
@@ -37,7 +37,7 @@ export default function PriceListDesktop() {
   const loadProducts = async () => {
     try {
       setLoading(true);
-      const data = await getProducts(selectedSupplier || null).catch(() => []);
+      const data = await getProducts().catch(() => []);
       setProducts(data || []);
     } catch (error) {
       console.error('Error loading products:', error);
@@ -82,12 +82,30 @@ export default function PriceListDesktop() {
     }
   };
 
+  // Находим имя выбранного города для фильтрации по cities
+  const selectedCityName = useMemo(() => {
+    if (!selectedSupplier) return '';
+    const sup = suppliers.find(s => s.id === selectedSupplier);
+    return sup?.name || '';
+  }, [selectedSupplier, suppliers]);
+
   const filteredProducts = products
     .filter(product => {
       const name = product?.name || '';
       const article = product?.article || '';
       const query = searchQuery.toLowerCase();
-      return name.toLowerCase().includes(query) || article.toLowerCase().includes(query);
+      const matchesSearch = name.toLowerCase().includes(query) || article.toLowerCase().includes(query);
+
+      // Фильтр по городу: если выбран город, показываем товары у которых этот город в cities
+      // Фоллбек: если у товара нет cities вообще — показываем его в любом случае (base_price)
+      if (selectedCityName) {
+        const cities = product?.cities || [];
+        if (cities.length > 0 && !cities.some(c => c === selectedCityName || c.includes(selectedCityName) || selectedCityName.includes(c))) {
+          return false;
+        }
+      }
+
+      return matchesSearch;
     })
     .sort((a, b) => {
       let aVal, bVal;
@@ -241,12 +259,24 @@ export default function PriceListDesktop() {
                   </td>
                 </tr>
               ) : (
-                filteredProducts.map((product) => {
+                (() => {
+                let lastCategory = null;
+                return filteredProducts.map((product) => {
                   const isEditing = editingId === product.id;
+                  const category = Array.isArray(product.category) ? product.category[0] : (product.category || '');
+                  const showCategoryHeader = category !== lastCategory;
+                  lastCategory = category;
                   
                   return (
+                    <React.Fragment key={product.id}>
+                      {showCategoryHeader && category && (
+                        <tr className="bg-blue-50 border-y border-blue-200">
+                          <td colSpan={canEdit ? 6 : 5} className="px-3 py-1.5 font-semibold text-blue-800 text-xs sticky top-0">
+                            {category}
+                          </td>
+                        </tr>
+                      )}
                     <tr 
-                      key={product.id} 
                       className="border-b border-gray-100 hover:bg-gray-50"
                     >
                       <td className="px-3 py-1.5 font-mono text-xs text-gray-600">
@@ -314,8 +344,10 @@ export default function PriceListDesktop() {
                         </td>
                       )}
                     </tr>
+                    </React.Fragment>
                   );
-                })
+                });
+              })()
               )}
             </tbody>
           </table>

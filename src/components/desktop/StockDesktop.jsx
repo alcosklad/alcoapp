@@ -1,6 +1,6 @@
-import React, { useState, useEffect } from 'react';
-import { Search, ChevronUp, ChevronDown, RefreshCw } from 'lucide-react';
-import { getStocksWithDetails, getSuppliers } from '../../lib/pocketbase';
+import React, { useState, useEffect, useMemo } from 'react';
+import { Search, ChevronUp, ChevronDown, RefreshCw, MapPin, X } from 'lucide-react';
+import { getStocksAggregated, getSuppliers } from '../../lib/pocketbase';
 import pb from '../../lib/pocketbase';
 
 export default function StockDesktop() {
@@ -10,26 +10,23 @@ export default function StockDesktop() {
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('');
-  const [sortField, setSortField] = useState('name');
+  const [sortField, setSortField] = useState('category');
   const [sortDir, setSortDir] = useState('asc');
+  const [cityModal, setCityModal] = useState(null);
 
   useEffect(() => {
     loadSuppliers();
+    loadStocks();
   }, []);
 
   useEffect(() => {
-    if (selectedSupplier) {
-      loadStocks();
-    }
+    loadStocks();
   }, [selectedSupplier]);
 
   const loadSuppliers = async () => {
     try {
       const data = await getSuppliers().catch(() => []);
       setSuppliers(data || []);
-      if (data && data.length > 0) {
-        setSelectedSupplier(data[0].id);
-      }
     } catch (error) {
       console.error('Error loading suppliers:', error);
     }
@@ -38,7 +35,7 @@ export default function StockDesktop() {
   const loadStocks = async () => {
     try {
       setLoading(true);
-      const data = await getStocksWithDetails(selectedSupplier).catch(() => []);
+      const data = await getStocksAggregated(selectedSupplier || null).catch(() => []);
       setStocks(data || []);
     } catch (error) {
       console.error('Error loading stocks:', error);
@@ -154,6 +151,7 @@ export default function StockDesktop() {
             onChange={(e) => setSelectedSupplier(e.target.value)}
             className="px-2 py-1 border border-gray-300 rounded text-xs focus:outline-none focus:ring-2 focus:ring-blue-500"
           >
+            <option value="">Все города</option>
             {suppliers.map(supplier => (
               <option key={supplier.id} value={supplier.id}>
                 {supplier.name}
@@ -298,50 +296,75 @@ export default function StockDesktop() {
                 </tr>
               ) : (
                 <>
-                  {filteredStocks.map((stock) => {
-                    const product = stock?.expand?.product || stock?.product || {};
-                    const quantity = stock?.quantity || 0;
-                    const cost = product.cost || 0;
-                    const price = product.price || 0;
-                    const margin = price - cost;
-                    const stockValue = quantity * price;
-                    const category = Array.isArray(product.category) ? product.category[0] : (product.category || '');
-                    
-                    return (
-                      <tr 
-                        key={stock.id} 
-                        className="border-b border-gray-100 hover:bg-gray-50"
-                      >
-                        <td className="px-3 py-1.5 font-mono text-xs text-gray-600">
-                          {product.article || '—'}
-                        </td>
-                        <td className="px-3 py-1.5">
-                          {product.name || 'Без названия'}
-                        </td>
-                        <td className="px-3 py-1.5 text-gray-600">
-                          {category || '—'}
-                        </td>
-                        <td className="px-3 py-1.5 text-gray-600">
-                          {product.volume || '—'}
-                        </td>
-                        <td className={`px-3 py-1.5 text-right font-medium ${quantity < 3 ? 'text-red-600' : ''}`}>
-                          {quantity} шт
-                        </td>
-                        <td className="px-3 py-1.5 text-right text-gray-600">
-                          {cost.toLocaleString('ru-RU')} ₽
-                        </td>
-                        <td className="px-3 py-1.5 text-right font-medium">
-                          {price.toLocaleString('ru-RU')} ₽
-                        </td>
-                        <td className={`px-3 py-1.5 text-right font-medium ${margin > 0 ? 'text-green-600' : 'text-red-600'}`}>
-                          {margin.toLocaleString('ru-RU')} ₽
-                        </td>
-                        <td className="px-3 py-1.5 text-right font-medium">
-                          {stockValue.toLocaleString('ru-RU')} ₽
-                        </td>
-                      </tr>
-                    );
-                  })}
+                  {(() => {
+                    let lastCategory = null;
+                    return filteredStocks.map((stock) => {
+                      const product = stock?.expand?.product || stock?.product || {};
+                      const quantity = stock?.quantity || 0;
+                      const cost = product.cost || 0;
+                      const price = product.price || 0;
+                      const margin = price - cost;
+                      const stockValue = quantity * price;
+                      const category = Array.isArray(product.category) ? product.category[0] : (product.category || '');
+                      const isGlobal = !selectedSupplier;
+                      const hasCityBreakdown = isGlobal && stock._cityBreakdown && stock._cityBreakdown.length > 1;
+
+                      const showCategoryHeader = category !== lastCategory;
+                      lastCategory = category;
+
+                      return (
+                        <React.Fragment key={stock.id}>
+                          {showCategoryHeader && category && (
+                            <tr className="bg-blue-50 border-y border-blue-200">
+                              <td colSpan={9} className="px-3 py-1.5 font-semibold text-blue-800 text-xs sticky top-0">
+                                {category}
+                              </td>
+                            </tr>
+                          )}
+                          <tr className="border-b border-gray-100 hover:bg-gray-50">
+                            <td className="px-3 py-1.5 font-mono text-xs text-gray-600">
+                              {product.article || '—'}
+                            </td>
+                            <td className="px-3 py-1.5">
+                              {product.name || 'Без названия'}
+                            </td>
+                            <td className="px-3 py-1.5 text-gray-600">
+                              {category || '—'}
+                            </td>
+                            <td className="px-3 py-1.5 text-gray-600">
+                              {product.volume || '—'}
+                            </td>
+                            <td className={`px-3 py-1.5 text-right font-medium ${quantity < 3 ? 'text-red-600' : ''}`}>
+                              <span className="inline-flex items-center gap-1">
+                                {quantity} шт
+                                {hasCityBreakdown && (
+                                  <button
+                                    onClick={() => setCityModal({ product, breakdown: stock._cityBreakdown, totalQty: quantity })}
+                                    className="text-blue-400 hover:text-blue-600"
+                                    title="Разбивка по городам"
+                                  >
+                                    <MapPin size={12} />
+                                  </button>
+                                )}
+                              </span>
+                            </td>
+                            <td className="px-3 py-1.5 text-right text-gray-600">
+                              {cost.toLocaleString('ru-RU')} ₽
+                            </td>
+                            <td className="px-3 py-1.5 text-right font-medium">
+                              {price.toLocaleString('ru-RU')} ₽
+                            </td>
+                            <td className={`px-3 py-1.5 text-right font-medium ${margin > 0 ? 'text-green-600' : 'text-red-600'}`}>
+                              {margin.toLocaleString('ru-RU')} ₽
+                            </td>
+                            <td className="px-3 py-1.5 text-right font-medium">
+                              {stockValue.toLocaleString('ru-RU')} ₽
+                            </td>
+                          </tr>
+                        </React.Fragment>
+                      );
+                    });
+                  })()}
                   {/* Строка итогов */}
                   <tr className="bg-gray-100 border-t-2 border-gray-300 font-semibold text-xs">
                     <td colSpan={4} className="px-3 py-2 text-right text-gray-700">Итого:</td>
@@ -357,6 +380,36 @@ export default function StockDesktop() {
           </table>
         </div>
       </div>
+
+      {/* Модалка: разбивка по городам */}
+      {cityModal && (
+        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50" onClick={() => setCityModal(null)}>
+          <div className="bg-white rounded-xl max-w-md w-full mx-4 max-h-[70vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
+            <div className="sticky top-0 bg-white border-b px-5 py-4 flex justify-between items-center">
+              <div>
+                <h3 className="text-sm font-semibold text-gray-900">{cityModal.product?.name || 'Товар'}</h3>
+                <p className="text-xs text-gray-500">Всего: {cityModal.totalQty} шт</p>
+              </div>
+              <button onClick={() => setCityModal(null)} className="p-1 hover:bg-gray-100 rounded">
+                <X size={18} className="text-gray-500" />
+              </button>
+            </div>
+            <div className="p-5 space-y-2">
+              {cityModal.breakdown
+                .sort((a, b) => b.quantity - a.quantity)
+                .map((city, idx) => (
+                <div key={idx} className="flex items-center justify-between bg-gray-50 rounded-lg px-4 py-2.5">
+                  <div className="flex items-center gap-2">
+                    <MapPin size={14} className="text-gray-400" />
+                    <span className="text-sm text-gray-800">{city.supplierName}</span>
+                  </div>
+                  <span className="text-sm font-medium text-gray-900">{city.quantity} шт</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

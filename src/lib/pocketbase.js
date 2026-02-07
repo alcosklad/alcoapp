@@ -307,6 +307,45 @@ export const getStocksWithDetails = async (supplierId = null) => {
   }
 };
 
+// Получение всех остатков с агрегацией по product_id (глобальный контекст)
+export const getStocksAggregated = async (supplierId = null) => {
+  try {
+    const filter = supplierId ? `supplier = "${supplierId}"` : '';
+    const stocks = await pb.collection('stocks').getFullList({
+      filter,
+      expand: 'product,supplier'
+    });
+
+    if (supplierId) {
+      return stocks;
+    }
+
+    // Агрегация: SUM(quantity) GROUP BY product_id
+    const grouped = {};
+    stocks.forEach(stock => {
+      const productId = stock.product;
+      if (!grouped[productId]) {
+        grouped[productId] = {
+          ...stock,
+          quantity: 0,
+          _cityBreakdown: [],
+        };
+      }
+      grouped[productId].quantity += stock.quantity || 0;
+      grouped[productId]._cityBreakdown.push({
+        supplierName: stock.expand?.supplier?.name || '—',
+        supplierId: stock.supplier,
+        quantity: stock.quantity || 0,
+      });
+    });
+
+    return Object.values(grouped);
+  } catch (error) {
+    console.error('PocketBase: Error loading aggregated stocks:', error);
+    return [];
+  }
+};
+
 // Функции для работы с документами (для совместимости)
 export const getDocuments = async (type = 'reception') => {
   try {
@@ -456,7 +495,7 @@ export const getDashboardStats = async (filterId = null) => {
     
     const stocks = await pb.collection('stocks').getFullList({
       filter: stocksFilter,
-      expand: 'product'
+      expand: 'product,supplier'
     }).catch(() => []);
     
     let totalStockQuantity = 0;
@@ -511,9 +550,25 @@ export const getDashboardStats = async (filterId = null) => {
       }
     });
     
-    const staleProducts = stocks.filter(stock => {
-      return stock.quantity > 0 && !soldProductIds.has(stock.product);
+    // Группируем неликвид по product_id с разбивкой по городам
+    const staleByProduct = {};
+    stocks.forEach(stock => {
+      if (stock.quantity > 0 && !soldProductIds.has(stock.product)) {
+        if (!staleByProduct[stock.product]) {
+          staleByProduct[stock.product] = {
+            ...stock,
+            quantity: 0,
+            _cityBreakdown: [],
+          };
+        }
+        staleByProduct[stock.product].quantity += stock.quantity || 0;
+        staleByProduct[stock.product]._cityBreakdown.push({
+          supplierName: stock.expand?.supplier?.name || '—',
+          quantity: stock.quantity || 0,
+        });
+      }
     });
+    const staleProducts = Object.values(staleByProduct);
     
     // Получаем статистику продаж за разные периоды (параллельно)
     const [salesDay, salesWeek, salesMonth, salesHalfYear] = await Promise.all([
