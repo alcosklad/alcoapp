@@ -15,6 +15,8 @@ import DashboardDesktop from './components/desktop/DashboardDesktop';
 import StockDesktop from './components/desktop/StockDesktop';
 import PriceListDesktop from './components/desktop/PriceListDesktop';
 import ReceptionDesktop from './components/desktop/ReceptionDesktop';
+import SalesDesktop from './components/desktop/SalesDesktop';
+import ShiftsDesktop from './components/desktop/ShiftsDesktop';
 import pb from './lib/pocketbase';
 import ErrorBoundary from './components/ErrorBoundary';
 
@@ -69,6 +71,10 @@ function App() {
           return <StockDesktop />;
         case 'pricelist':
           return <PriceListDesktop />;
+        case 'sales':
+          return <SalesDesktop />;
+        case 'shifts':
+          return <ShiftsDesktop />;
         default:
           return <DashboardDesktop user={user} />;
       }

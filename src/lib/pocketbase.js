@@ -794,6 +794,40 @@ export const getShifts = async (userId) => {
   }
 };
 
+// === RBAC: Функции для админа (все смены / все продажи) ===
+
+// Получение всех смен (для админа) с expand user
+export const getAllShifts = async (filters = {}) => {
+  try {
+    const records = await pb.collection('shifts').getFullList({
+      sort: '-start',
+      expand: 'user',
+      ...filters
+    });
+    return records;
+  } catch (error) {
+    if (error.status === 404) return [];
+    console.error('PocketBase: Error getting all shifts:', error);
+    throw error;
+  }
+};
+
+// Получение всех заказов/продаж (для админа) с expand user
+export const getAllOrders = async (filters = {}) => {
+  try {
+    const records = await pb.collection('orders').getFullList({
+      sort: '-local_time',
+      expand: 'user',
+      ...filters
+    });
+    return records;
+  } catch (error) {
+    if (error.status === 404) return [];
+    console.error('PocketBase: Error getting all orders:', error);
+    throw error;
+  }
+};
+
 export const updateUserTimezone = async (userId, timezone) => {
   try {
     const record = await pb.collection('users').update(userId, {

@@ -4,6 +4,8 @@ import {
   Package, 
   Warehouse, 
   FileText, 
+  ShoppingCart,
+  Clock,
   LogOut,
   ChevronLeft,
   ChevronRight
@@ -21,6 +23,8 @@ export default function DesktopLayout({ children, activeTab, onTabChange, user, 
     { id: 'reception', label: 'Приёмки', icon: Package },
     { id: 'stock', label: 'Остатки', icon: Warehouse },
     { id: 'pricelist', label: 'Прайс-лист', icon: FileText },
+    { id: 'sales', label: 'Продажи', icon: ShoppingCart },
+    { id: 'shifts', label: 'Смены', icon: Clock },
   ];
 
   // Меню для оператора (без приёмок)
