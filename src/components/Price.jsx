@@ -95,12 +95,11 @@ export default function Price() {
                         </div>
                         <div className="text-right">
                           <p className="text-2xl font-bold text-blue-600">
-                            {stock.product?.price ? `${stock.product.price.toLocaleString('ru-RU')} ₽` : '—'}
+                            {stock.product?.price ? `${stock.product.price.toLocaleString('ru-RU')}` : '—'}
                           </p>
                           {stock.product?.cost && stock.product.cost !== stock.product.price && (
                             <p className="text-sm text-gray-500">
-                              Закупка: {stock.product.cost.toLocaleString('ru-RU')} ₽
-                            </p>
+                              Закупка: {stock.product.cost.toLocaleString('ru-RU')}                            </p>
                           )}
                           <p className="text-xs text-gray-400 mt-2">
                             Остаток: {stock.quantity || 0} шт
@@ -124,8 +123,7 @@ export default function Price() {
                     <span className="text-sm font-medium text-gray-700">
                       Общая сумма: {stocks.reduce((sum, stock) => 
                       sum + ((stock.product?.price || 0) * stock.quantity), 0
-                      ).toLocaleString('ru-RU')} ₽
-                    </span>
+                      ).toLocaleString('ru-RU')}                    </span>
                   </div>
                 </div>
               </div>

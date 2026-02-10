@@ -180,12 +180,21 @@ export const createReception = async (data) => {
     
     const result = await pb.collection('receptions').create(receptionData);
     
-    // Обновляем остатки на складе
+    // Обновляем остатки на складе и синхронизируем цену закупа в прайс-лист
     if (data.items && data.supplier) {
       const items = data.items;
       for (const item of items) {
         const purchasePrice = item.cost ?? item.purchase_price ?? null;
         await updateStock(item.product, null, item.quantity, data.supplier, purchasePrice);
+        
+        // Price Sync: обновляем cost товара в прайс-листе если указана цена закупа
+        if (purchasePrice && purchasePrice > 0 && item.product) {
+          try {
+            await pb.collection('products').update(item.product, { cost: purchasePrice });
+          } catch (e) {
+            console.warn('Price Sync: не удалось обновить cost для', item.product, e);
+          }
+        }
       }
     }
     
@@ -893,6 +902,106 @@ export const updateUserTimezone = async (userId, timezone) => {
     console.error('PocketBase: Error updating timezone:', error);
     throw error;
   }
+};
+
+// === Управление пользователями (Admin CRUD) ===
+
+export const createUser = async (data) => {
+  try {
+    const record = await pb.collection('users').create({
+      username: data.username,
+      password: data.password,
+      passwordConfirm: data.password,
+      name: data.name || data.username,
+      role: data.role || 'worker',
+      city: data.city || '',
+      email: data.email || `${data.username}@nashsklad.local`,
+      emailVisibility: false,
+    });
+    return record;
+  } catch (error) {
+    console.error('PocketBase: Error creating user:', error);
+    throw error;
+  }
+};
+
+export const updateUser = async (userId, data) => {
+  try {
+    const updateData = {};
+    if (data.name !== undefined) updateData.name = data.name;
+    if (data.role !== undefined) updateData.role = data.role;
+    if (data.city !== undefined) updateData.city = data.city;
+    if (data.username !== undefined) updateData.username = data.username;
+    if (data.password) {
+      updateData.password = data.password;
+      updateData.passwordConfirm = data.password;
+    }
+    const record = await pb.collection('users').update(userId, updateData);
+    return record;
+  } catch (error) {
+    console.error('PocketBase: Error updating user:', error);
+    throw error;
+  }
+};
+
+export const deleteUser = async (userId) => {
+  try {
+    await pb.collection('users').delete(userId);
+    return true;
+  } catch (error) {
+    console.error('PocketBase: Error deleting user:', error);
+    throw error;
+  }
+};
+
+// === CRUD для продаж и смен (Admin) ===
+
+export const deleteOrder = async (orderId) => {
+  try {
+    await pb.collection('orders').delete(orderId);
+    return true;
+  } catch (error) {
+    console.error('PocketBase: Error deleting order:', error);
+    throw error;
+  }
+};
+
+export const updateOrder = async (orderId, data) => {
+  try {
+    const record = await pb.collection('orders').update(orderId, data);
+    return record;
+  } catch (error) {
+    console.error('PocketBase: Error updating order:', error);
+    throw error;
+  }
+};
+
+export const deleteShift = async (shiftId) => {
+  try {
+    await pb.collection('shifts').delete(shiftId);
+    return true;
+  } catch (error) {
+    console.error('PocketBase: Error deleting shift:', error);
+    throw error;
+  }
+};
+
+export const updateShift = async (shiftId, data) => {
+  try {
+    const record = await pb.collection('shifts').update(shiftId, data);
+    return record;
+  } catch (error) {
+    console.error('PocketBase: Error updating shift:', error);
+    throw error;
+  }
+};
+
+// === Заглушка для авто-расчёта цены продажи ===
+// TODO: Настроить формулу наценки. Пока просто возвращает закуп * коэффициент.
+export const calculateSalePrice = (purchasePrice, ratio = 1.0) => {
+  // Формула: Цена продажи = Закуп * Накрутка
+  // ratio = 1.3 означает наценку 30%
+  return Math.round(purchasePrice * ratio);
 };
 
 export default pb;

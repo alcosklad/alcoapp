@@ -8,7 +8,8 @@ import {
   Clock,
   LogOut,
   ChevronLeft,
-  ChevronRight
+  ChevronRight,
+  Settings
 } from 'lucide-react';
 import pb from '../lib/pocketbase';
 
@@ -25,6 +26,7 @@ export default function DesktopLayout({ children, activeTab, onTabChange, user, 
     { id: 'pricelist', label: 'Прайс-лист', icon: FileText },
     { id: 'sales', label: 'Продажи', icon: ShoppingCart },
     { id: 'shifts', label: 'Смены', icon: Clock },
+    { id: 'settings', label: 'Настройки', icon: Settings },
   ];
 
   // Меню для оператора (без приёмок)

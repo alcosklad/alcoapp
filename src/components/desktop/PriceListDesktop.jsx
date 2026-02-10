@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { Search, ChevronUp, ChevronDown, RefreshCw, Edit2, Check, X } from 'lucide-react';
 import { getProducts, updateProduct, getSuppliers } from '../../lib/pocketbase';
+import { detectSubcategory } from '../../lib/subcategories';
 import pb from '../../lib/pocketbase';
 
 export default function PriceListDesktop() {
@@ -108,8 +109,18 @@ export default function PriceListDesktop() {
       return matchesSearch;
     })
     .sort((a, b) => {
+      // Первичная: по категории (для группировки)
+      const catA = Array.isArray(a?.category) ? a.category[0] : (a?.category || '');
+      const catB = Array.isArray(b?.category) ? b.category[0] : (b?.category || '');
+      if (catA !== catB) return catA.localeCompare(catB);
+
+      // Вторичная: по подкатегории
+      const subA = a?.subcategory || detectSubcategory(a?.name);
+      const subB = b?.subcategory || detectSubcategory(b?.name);
+      if (subA !== subB) return subA.localeCompare(subB);
+
+      // Третичная: по выбранному полю
       let aVal, bVal;
-      
       switch (sortField) {
         case 'name':
           aVal = a?.name || '';
@@ -118,10 +129,6 @@ export default function PriceListDesktop() {
         case 'article':
           aVal = a?.article || '';
           bVal = b?.article || '';
-          break;
-        case 'category':
-          aVal = a?.category || '';
-          bVal = b?.category || '';
           break;
         case 'purchasePrice':
           aVal = a?.cost || 0;
@@ -132,8 +139,8 @@ export default function PriceListDesktop() {
           bVal = b?.price || 0;
           break;
         default:
-          aVal = '';
-          bVal = '';
+          aVal = a?.name || '';
+          bVal = b?.name || '';
       }
 
       if (typeof aVal === 'string') {
@@ -198,11 +205,11 @@ export default function PriceListDesktop() {
             <thead>
               <tr className="bg-gray-50 border-b border-gray-200">
                 <th 
-                  className="text-left px-3 py-2 font-medium text-gray-600 cursor-pointer hover:bg-gray-100"
+                  className="text-left px-2 py-2 font-medium text-gray-600 cursor-pointer hover:bg-gray-100 w-[70px] max-w-[70px]"
                   onClick={() => handleSort('article')}
                 >
                   <div className="flex items-center gap-1">
-                    Артикул <SortIcon field="article" />
+                    Арт. <SortIcon field="article" />
                   </div>
                 </th>
                 <th 
@@ -261,11 +268,16 @@ export default function PriceListDesktop() {
               ) : (
                 (() => {
                 let lastCategory = null;
+                let lastSubcategory = null;
                 return filteredProducts.map((product) => {
                   const isEditing = editingId === product.id;
                   const category = Array.isArray(product.category) ? product.category[0] : (product.category || '');
+                  const subcategory = product.subcategory || detectSubcategory(product.name);
                   const showCategoryHeader = category !== lastCategory;
+                  const showSubcategoryHeader = subcategory && (showCategoryHeader || subcategory !== lastSubcategory);
+                  if (showCategoryHeader) lastSubcategory = null;
                   lastCategory = category;
+                  lastSubcategory = subcategory;
                   
                   return (
                     <React.Fragment key={product.id}>
@@ -276,10 +288,17 @@ export default function PriceListDesktop() {
                           </td>
                         </tr>
                       )}
+                      {showSubcategoryHeader && subcategory && (
+                        <tr className="bg-gray-50 border-y border-gray-200">
+                          <td colSpan={canEdit ? 6 : 5} className="px-6 py-1 font-medium text-gray-600 text-xs">
+                            {subcategory}
+                          </td>
+                        </tr>
+                      )}
                     <tr 
                       className="border-b border-gray-100 hover:bg-gray-50"
                     >
-                      <td className="px-3 py-1.5 font-mono text-xs text-gray-600">
+                      <td className="px-2 py-1.5 font-mono text-xs text-gray-500 w-[70px] max-w-[70px] truncate">
                         {product.article || '—'}
                       </td>
                       <td className="px-3 py-1.5">
@@ -298,8 +317,7 @@ export default function PriceListDesktop() {
                           />
                         ) : (
                           <span className="text-gray-600">
-                            {(product.cost || 0).toLocaleString('ru-RU')} ₽
-                          </span>
+                            {(product.cost || 0).toLocaleString('ru-RU')}                          </span>
                         )}
                       </td>
                       <td className="px-4 py-2.5 text-right">
@@ -312,8 +330,7 @@ export default function PriceListDesktop() {
                           />
                         ) : (
                           <span className="font-medium">
-                            {(product.price || 0).toLocaleString('ru-RU')} ₽
-                          </span>
+                            {(product.price || 0).toLocaleString('ru-RU')}                          </span>
                         )}
                       </td>
                       {canEdit && (

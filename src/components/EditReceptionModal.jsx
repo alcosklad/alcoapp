@@ -335,8 +335,7 @@ export default function EditReceptionModal({ isOpen, onClose, reception, onSave,
                   {/* Сумма */}
                   <div className="flex-1 text-right">
                     <span className="font-medium text-gray-900">
-                      {(item.price * item.quantity).toLocaleString('ru-RU')} ₽
-                    </span>
+                      {(item.price * item.quantity).toLocaleString('ru-RU')}                    </span>
                   </div>
                 </div>
               </div>
@@ -386,7 +385,7 @@ export default function EditReceptionModal({ isOpen, onClose, reception, onSave,
                         {product.article && (
                           <div className="text-xs text-gray-500">Арт. {product.article}</div>
                         )}
-                        <div className="text-xs text-gray-600">{product.price} ₽</div>
+                        <div className="text-xs text-gray-600">{product.price}</div>
                       </div>
                     ))
                   ) : (
@@ -439,8 +438,7 @@ export default function EditReceptionModal({ isOpen, onClose, reception, onSave,
               <div className="flex justify-between items-center">
                 <span className="text-lg font-semibold text-gray-900">Итого:</span>
                 <span className="text-xl font-bold text-gray-900">
-                  {totalAmount.toLocaleString('ru-RU')} ₽
-                </span>
+                  {totalAmount.toLocaleString('ru-RU')}                </span>
               </div>
             </div>
           )}

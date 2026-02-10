@@ -135,8 +135,7 @@ export default function ProductSelectorModal({ isOpen, onClose, onAdd }) {
                   {/* Цена */}
                   {product?.cost && (
                     <p className="text-sm font-bold text-gray-900">
-                      {product.cost.toLocaleString('ru-RU')} ₽
-                    </p>
+                      {product.cost.toLocaleString('ru-RU')}                    </p>
                   )}
                   
                   {/* Кнопка добавления */}
@@ -259,8 +258,7 @@ function QuantityModal({ isOpen, onClose, onConfirm, product }) {
             {/* Cost */}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
-                Цена закупки, ₽
-              </label>
+                Цена закупки,              </label>
               <input
                 type="number"
                 value={cost}
@@ -276,8 +274,7 @@ function QuantityModal({ isOpen, onClose, onConfirm, product }) {
               <div className="flex justify-between items-center">
                 <span className="text-sm font-medium text-blue-900">Сумма</span>
                 <span className="text-xl font-bold text-blue-600">
-                  {((parseInt(quantity) || 0) * (parseFloat(cost) || 0)).toLocaleString('ru-RU')} ₽
-                </span>
+                  {((parseInt(quantity) || 0) * (parseFloat(cost) || 0)).toLocaleString('ru-RU')}                </span>
               </div>
             </div>
           </div>

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { X, Package, DollarSign } from 'lucide-react';
+import { X, Package, RussianRuble } from 'lucide-react';
 
 export default function SellModal({ isOpen, onClose, product, onSell }) {
   const [quantity, setQuantity] = useState(1);
@@ -111,11 +111,11 @@ export default function SellModal({ isOpen, onClose, product, onSell }) {
         <div className="mb-6">
           <div className="flex items-center justify-between p-4 bg-blue-50 rounded-lg">
             <span className="text-sm font-medium text-gray-700">Цена за единицу:</span>
-            <span className="font-semibold text-gray-900">{(product.price || 0).toLocaleString('ru-RU')} ₽</span>
+            <span className="font-semibold text-gray-900">{(product.price || 0).toLocaleString('ru-RU')}</span>
           </div>
           <div className="flex items-center justify-between p-4 bg-green-50 rounded-lg mt-2">
             <span className="text-sm font-medium text-gray-700">Общая сумма:</span>
-            <span className="text-xl font-bold text-green-600">{totalPrice.toLocaleString('ru-RU')} ₽</span>
+            <span className="text-xl font-bold text-green-600">{totalPrice.toLocaleString('ru-RU')}</span>
           </div>
         </div>
 
@@ -133,7 +133,7 @@ export default function SellModal({ isOpen, onClose, product, onSell }) {
               </>
             ) : (
               <>
-                <DollarSign size={20} />
+                <RussianRuble size={20} />
                 <span>Продать</span>
               </>
             )}

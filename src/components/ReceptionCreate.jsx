@@ -318,13 +318,11 @@ export default function ReceptionCreate({ onBack, onSuccess, initialItems = [], 
                     <div className="flex-1">
                       <p className="font-medium text-gray-900">{item?.product?.name || 'Товар'}</p>
                       <p className="text-sm text-gray-500">
-                        {item?.quantity || 0} шт × {item?.cost || 0} ₽
-                      </p>
+                        {item?.quantity || 0} шт × {item?.cost || 0}                      </p>
                     </div>
                     <div className="flex items-center gap-3">
                       <p className="font-semibold text-gray-900">
-                        {((item?.quantity || 0) * (item?.cost || 0)).toLocaleString('ru-RU')} ₽
-                      </p>
+                        {((item?.quantity || 0) * (item?.cost || 0)).toLocaleString('ru-RU')}                      </p>
                       <button
                         onClick={() => handleRemoveItem(index)}
                         className="p-1 text-red-500 hover:bg-red-50 rounded"
@@ -344,8 +342,7 @@ export default function ReceptionCreate({ onBack, onSuccess, initialItems = [], 
               <div className="flex justify-between items-center">
                 <span className="font-semibold text-gray-900">ИТОГО</span>
                 <span className="text-xl font-bold text-blue-600">
-                  {getTotal().toLocaleString('ru-RU')} ₽
-                </span>
+                  {getTotal().toLocaleString('ru-RU')}                </span>
               </div>
             </div>
           )}

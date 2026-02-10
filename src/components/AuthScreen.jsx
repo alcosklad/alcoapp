@@ -3,7 +3,7 @@ import pb from '../lib/pocketbase';
 import { LogIn, Eye, EyeOff } from 'lucide-react';
 
 export default function AuthScreen({ onAuth }) {
-  const [email, setEmail] = useState('');
+  const [login, setLogin] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -35,12 +35,12 @@ export default function AuthScreen({ onAuth }) {
     setError('');
 
     try {
-      const authData = await pb.collection('users').authWithPassword(email, password);
+      const authData = await pb.collection('users').authWithPassword(login, password);
       console.log('AuthScreen: Успешный вход:', authData.record);
       console.log('AuthScreen: Роль пользователя:', authData.record.role);
       onAuth(authData.record);
     } catch (err) {
-      setError('Неверный email или пароль');
+      setError('Неверный логин или пароль');
     } finally {
       setLoading(false);
     }
@@ -73,14 +73,14 @@ export default function AuthScreen({ onAuth }) {
 
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
-                Email
+                Логин
               </label>
               <input
-                type="email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
+                type="text"
+                value={login}
+                onChange={(e) => setLogin(e.target.value)}
                 className="w-full px-4 py-3 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                placeholder="Введите email"
+                placeholder="Введите логин"
                 required
               />
             </div>

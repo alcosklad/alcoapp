@@ -366,12 +366,12 @@ export default function PriceList() {
                     </div>
                     <div className="col-span-2 text-right pr-6">
                       <p className="text-gray-600">
-                        {product?.cost ? `${product.cost.toLocaleString('ru-RU')} ₽` : '—'}
+                        {product?.cost ? `${product.cost.toLocaleString('ru-RU')}` : '—'}
                       </p>
                     </div>
                     <div className="col-span-2 text-right pr-6">
                       <p className="font-semibold text-gray-900">
-                        {product?.price ? `${product.price.toLocaleString('ru-RU')} ₽` : '—'}
+                        {product?.price ? `${product.price.toLocaleString('ru-RU')}` : '—'}
                       </p>
                     </div>
                   </div>

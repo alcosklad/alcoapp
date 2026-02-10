@@ -351,8 +351,7 @@ export default function ReceptionDesktop() {
                         {itemsCount} шт
                       </td>
                       <td className="px-3 py-1.5 text-right font-medium">
-                        {totalAmount.toLocaleString('ru-RU')} ₽
-                      </td>
+                        {totalAmount.toLocaleString('ru-RU')}                      </td>
                       <td className="px-3 py-1.5 text-center">
                         <button
                           onClick={() => handleOpenReception(reception)}
@@ -439,8 +438,7 @@ export default function ReceptionDesktop() {
                 <div>
                   <p className="text-xs text-gray-500">Сумма закупа</p>
                   <p className="text-base font-semibold">
-                    {editedItems.reduce((sum, item) => sum + (item.cost * item.quantity), 0).toLocaleString('ru-RU')} ₽
-                  </p>
+                    {editedItems.reduce((sum, item) => sum + (item.cost * item.quantity), 0).toLocaleString('ru-RU')}                  </p>
                 </div>
                 <div>
                   <p className="text-xs text-gray-500">Сумма продажи</p>
@@ -448,8 +446,7 @@ export default function ReceptionDesktop() {
                     {editedItems.reduce((sum, item) => {
                       const product = products.find(p => p.id === item.product);
                       return sum + ((product?.price || 0) * item.quantity);
-                    }, 0).toLocaleString('ru-RU')} ₽
-                  </p>
+                    }, 0).toLocaleString('ru-RU')}                  </p>
                 </div>
               </div>
 
@@ -498,8 +495,8 @@ export default function ReceptionDesktop() {
                                   <div className="text-center">{quantity} шт</div>
                                 )}
                               </td>
-                              <td className="px-3 py-2 text-right">{cost.toLocaleString('ru-RU')} ₽</td>
-                              <td className="px-3 py-2 text-right font-medium">{total.toLocaleString('ru-RU')} ₽</td>
+                              <td className="px-3 py-2 text-right">{cost.toLocaleString('ru-RU')}</td>
+                              <td className="px-3 py-2 text-right font-medium">{total.toLocaleString('ru-RU')}</td>
                               {isAdmin && (
                                 <td className="px-3 py-2">
                                   <button

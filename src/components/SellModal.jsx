@@ -96,13 +96,13 @@ export default function SellModal({ isOpen, onClose, stock, onSell }) {
               Текущее количество: <span className="font-medium">{maxQuantity} шт</span>
             </p>
             <p className="text-sm text-gray-600">
-              Закупочная цена: <span className="font-medium">{costPerUnit.toLocaleString('ru-RU')} ₽</span>
+              Закупочная цена: <span className="font-medium">{costPerUnit.toLocaleString('ru-RU')}</span>
             </p>
             <p className="text-sm text-gray-600">
-              Цена продажи: <span className="font-medium">{pricePerUnit.toLocaleString('ru-RU')} ₽</span>
+              Цена продажи: <span className="font-medium">{pricePerUnit.toLocaleString('ru-RU')}</span>
             </p>
             <p className="text-sm font-medium text-gray-900">
-              Общая сумма: <span className="text-lg">{currentTotal.toLocaleString('ru-RU')} ₽</span>
+              Общая сумма: <span className="text-lg">{currentTotal.toLocaleString('ru-RU')}</span>
             </p>
           </div>
         </div>
@@ -129,20 +129,19 @@ export default function SellModal({ isOpen, onClose, stock, onSell }) {
           <div className="p-2 bg-blue-50 rounded-lg">
             <div className="space-y-1 text-xs">
               <p className="text-gray-600">
-                Сумма списания: <span className="font-medium text-blue-600">{selectedTotal.toLocaleString('ru-RU')} ₽</span>
+                Сумма списания: <span className="font-medium text-blue-600">{selectedTotal.toLocaleString('ru-RU')}</span>
               </p>
               <p className="text-gray-600">
                 Остаток после: <span className="font-medium">{remainingQuantity} шт</span>
               </p>
               <p className="text-gray-600">
-                Общая сумма остатка: <span className="font-medium text-green-600">{remainingTotal.toLocaleString('ru-RU')} ₽</span>
+                Общая сумма остатка: <span className="font-medium text-green-600">{remainingTotal.toLocaleString('ru-RU')}</span>
               </p>
               {selectedQuantity > 0 && (
                 <div className="pt-1 border-t border-blue-200">
                   <p className="text-gray-600">
                     Прибыль: <span className="font-medium text-green-600">
-                      {((pricePerUnit - costPerUnit) * selectedQuantity).toLocaleString('ru-RU')} ₽
-                    </span>
+                      {((pricePerUnit - costPerUnit) * selectedQuantity).toLocaleString('ru-RU')}                    </span>
                   </p>
                 </div>
               )}

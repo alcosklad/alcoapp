@@ -135,7 +135,7 @@ export default function ProductSelector({ isOpen, onClose, onAdd }) {
                       <p className="text-sm text-gray-500">Арт. {product.article}</p>
                     )}
                     {product?.price && (
-                      <p className="text-sm text-blue-600">Цена: {product.price} ₽</p>
+                      <p className="text-sm text-blue-600">Цена: {product.price}</p>
                     )}
                   </div>
                 </button>

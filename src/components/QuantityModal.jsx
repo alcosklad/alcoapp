@@ -69,8 +69,7 @@ export default function QuantityModal({ isOpen, onClose, onConfirm, product }) {
 
           <div className="bg-blue-50 rounded-lg p-3">
             <p className="text-sm text-blue-900">
-              Сумма: {(quantity * cost).toLocaleString('ru-RU')} ₽
-            </p>
+              Сумма: {(quantity * cost).toLocaleString('ru-RU')}            </p>
           </div>
         </div>
 

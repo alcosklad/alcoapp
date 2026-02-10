@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { X, Plus, Minus, Percent, DollarSign, ShoppingCart, Check } from 'lucide-react';
+import { X, Plus, Minus, Percent, RussianRuble, ShoppingCart, Check } from 'lucide-react';
 
 export default function CartModal({ isOpen, onClose, stocks, onCompleteOrder }) {
   const [cartItems, setCartItems] = useState([]);
@@ -179,7 +179,7 @@ export default function CartModal({ isOpen, onClose, stocks, onCompleteOrder }) 
                     <div>
                       <p className="font-medium">{stock.expand?.product?.name || 'Товар'}</p>
                       <p className="text-sm text-gray-500">
-                        {(stock.expand?.product?.price || 0).toLocaleString('ru-RU')} ₽ • {stock.quantity} шт
+                        {(stock.expand?.product?.price || 0).toLocaleString('ru-RU')} • {stock.quantity} шт
                       </p>
                     </div>
                     <Plus size={20} className="text-gray-400" />
@@ -198,7 +198,7 @@ export default function CartModal({ isOpen, onClose, stocks, onCompleteOrder }) 
                       <div className="flex-1">
                         <p className="font-medium">{item.name}</p>
                         <p className="text-sm text-gray-500">
-                          {item.price.toLocaleString('ru-RU')} ₽ за шт
+                          {item.price.toLocaleString('ru-RU')} за шт
                         </p>
                       </div>
                       <button
@@ -225,8 +225,7 @@ export default function CartModal({ isOpen, onClose, stocks, onCompleteOrder }) 
                         <Plus size={16} />
                       </button>
                       <span className="ml-auto text-sm font-medium">
-                        {(item.price * item.quantity).toLocaleString('ru-RU')} ₽
-                      </span>
+                        {(item.price * item.quantity).toLocaleString('ru-RU')}                      </span>
                     </div>
                   </div>
                 ))}
@@ -250,14 +249,13 @@ export default function CartModal({ isOpen, onClose, stocks, onCompleteOrder }) 
                       discountType === 'percentage' ? 'bg-blue-600 text-white' : 'bg-gray-200'
                     }`}
                   >
-                    {discountType === 'percentage' ? <Percent size={16} /> : <DollarSign size={16} />}
+                    {discountType === 'percentage' ? <Percent size={16} /> : <RussianRuble size={16} />}
                     {discountType === 'percentage' ? 'Проценты' : 'Сумма'}
                   </button>
                 </div>
                 {discountValue && (
                   <p className="text-sm text-gray-600 mt-1">
-                    Скидка: {calculateDiscount().toLocaleString('ru-RU')} ₽
-                  </p>
+                    Скидка: {calculateDiscount().toLocaleString('ru-RU')}                  </p>
                 )}
               </div>
 
@@ -303,12 +301,12 @@ export default function CartModal({ isOpen, onClose, stocks, onCompleteOrder }) 
                 {discountValue && (
                   <div className="flex justify-between text-sm mb-1 text-green-600">
                     <span>Скидка:</span>
-                    <span>-{calculateDiscount().toLocaleString('ru-RU')} ₽</span>
+                    <span>-{calculateDiscount().toLocaleString('ru-RU')}</span>
                   </div>
                 )}
                 <div className="flex justify-between text-lg font-bold">
                   <span>Итого:</span>
-                  <span>{calculateTotal().toLocaleString('ru-RU')} ₽</span>
+                  <span>{calculateTotal().toLocaleString('ru-RU')}</span>
                 </div>
               </div>
 

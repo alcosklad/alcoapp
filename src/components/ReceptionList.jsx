@@ -171,8 +171,7 @@ export default function ReceptionList({ onCreate }) {
                           return total.toLocaleString('ru-RU');
                         }
                         return '0';
-                      })()} ₽
-                    </p>
+                      })()}                    </p>
                   </div>
                 </div>
               </div>

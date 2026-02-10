@@ -137,7 +137,7 @@ export default function Stock() {
       loadStocks();
       
       console.log(`✅ Продано: ${sellData.quantity} шт товара ID: ${sellData.product}`);
-      alert(`Успешно продано ${sellData.quantity} шт на сумму ${sellData.total.toLocaleString('ru-RU')} ₽!`);
+      alert(`Успешно продано ${sellData.quantity} шт на сумму ${sellData.total.toLocaleString('ru-RU')}!`);
     } catch (error) {
       console.error('❌ Ошибка продажи:', error);
       throw error; // Пробрасываем ошибку в модальное окно
@@ -209,7 +209,7 @@ export default function Stock() {
         }
       }
       
-      alert(`Заказ успешно оформлен на сумму ${orderData.total.toLocaleString('ru-RU')} ₽!`);
+      alert(`Заказ успешно оформлен на сумму ${orderData.total.toLocaleString('ru-RU')}!`);
       
       // Перезагружаем остатки
       loadStocks();
@@ -453,11 +453,9 @@ export default function Stock() {
                         <p className="text-xs text-gray-400 mt-1">{stock.warehouse.name}</p>
                       )}
                       <p className="text-sm font-medium text-gray-700 mt-2">
-                        Общая сумма: {totalSum.toLocaleString('ru-RU')} ₽
-                      </p>
+                        Общая сумма: {totalSum.toLocaleString('ru-RU')}                      </p>
                       <p className="text-sm text-gray-600 mt-1">
-                        Цена за шт: {price.toLocaleString('ru-RU')} ₽
-                      </p>
+                        Цена за шт: {price.toLocaleString('ru-RU')}                      </p>
                     </div>
                     <div className="text-right">
                       <p className={`text-lg font-bold px-3 py-1 rounded-lg ${

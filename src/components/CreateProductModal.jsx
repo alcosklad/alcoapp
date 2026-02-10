@@ -157,7 +157,7 @@ export default function CreateProductModal({ isOpen, onClose, onProductCreated }
           <div className="grid grid-cols-2 gap-4">
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
-                Цена продажи (₽)
+                Цена продажи
               </label>
               <input
                 type="number"
@@ -171,7 +171,7 @@ export default function CreateProductModal({ isOpen, onClose, onProductCreated }
             </div>
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
-                Цена закупа (₽)
+                Цена закупа
               </label>
               <input
                 type="number"

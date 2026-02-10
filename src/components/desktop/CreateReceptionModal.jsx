@@ -344,8 +344,7 @@ export default function CreateReceptionModal({
                           />
                         </td>
                         <td className="px-3 py-2 text-right font-medium">
-                          {(item.cost * item.quantity).toLocaleString('ru-RU')} ₽
-                        </td>
+                          {(item.cost * item.quantity).toLocaleString('ru-RU')}                        </td>
                         <td className="px-3 py-2">
                           <button
                             onClick={() => handleRemoveItem(item.product)}
@@ -363,8 +362,7 @@ export default function CreateReceptionModal({
                         Итого:
                       </td>
                       <td className="px-3 py-2 text-right font-bold text-gray-900">
-                        {totalAmount.toLocaleString('ru-RU')} ₽
-                      </td>
+                        {totalAmount.toLocaleString('ru-RU')}                      </td>
                       <td></td>
                     </tr>
                   </tfoot>

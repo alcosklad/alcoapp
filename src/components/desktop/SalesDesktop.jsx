@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { ShoppingCart, DollarSign, TrendingUp, CreditCard, Banknote, Search, ChevronDown, ChevronUp, X, Eye } from 'lucide-react';
-import { getAllOrders, getUsers } from '../../lib/pocketbase';
+import { ShoppingCart, RussianRuble, TrendingUp, CreditCard, Banknote, Search, ChevronDown, ChevronUp, X, Eye, Trash2 } from 'lucide-react';
+import { getAllOrders, getUsers, deleteOrder } from '../../lib/pocketbase';
 import pb from '../../lib/pocketbase';
 
 export default function SalesDesktop() {
@@ -22,6 +22,20 @@ export default function SalesDesktop() {
 
   // Detail modal
   const [selectedOrder, setSelectedOrder] = useState(null);
+
+  const isAdmin = pb.authStore.model?.role === 'admin';
+
+  const handleDeleteOrder = async (order) => {
+    if (!window.confirm(`Удалить продажу #${order.id?.slice(-6)} на сумму ${(order.total || 0).toLocaleString('ru-RU')}?`)) return;
+    try {
+      await deleteOrder(order.id);
+      setSelectedOrder(null);
+      await loadData();
+    } catch (err) {
+      console.error('Error deleting order:', err);
+      alert('Ошибка удаления: ' + (err.message || ''));
+    }
+  };
 
   useEffect(() => {
     loadData();
@@ -214,10 +228,10 @@ export default function SalesDesktop() {
       <div className="grid grid-cols-5 gap-4">
         <div className="bg-white rounded-xl shadow-sm p-4">
           <div className="flex items-center gap-2 text-gray-500 mb-1">
-            <DollarSign size={18} />
+            <RussianRuble size={18} />
             <span className="text-sm">Выручка</span>
           </div>
-          <p className="text-xl font-bold text-gray-900">{formatMoney(stats.totalSum)} ₽</p>
+          <p className="text-xl font-bold text-gray-900">{formatMoney(stats.totalSum)}</p>
         </div>
         <div className="bg-white rounded-xl shadow-sm p-4">
           <div className="flex items-center gap-2 text-gray-500 mb-1">
@@ -232,21 +246,21 @@ export default function SalesDesktop() {
             <TrendingUp size={18} />
             <span className="text-sm">Ср. чек</span>
           </div>
-          <p className="text-xl font-bold text-gray-900">{formatMoney(Math.round(stats.avgCheck))} ₽</p>
+          <p className="text-xl font-bold text-gray-900">{formatMoney(Math.round(stats.avgCheck))}</p>
         </div>
         <div className="bg-white rounded-xl shadow-sm p-4">
           <div className="flex items-center gap-2 text-gray-500 mb-1">
             <Banknote size={18} />
             <span className="text-sm">Наличные</span>
           </div>
-          <p className="text-xl font-bold text-green-600">{formatMoney(stats.cashSum)} ₽</p>
+          <p className="text-xl font-bold text-green-600">{formatMoney(stats.cashSum)}</p>
         </div>
         <div className="bg-white rounded-xl shadow-sm p-4">
           <div className="flex items-center gap-2 text-gray-500 mb-1">
             <CreditCard size={18} />
             <span className="text-sm">Безнал</span>
           </div>
-          <p className="text-xl font-bold text-blue-600">{formatMoney(stats.cardSum)} ₽</p>
+          <p className="text-xl font-bold text-blue-600">{formatMoney(stats.cardSum)}</p>
         </div>
       </div>
 
@@ -397,8 +411,7 @@ export default function SalesDesktop() {
                         {itemsCount} шт
                       </td>
                       <td className="px-4 py-3 text-right font-medium text-gray-900">
-                        {formatMoney(order.total)} ₽
-                      </td>
+                        {formatMoney(order.total)}                      </td>
                       <td className="px-4 py-3 text-center">
                         {order.payment_method === '0' ? (
                           <span className="inline-flex items-center gap-1 text-xs text-green-600">
@@ -411,13 +424,24 @@ export default function SalesDesktop() {
                         )}
                       </td>
                       <td className="px-4 py-3 text-center">
-                        <button
-                          onClick={() => setSelectedOrder(order)}
-                          className="p-1 hover:bg-gray-100 rounded text-gray-400 hover:text-gray-600"
-                          title="Детали"
-                        >
-                          <Eye size={16} />
-                        </button>
+                        <div className="flex items-center justify-center gap-1">
+                          <button
+                            onClick={() => setSelectedOrder(order)}
+                            className="p-1 hover:bg-gray-100 rounded text-gray-400 hover:text-gray-600"
+                            title="Детали"
+                          >
+                            <Eye size={16} />
+                          </button>
+                          {isAdmin && (
+                            <button
+                              onClick={() => handleDeleteOrder(order)}
+                              className="p-1 hover:bg-red-50 rounded text-gray-400 hover:text-red-600"
+                              title="Удалить"
+                            >
+                              <Trash2 size={16} />
+                            </button>
+                          )}
+                        </div>
                       </td>
                     </tr>
                   );
@@ -434,8 +458,7 @@ export default function SalesDesktop() {
               Показано: {filteredOrders.length} из {orders.length}
             </span>
             <span className="font-semibold text-gray-900">
-              Итого: {formatMoney(stats.totalSum)} ₽
-            </span>
+              Итого: {formatMoney(stats.totalSum)}            </span>
           </div>
         )}
       </div>
@@ -451,9 +474,19 @@ export default function SalesDesktop() {
                   {formatDate(selectedOrder.local_time)} {formatTime(selectedOrder.local_time)} — {selectedOrder.expand?.user?.name || '—'} ({selectedOrder.city || '—'})
                 </p>
               </div>
-              <button onClick={() => setSelectedOrder(null)} className="p-1 hover:bg-gray-100 rounded">
-                <X size={20} className="text-gray-500" />
-              </button>
+              <div className="flex items-center gap-2">
+                {isAdmin && (
+                  <button
+                    onClick={() => handleDeleteOrder(selectedOrder)}
+                    className="px-3 py-1.5 text-xs bg-red-50 text-red-600 hover:bg-red-100 rounded-lg transition-colors"
+                  >
+                    Удалить
+                  </button>
+                )}
+                <button onClick={() => setSelectedOrder(null)} className="p-1 hover:bg-gray-100 rounded">
+                  <X size={20} className="text-gray-500" />
+                </button>
+              </div>
             </div>
 
             <div className="p-6 space-y-4">
@@ -466,13 +499,11 @@ export default function SalesDesktop() {
                       <div className="flex-1">
                         <p className="text-sm font-medium text-gray-900">{item.name || 'Товар'}</p>
                         <p className="text-xs text-gray-500">
-                          {item.quantity || 1} шт × {formatMoney(item.price)} ₽
-                          {item.discount > 0 && ` (скидка ${item.discount}%)`}
+                          {item.quantity || 1} шт × {formatMoney(item.price)}                          {item.discount > 0 && ` (скидка ${item.discount}%)`}
                         </p>
                       </div>
                       <p className="text-sm font-medium text-gray-900 ml-4">
-                        {formatMoney(item.total || (item.price * (item.quantity || 1)))} ₽
-                      </p>
+                        {formatMoney(item.total || (item.price * (item.quantity || 1)))}                      </p>
                     </div>
                   ))}
                 </div>
@@ -488,7 +519,7 @@ export default function SalesDesktop() {
                 </div>
                 <div className="flex justify-between text-base font-semibold">
                   <span>Итого</span>
-                  <span className="text-green-600">{formatMoney(selectedOrder.total)} ₽</span>
+                  <span className="text-green-600">{formatMoney(selectedOrder.total)}</span>
                 </div>
               </div>
             </div>

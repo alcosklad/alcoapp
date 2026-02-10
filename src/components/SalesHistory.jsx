@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Calendar, DollarSign, Percent, Clock, Package, Filter, X } from 'lucide-react';
+import { Calendar, RussianRuble, Percent, Clock, Package, Filter, X } from 'lucide-react';
 import { getOrders } from '../lib/pocketbase';
 
 export default function SalesHistory({ isOpen, onClose }) {
@@ -190,7 +190,7 @@ export default function SalesHistory({ isOpen, onClose }) {
               
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
-                  <DollarSign size={16} className="inline mr-1" />
+                  <RussianRuble size={16} className="inline mr-1" />
                   Способ оплаты
                 </label>
                 <select
@@ -262,8 +262,7 @@ export default function SalesHistory({ isOpen, onClose }) {
                             {item.name} <span className="text-gray-500">×{item.quantity}</span>
                           </span>
                           <span className="text-gray-600">
-                            {(item.price * item.quantity).toLocaleString('ru-RU')} ₽
-                          </span>
+                            {(item.price * item.quantity).toLocaleString('ru-RU')}                          </span>
                         </div>
                       ))}
                     </div>
@@ -275,7 +274,7 @@ export default function SalesHistory({ isOpen, onClose }) {
                           <div className="flex items-center text-sm text-green-600">
                             <Percent size={14} className="mr-1" />
                             <span>
-                              Скидка: {discountType === 'percentage' ? `${order.discount}%` : `${order.discount} ₽`}
+                              Скидка: {discountType === 'percentage' ? `${order.discount}%` : `${order.discount}`}
                             </span>
                           </div>
                         )}
@@ -283,8 +282,7 @@ export default function SalesHistory({ isOpen, onClose }) {
                       <div className="text-right">
                         <div className="text-sm text-gray-500">Итого:</div>
                         <div className="text-lg font-bold text-gray-800">
-                          {order.total.toLocaleString('ru-RU')} ₽
-                        </div>
+                          {order.total.toLocaleString('ru-RU')}                        </div>
                       </div>
                     </div>
                   </div>
@@ -302,8 +300,7 @@ export default function SalesHistory({ isOpen, onClose }) {
                 Показано заказов: {filteredOrders.length}
               </span>
               <span className="font-semibold text-gray-800">
-                Общая сумма: {filteredOrders.reduce((sum, order) => sum + order.total, 0).toLocaleString('ru-RU')} ₽
-              </span>
+                Общая сумма: {filteredOrders.reduce((sum, order) => sum + order.total, 0).toLocaleString('ru-RU')}              </span>
             </div>
           </div>
         )}

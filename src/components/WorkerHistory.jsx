@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { History, Calendar, DollarSign, Package, Search, Percent, Clock, Wallet, Smartphone, FileText, Check } from 'lucide-react';
+import { History, Calendar, RussianRuble, Package, Search, Percent, Clock, Wallet, Smartphone, FileText, Check } from 'lucide-react';
 import { getOrders } from '../lib/pocketbase';
 
 export default function WorkerHistory() {
@@ -130,10 +130,9 @@ export default function WorkerHistory() {
               <div>
                 <p className="text-sm text-gray-600">Выручка</p>
                 <p className="text-xl font-bold text-gray-900">
-                  {totalRevenue.toLocaleString('ru-RU')} ₽
-                </p>
+                  {totalRevenue.toLocaleString('ru-RU')}                </p>
               </div>
-              <DollarSign size={20} className="text-green-600" />
+              <RussianRuble size={20} className="text-green-600" />
             </div>
           </div>
         </div>
@@ -229,8 +228,7 @@ export default function WorkerHistory() {
                           {item.name} <span className="text-gray-500">×{item.quantity}</span>
                         </span>
                         <span className="text-gray-600">
-                          {(item.price * item.quantity).toLocaleString('ru-RU')} ₽
-                        </span>
+                          {(item.price * item.quantity).toLocaleString('ru-RU')}                        </span>
                       </div>
                     ))}
                   </div>
@@ -243,15 +241,14 @@ export default function WorkerHistory() {
                           {discountType === 'percentage' ? (
                             <span>Скидка {order.discount}%</span>
                           ) : (
-                            <span>Скидка {order.discount} ₽</span>
+                            <span>Скидка {order.discount}</span>
                           )}
                         </div>
                       )}
                     </div>
                     <div className="text-right">
                       <div className="text-lg font-bold text-gray-800">
-                        {parseFloat(order.total).toLocaleString('ru-RU')} ₽
-                      </div>
+                        {parseFloat(order.total).toLocaleString('ru-RU')}                      </div>
                     </div>
                   </div>
                 </div>

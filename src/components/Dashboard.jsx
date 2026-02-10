@@ -152,8 +152,7 @@ export default function Dashboard({ user, onLogout }) {
                 <div>
                   <p className="text-gray-500 text-sm">Общая сумма закупа</p>
                   <p className="text-3xl font-bold text-gray-900 mt-1">
-                    {(stats.totalPurchaseValue || 0).toLocaleString('ru-RU')} ₽
-                  </p>
+                    {(stats.totalPurchaseValue || 0).toLocaleString('ru-RU')}                  </p>
                 </div>
                 <div className="bg-orange-100 p-3 rounded-lg">
                   <svg className="w-8 h-8 text-orange-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -171,8 +170,7 @@ export default function Dashboard({ user, onLogout }) {
                 <div>
                   <p className="text-gray-500 text-sm">Общая сумма склада</p>
                   <p className="text-3xl font-bold text-gray-900 mt-1">
-                    {(stats.totalSaleValue || 0).toLocaleString('ru-RU')} ₽
-                  </p>
+                    {(stats.totalSaleValue || 0).toLocaleString('ru-RU')}                  </p>
                 </div>
                 <div className="bg-green-100 p-3 rounded-lg">
                   <svg className="w-8 h-8 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">

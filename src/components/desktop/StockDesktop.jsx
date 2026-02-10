@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { Search, ChevronUp, ChevronDown, RefreshCw, MapPin, X } from 'lucide-react';
 import { getStocksAggregated, getSuppliers } from '../../lib/pocketbase';
+import { detectSubcategory } from '../../lib/subcategories';
 import pb from '../../lib/pocketbase';
 
 export default function StockDesktop() {
@@ -10,9 +11,12 @@ export default function StockDesktop() {
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('');
-  const [sortField, setSortField] = useState('category');
+  const [sortField, setSortField] = useState('name');
   const [sortDir, setSortDir] = useState('asc');
   const [cityModal, setCityModal] = useState(null);
+
+  const userRole = pb.authStore.model?.role;
+  const isAdmin = userRole === 'admin';
 
   useEffect(() => {
     loadSuppliers();
@@ -44,7 +48,6 @@ export default function StockDesktop() {
     }
   };
 
-  // Сортировка
   const handleSort = (field) => {
     if (sortField === field) {
       setSortDir(sortDir === 'asc' ? 'desc' : 'asc');
@@ -59,69 +62,84 @@ export default function StockDesktop() {
     stock?.expand?.product?.category || stock?.product?.category || ''
   ).filter(Boolean))].sort();
 
-  // Фильтрация и сортировка данных
-  const filteredStocks = stocks
-    .filter(stock => {
-      const name = stock?.expand?.product?.name || stock?.product?.name || '';
-      const article = stock?.expand?.product?.article || stock?.product?.article || '';
-      const category = stock?.expand?.product?.category || stock?.product?.category || '';
-      const query = searchQuery.toLowerCase();
-      
-      const matchesSearch = name.toLowerCase().includes(query) || article.toLowerCase().includes(query);
-      const matchesCategory = !selectedCategory || category === selectedCategory;
-      
-      return matchesSearch && matchesCategory;
-    })
-    .sort((a, b) => {
-      let aVal, bVal;
-      
-      switch (sortField) {
-        case 'name':
-          aVal = a?.expand?.product?.name || a?.product?.name || '';
-          bVal = b?.expand?.product?.name || b?.product?.name || '';
-          break;
-        case 'article':
-          aVal = a?.expand?.product?.article || a?.product?.article || '';
-          bVal = b?.expand?.product?.article || b?.product?.article || '';
-          break;
-        case 'quantity':
-          aVal = a?.quantity || 0;
-          bVal = b?.quantity || 0;
-          break;
-        case 'purchasePrice':
-          aVal = a?.expand?.product?.cost || a?.product?.cost || 0;
-          bVal = b?.expand?.product?.cost || b?.product?.cost || 0;
-          break;
-        case 'price':
-          aVal = a?.expand?.product?.price || a?.product?.price || 0;
-          bVal = b?.expand?.product?.price || b?.product?.price || 0;
-          break;
-        case 'category':
-          aVal = a?.expand?.product?.category || a?.product?.category || '';
-          bVal = b?.expand?.product?.category || b?.product?.category || '';
-          break;
-        case 'volume':
-          aVal = a?.expand?.product?.volume || a?.product?.volume || '';
-          bVal = b?.expand?.product?.volume || b?.product?.volume || '';
-          break;
-        case 'margin':
-          aVal = (a?.expand?.product?.price || a?.product?.price || 0) - (a?.expand?.product?.cost || a?.product?.cost || 0);
-          bVal = (b?.expand?.product?.price || b?.product?.price || 0) - (b?.expand?.product?.cost || b?.product?.cost || 0);
-          break;
-        case 'stockValue':
-          aVal = (a?.quantity || 0) * (a?.expand?.product?.price || a?.product?.price || 0);
-          bVal = (b?.quantity || 0) * (b?.expand?.product?.price || b?.product?.price || 0);
-          break;
-        default:
-          aVal = '';
-          bVal = '';
-      }
+  // Хелпер для получения данных продукта
+  const getProduct = (stock) => stock?.expand?.product || stock?.product || {};
 
-      if (typeof aVal === 'string') {
-        return sortDir === 'asc' ? aVal.localeCompare(bVal) : bVal.localeCompare(aVal);
-      }
-      return sortDir === 'asc' ? aVal - bVal : bVal - aVal;
-    });
+  // Фильтрация и сортировка данных
+  const filteredStocks = useMemo(() => {
+    return stocks
+      .filter(stock => {
+        const product = getProduct(stock);
+        const name = product.name || '';
+        const article = product.article || '';
+        const category = Array.isArray(product.category) ? product.category[0] : (product.category || '');
+        const query = searchQuery.toLowerCase();
+        
+        const matchesSearch = name.toLowerCase().includes(query) || article.toLowerCase().includes(query);
+        const matchesCategory = !selectedCategory || category === selectedCategory;
+        
+        return matchesSearch && matchesCategory;
+      })
+      .sort((a, b) => {
+        const pA = getProduct(a);
+        const pB = getProduct(b);
+
+        // Первичная сортировка — по категории всегда (для группировки)
+        const catA = Array.isArray(pA.category) ? pA.category[0] : (pA.category || '');
+        const catB = Array.isArray(pB.category) ? pB.category[0] : (pB.category || '');
+        if (catA !== catB) return catA.localeCompare(catB);
+
+        // Внутри категории — сортировка по подкатегории
+        const subA = pA.subcategory || detectSubcategory(pA.name);
+        const subB = pB.subcategory || detectSubcategory(pB.name);
+        if (subA !== subB) return subA.localeCompare(subB);
+
+        // Внутри подкатегории — по выбранному полю
+        let aVal, bVal;
+        switch (sortField) {
+          case 'name':
+            aVal = pA.name || '';
+            bVal = pB.name || '';
+            break;
+          case 'article':
+            aVal = pA.article || '';
+            bVal = pB.article || '';
+            break;
+          case 'quantity':
+            aVal = a?.quantity || 0;
+            bVal = b?.quantity || 0;
+            break;
+          case 'purchasePrice':
+            aVal = pA.cost || 0;
+            bVal = pB.cost || 0;
+            break;
+          case 'price':
+            aVal = pA.price || 0;
+            bVal = pB.price || 0;
+            break;
+          case 'volume':
+            aVal = pA.volume || '';
+            bVal = pB.volume || '';
+            break;
+          case 'margin':
+            aVal = (pA.price || 0) - (pA.cost || 0);
+            bVal = (pB.price || 0) - (pB.cost || 0);
+            break;
+          case 'stockValue':
+            aVal = (a?.quantity || 0) * (pA.price || 0);
+            bVal = (b?.quantity || 0) * (pB.price || 0);
+            break;
+          default:
+            aVal = pA.name || '';
+            bVal = pB.name || '';
+        }
+
+        if (typeof aVal === 'string') {
+          return sortDir === 'asc' ? aVal.localeCompare(bVal) : bVal.localeCompare(aVal);
+        }
+        return sortDir === 'asc' ? aVal - bVal : bVal - aVal;
+      });
+  }, [stocks, searchQuery, selectedCategory, sortField, sortDir]);
 
   const SortIcon = ({ field }) => {
     if (sortField !== field) return null;
@@ -131,14 +149,17 @@ export default function StockDesktop() {
   // Итоги
   const totalQuantity = filteredStocks.reduce((sum, s) => sum + (s?.quantity || 0), 0);
   const totalCostValue = filteredStocks.reduce((sum, s) => {
-    const product = s?.expand?.product || s?.product || {};
+    const product = getProduct(s);
     return sum + ((product.cost || 0) * (s?.quantity || 0));
   }, 0);
   const totalSaleValue = filteredStocks.reduce((sum, s) => {
-    const product = s?.expand?.product || s?.product || {};
+    const product = getProduct(s);
     return sum + ((product.price || 0) * (s?.quantity || 0));
   }, 0);
   const totalMargin = totalSaleValue - totalCostValue;
+
+  // Кол-во колонок зависит от роли
+  const colCount = isAdmin ? 10 : 7;
 
   return (
     <div className="space-y-4">
@@ -205,11 +226,11 @@ export default function StockDesktop() {
             <thead>
               <tr className="bg-gray-50 border-b border-gray-200">
                 <th 
-                  className="text-left px-3 py-2 font-medium text-gray-600 cursor-pointer hover:bg-gray-100"
+                  className="text-left px-2 py-2 font-medium text-gray-600 cursor-pointer hover:bg-gray-100 w-[70px] max-w-[70px]"
                   onClick={() => handleSort('article')}
                 >
                   <div className="flex items-center gap-1">
-                    Артикул <SortIcon field="article" />
+                    Арт. <SortIcon field="article" />
                   </div>
                 </th>
                 <th 
@@ -220,16 +241,11 @@ export default function StockDesktop() {
                     Наименование <SortIcon field="name" />
                   </div>
                 </th>
-                <th 
-                  className="text-left px-3 py-2 font-medium text-gray-600 cursor-pointer hover:bg-gray-100"
-                  onClick={() => handleSort('category')}
-                >
-                  <div className="flex items-center gap-1">
-                    Категория <SortIcon field="category" />
-                  </div>
+                <th className="text-left px-2 py-2 font-medium text-gray-600">
+                  Подкатегория
                 </th>
                 <th 
-                  className="text-left px-3 py-2 font-medium text-gray-600 cursor-pointer hover:bg-gray-100"
+                  className="text-left px-2 py-2 font-medium text-gray-600 cursor-pointer hover:bg-gray-100"
                   onClick={() => handleSort('volume')}
                 >
                   <div className="flex items-center gap-1">
@@ -244,14 +260,16 @@ export default function StockDesktop() {
                     Остаток <SortIcon field="quantity" />
                   </div>
                 </th>
-                <th 
-                  className="text-right px-3 py-2 font-medium text-gray-600 cursor-pointer hover:bg-gray-100"
-                  onClick={() => handleSort('purchasePrice')}
-                >
-                  <div className="flex items-center justify-end gap-1">
-                    Закуп <SortIcon field="purchasePrice" />
-                  </div>
-                </th>
+                {isAdmin && (
+                  <th 
+                    className="text-right px-3 py-2 font-medium text-gray-600 cursor-pointer hover:bg-gray-100"
+                    onClick={() => handleSort('purchasePrice')}
+                  >
+                    <div className="flex items-center justify-end gap-1">
+                      Закуп <SortIcon field="purchasePrice" />
+                    </div>
+                  </th>
+                )}
                 <th 
                   className="text-right px-3 py-2 font-medium text-gray-600 cursor-pointer hover:bg-gray-100"
                   onClick={() => handleSort('price')}
@@ -260,28 +278,32 @@ export default function StockDesktop() {
                     Продажа <SortIcon field="price" />
                   </div>
                 </th>
-                <th 
-                  className="text-right px-3 py-2 font-medium text-gray-600 cursor-pointer hover:bg-gray-100"
-                  onClick={() => handleSort('margin')}
-                >
-                  <div className="flex items-center justify-end gap-1">
-                    Маржа <SortIcon field="margin" />
-                  </div>
-                </th>
-                <th 
-                  className="text-right px-3 py-2 font-medium text-gray-600 cursor-pointer hover:bg-gray-100"
-                  onClick={() => handleSort('stockValue')}
-                >
-                  <div className="flex items-center justify-end gap-1">
-                    Сумма <SortIcon field="stockValue" />
-                  </div>
-                </th>
+                {isAdmin && (
+                  <th 
+                    className="text-right px-3 py-2 font-medium text-gray-600 cursor-pointer hover:bg-gray-100"
+                    onClick={() => handleSort('margin')}
+                  >
+                    <div className="flex items-center justify-end gap-1">
+                      Маржа <SortIcon field="margin" />
+                    </div>
+                  </th>
+                )}
+                {isAdmin && (
+                  <th 
+                    className="text-right px-3 py-2 font-medium text-gray-600 cursor-pointer hover:bg-gray-100"
+                    onClick={() => handleSort('stockValue')}
+                  >
+                    <div className="flex items-center justify-end gap-1">
+                      Сумма <SortIcon field="stockValue" />
+                    </div>
+                  </th>
+                )}
               </tr>
             </thead>
             <tbody>
               {loading ? (
                 <tr>
-                  <td colSpan={9} className="px-3 py-6 text-center text-gray-500">
+                  <td colSpan={colCount} className="px-3 py-6 text-center text-gray-500">
                     <div className="flex items-center justify-center gap-2">
                       <RefreshCw size={14} className="animate-spin" />
                       Загрузка...
@@ -290,7 +312,7 @@ export default function StockDesktop() {
                 </tr>
               ) : filteredStocks.length === 0 ? (
                 <tr>
-                  <td colSpan={9} className="px-3 py-6 text-center text-gray-500">
+                  <td colSpan={colCount} className="px-3 py-6 text-center text-gray-500">
                     {searchQuery || selectedCategory ? 'Ничего не найдено' : 'Нет данных'}
                   </td>
                 </tr>
@@ -298,40 +320,52 @@ export default function StockDesktop() {
                 <>
                   {(() => {
                     let lastCategory = null;
+                    let lastSubcategory = null;
                     return filteredStocks.map((stock) => {
-                      const product = stock?.expand?.product || stock?.product || {};
+                      const product = getProduct(stock);
                       const quantity = stock?.quantity || 0;
                       const cost = product.cost || 0;
                       const price = product.price || 0;
                       const margin = price - cost;
                       const stockValue = quantity * price;
                       const category = Array.isArray(product.category) ? product.category[0] : (product.category || '');
+                      const subcategory = product.subcategory || detectSubcategory(product.name);
                       const isGlobal = !selectedSupplier;
-                      const hasCityBreakdown = isGlobal && stock._cityBreakdown && stock._cityBreakdown.length > 1;
+                      const hasCityBreakdown = isGlobal && stock._cityBreakdown && stock._cityBreakdown.length >= 1;
 
                       const showCategoryHeader = category !== lastCategory;
+                      const showSubcategoryHeader = subcategory && (showCategoryHeader || subcategory !== lastSubcategory);
+                      if (showCategoryHeader) lastSubcategory = null;
                       lastCategory = category;
+                      lastSubcategory = subcategory;
 
                       return (
                         <React.Fragment key={stock.id}>
                           {showCategoryHeader && category && (
                             <tr className="bg-blue-50 border-y border-blue-200">
-                              <td colSpan={9} className="px-3 py-1.5 font-semibold text-blue-800 text-xs sticky top-0">
+                              <td colSpan={colCount} className="px-3 py-1.5 font-semibold text-blue-800 text-xs sticky top-0">
                                 {category}
                               </td>
                             </tr>
                           )}
+                          {showSubcategoryHeader && subcategory && (
+                            <tr className="bg-gray-50 border-y border-gray-200">
+                              <td colSpan={colCount} className="px-6 py-1 font-medium text-gray-600 text-xs">
+                                {subcategory}
+                              </td>
+                            </tr>
+                          )}
                           <tr className="border-b border-gray-100 hover:bg-gray-50">
-                            <td className="px-3 py-1.5 font-mono text-xs text-gray-600">
+                            <td className="px-2 py-1.5 font-mono text-xs text-gray-500 w-[70px] max-w-[70px] truncate">
                               {product.article || '—'}
                             </td>
                             <td className="px-3 py-1.5">
                               {product.name || 'Без названия'}
                             </td>
-                            <td className="px-3 py-1.5 text-gray-600">
-                              {category || '—'}
+                            <td className="px-2 py-1.5 text-gray-500 text-xs">
+                              {subcategory || '—'}
                             </td>
-                            <td className="px-3 py-1.5 text-gray-600">
+                            <td className="px-2 py-1.5 text-gray-600">
                               {product.volume || '—'}
                             </td>
                             <td className={`px-3 py-1.5 text-right font-medium ${quantity < 3 ? 'text-red-600' : ''}`}>
@@ -341,25 +375,31 @@ export default function StockDesktop() {
                                   <button
                                     onClick={() => setCityModal({ product, breakdown: stock._cityBreakdown, totalQty: quantity })}
                                     className="text-blue-400 hover:text-blue-600"
-                                    title="Разбивка по городам"
+                                    title="Наличие в городах"
                                   >
                                     <MapPin size={12} />
                                   </button>
                                 )}
                               </span>
                             </td>
-                            <td className="px-3 py-1.5 text-right text-gray-600">
-                              {cost.toLocaleString('ru-RU')} ₽
-                            </td>
+                            {isAdmin && (
+                              <td className="px-3 py-1.5 text-right text-gray-600">
+                                {cost.toLocaleString('ru-RU')}
+                              </td>
+                            )}
                             <td className="px-3 py-1.5 text-right font-medium">
-                              {price.toLocaleString('ru-RU')} ₽
+                              {price.toLocaleString('ru-RU')}
                             </td>
-                            <td className={`px-3 py-1.5 text-right font-medium ${margin > 0 ? 'text-green-600' : 'text-red-600'}`}>
-                              {margin.toLocaleString('ru-RU')} ₽
-                            </td>
-                            <td className="px-3 py-1.5 text-right font-medium">
-                              {stockValue.toLocaleString('ru-RU')} ₽
-                            </td>
+                            {isAdmin && (
+                              <td className={`px-3 py-1.5 text-right font-medium ${margin > 0 ? 'text-green-600' : 'text-red-600'}`}>
+                                {margin.toLocaleString('ru-RU')}
+                              </td>
+                            )}
+                            {isAdmin && (
+                              <td className="px-3 py-1.5 text-right font-medium">
+                                {stockValue.toLocaleString('ru-RU')}
+                              </td>
+                            )}
                           </tr>
                         </React.Fragment>
                       );
@@ -369,10 +409,16 @@ export default function StockDesktop() {
                   <tr className="bg-gray-100 border-t-2 border-gray-300 font-semibold text-xs">
                     <td colSpan={4} className="px-3 py-2 text-right text-gray-700">Итого:</td>
                     <td className="px-3 py-2 text-right text-gray-900">{totalQuantity} шт</td>
-                    <td className="px-3 py-2 text-right text-gray-600">{totalCostValue.toLocaleString('ru-RU')} ₽</td>
-                    <td className="px-3 py-2 text-right text-gray-900">{totalSaleValue.toLocaleString('ru-RU')} ₽</td>
-                    <td className={`px-3 py-2 text-right ${totalMargin > 0 ? 'text-green-700' : 'text-red-700'}`}>{totalMargin.toLocaleString('ru-RU')} ₽</td>
-                    <td className="px-3 py-2 text-right text-gray-900">{totalSaleValue.toLocaleString('ru-RU')} ₽</td>
+                    {isAdmin && (
+                      <td className="px-3 py-2 text-right text-gray-600">{totalCostValue.toLocaleString('ru-RU')}</td>
+                    )}
+                    <td className="px-3 py-2 text-right text-gray-900">{totalSaleValue.toLocaleString('ru-RU')}</td>
+                    {isAdmin && (
+                      <td className={`px-3 py-2 text-right ${totalMargin > 0 ? 'text-green-700' : 'text-red-700'}`}>{totalMargin.toLocaleString('ru-RU')}</td>
+                    )}
+                    {isAdmin && (
+                      <td className="px-3 py-2 text-right text-gray-900">{totalSaleValue.toLocaleString('ru-RU')}</td>
+                    )}
                   </tr>
                 </>
               )}

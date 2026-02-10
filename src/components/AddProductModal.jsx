@@ -192,8 +192,7 @@ export default function AddProductModal({ isOpen, onClose, onAdd }) {
                 <div className="flex justify-between items-center">
                   <span className="text-sm font-medium text-blue-900">Маржа</span>
                   <span className="text-lg font-bold text-blue-600">
-                    {(parseFloat(formData.price) - parseFloat(formData.cost)).toLocaleString('ru-RU')} ₽
-                    <span className="text-sm font-normal ml-2">
+                    {(parseFloat(formData.price) - parseFloat(formData.cost)).toLocaleString('ru-RU')}                    <span className="text-sm font-normal ml-2">
                       ({(((parseFloat(formData.price) - parseFloat(formData.cost)) / parseFloat(formData.price)) * 100).toFixed(1)}%)
                     </span>
                   </span>

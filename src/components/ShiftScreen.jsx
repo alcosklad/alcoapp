@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { ArrowLeft, Clock, DollarSign, Package, X, CheckCircle } from 'lucide-react';
+import { ArrowLeft, Clock, RussianRuble, Package, X, CheckCircle } from 'lucide-react';
 import { getActiveShift, getShifts, endShift, getSales } from '../lib/pocketbase';
 import pb from '../lib/pocketbase';
 
@@ -248,8 +248,7 @@ export default function ShiftScreen({ onBack }) {
                       {shift.totalItems} шт
                     </p>
                     <p className="text-sm text-green-600">
-                      {shift.totalAmount.toLocaleString('ru-RU')} ₽
-                    </p>
+                      {shift.totalAmount.toLocaleString('ru-RU')}                    </p>
                   </div>
                 </div>
               </div>
@@ -300,12 +299,11 @@ export default function ShiftScreen({ onBack }) {
                 
                 <div className="bg-gray-50 rounded-lg p-4">
                   <div className="flex items-center gap-2 text-gray-600 mb-1">
-                    <DollarSign size={16} />
+                    <RussianRuble size={16} />
                     <span className="text-sm">Сумма</span>
                   </div>
                   <p className="font-semibold text-green-600">
-                    {shiftData.totalAmount.toLocaleString('ru-RU')} ₽
-                  </p>
+                    {shiftData.totalAmount.toLocaleString('ru-RU')}                  </p>
                 </div>
               </div>
               
@@ -332,8 +330,7 @@ export default function ShiftScreen({ onBack }) {
                           </div>
                           <div className="text-right">
                             <p className="text-sm font-medium text-gray-900">
-                              {sale.total?.toLocaleString('ru-RU')} ₽
-                            </p>
+                              {sale.total?.toLocaleString('ru-RU')}                            </p>
                             <p className="text-xs text-gray-500">
                               {sale.payment_method === 'cash' ? 'Наличные' : 'Карта'}
                             </p>
@@ -412,12 +409,11 @@ export default function ShiftScreen({ onBack }) {
                 
                 <div className="bg-gray-50 rounded-lg p-4">
                   <div className="flex items-center gap-2 text-gray-600 mb-1">
-                    <DollarSign size={16} />
+                    <RussianRuble size={16} />
                     <span className="text-sm">Сумма</span>
                   </div>
                   <p className="font-semibold text-green-600">
-                    {selectedShift.totalAmount.toLocaleString('ru-RU')} ₽
-                  </p>
+                    {selectedShift.totalAmount.toLocaleString('ru-RU')}                  </p>
                 </div>
               </div>
               
@@ -444,8 +440,7 @@ export default function ShiftScreen({ onBack }) {
                           </div>
                           <div className="text-right">
                             <p className="text-sm font-medium text-gray-900">
-                              {sale.total?.toLocaleString('ru-RU')} ₽
-                            </p>
+                              {sale.total?.toLocaleString('ru-RU')}                            </p>
                             <p className="text-xs text-gray-500">
                               {sale.payment_method === 'cash' ? 'Наличные' : 'Карта'}
                             </p>

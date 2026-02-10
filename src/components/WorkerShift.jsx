@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Clock, Play, Pause, Square, DollarSign } from 'lucide-react';
+import { Clock, Play, Pause, Square, RussianRuble } from 'lucide-react';
 import pb from '../lib/pocketbase';
 
 export default function WorkerShift() {
@@ -142,7 +142,7 @@ export default function WorkerShift() {
                 <p className="text-2xl font-bold text-gray-900">{shiftStats.sales}</p>
               </div>
               <div className="p-2 bg-blue-100 rounded-lg">
-                <DollarSign size={20} className="text-blue-600" />
+                <RussianRuble size={20} className="text-blue-600" />
               </div>
             </div>
           </div>
@@ -152,11 +152,10 @@ export default function WorkerShift() {
               <div>
                 <p className="text-sm text-gray-600">Выручка</p>
                 <p className="text-2xl font-bold text-gray-900">
-                  {shiftStats.revenue.toLocaleString('ru-RU')} ₽
-                </p>
+                  {shiftStats.revenue.toLocaleString('ru-RU')}                </p>
               </div>
               <div className="p-2 bg-green-100 rounded-lg">
-                <DollarSign size={20} className="text-green-600" />
+                <RussianRuble size={20} className="text-green-600" />
               </div>
             </div>
           </div>

@@ -286,8 +286,7 @@ export default function CreateReceptionScreen({ onBack, onContinue }) {
                       </div>
                       {product?.price && (
                         <p className="text-sm font-semibold text-blue-600">
-                          {product.price.toLocaleString('ru-RU')} ₽
-                        </p>
+                          {product.price.toLocaleString('ru-RU')}                        </p>
                       )}
                     </button>
                   ))}
@@ -307,8 +306,7 @@ export default function CreateReceptionScreen({ onBack, onContinue }) {
                       <div className="flex-1">
                         <p className="font-medium text-gray-900">{item?.product?.name || 'Товар'}</p>
                         <p className="text-sm text-gray-500">
-                          {item?.quantity || 0} шт × {item?.cost || 0} ₽ = {((item?.quantity || 0) * (item?.cost || 0)).toLocaleString('ru-RU')} ₽
-                        </p>
+                          {item?.quantity || 0} шт × {item?.cost || 0} = {((item?.quantity || 0) * (item?.cost || 0)).toLocaleString('ru-RU')}                        </p>
                       </div>
                       <button
                         onClick={() => handleRemoveItem(index)}
@@ -325,8 +323,7 @@ export default function CreateReceptionScreen({ onBack, onContinue }) {
                   <div className="flex justify-between items-center">
                     <span className="text-lg font-semibold text-blue-900">Итого:</span>
                     <span className="text-2xl font-bold text-blue-600">
-                      {selectedItems.reduce((sum, item) => sum + ((item?.quantity || 0) * (item?.cost || 0)), 0).toLocaleString('ru-RU')} ₽
-                    </span>
+                      {selectedItems.reduce((sum, item) => sum + ((item?.quantity || 0) * (item?.cost || 0)), 0).toLocaleString('ru-RU')}                    </span>
                   </div>
                 </div>
               </div>

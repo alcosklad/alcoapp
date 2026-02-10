@@ -133,8 +133,7 @@ export default function EditProductModal({ product, onClose, onSave }) {
             {/* Цена закупа */}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
-                Цена закупа, ₽
-              </label>
+                Цена закупа,              </label>
               <input
                 type="number"
                 value={formData.cost}
@@ -149,8 +148,7 @@ export default function EditProductModal({ product, onClose, onSave }) {
             {/* Цена продажи */}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
-                Цена продажи, ₽
-              </label>
+                Цена продажи,              </label>
               <input
                 type="number"
                 value={formData.price}

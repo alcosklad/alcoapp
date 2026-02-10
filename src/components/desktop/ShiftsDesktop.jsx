@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { Clock, DollarSign, TrendingUp, Users, Search, ChevronDown, ChevronUp, X, Eye } from 'lucide-react';
-import { getAllShifts, getUsers } from '../../lib/pocketbase';
+import { Clock, RussianRuble, TrendingUp, Users, Search, ChevronDown, ChevronUp, X, Eye, Trash2 } from 'lucide-react';
+import { getAllShifts, getUsers, deleteShift } from '../../lib/pocketbase';
 import pb from '../../lib/pocketbase';
 
 export default function ShiftsDesktop() {
@@ -22,6 +22,20 @@ export default function ShiftsDesktop() {
 
   // Detail modal
   const [selectedShift, setSelectedShift] = useState(null);
+
+  const isAdmin = pb.authStore.model?.role === 'admin';
+
+  const handleDeleteShift = async (shift) => {
+    if (!window.confirm(`Удалить смену ${shift.expand?.user?.name || ''} от ${formatDate(shift.start)}?`)) return;
+    try {
+      await deleteShift(shift.id);
+      setSelectedShift(null);
+      await loadData();
+    } catch (err) {
+      console.error('Error deleting shift:', err);
+      alert('Ошибка удаления: ' + (err.message || ''));
+    }
+  };
 
   useEffect(() => {
     loadData();
@@ -211,10 +225,10 @@ export default function ShiftsDesktop() {
       <div className="grid grid-cols-5 gap-4">
         <div className="bg-white rounded-xl shadow-sm p-4">
           <div className="flex items-center gap-2 text-gray-500 mb-1">
-            <DollarSign size={18} />
+            <RussianRuble size={18} />
             <span className="text-sm">Выручка</span>
           </div>
-          <p className="text-xl font-bold text-gray-900">{formatMoney(stats.totalSum)} ₽</p>
+          <p className="text-xl font-bold text-gray-900">{formatMoney(stats.totalSum)}</p>
         </div>
         <div className="bg-white rounded-xl shadow-sm p-4">
           <div className="flex items-center gap-2 text-gray-500 mb-1">
@@ -228,7 +242,7 @@ export default function ShiftsDesktop() {
             <TrendingUp size={18} />
             <span className="text-sm">Ср. выручка/смена</span>
           </div>
-          <p className="text-xl font-bold text-gray-900">{formatMoney(Math.round(stats.avgShift))} ₽</p>
+          <p className="text-xl font-bold text-gray-900">{formatMoney(Math.round(stats.avgShift))}</p>
         </div>
         <div className="bg-white rounded-xl shadow-sm p-4">
           <div className="flex items-center gap-2 text-gray-500 mb-1">
@@ -239,7 +253,7 @@ export default function ShiftsDesktop() {
         </div>
         <div className="bg-white rounded-xl shadow-sm p-4">
           <div className="flex items-center gap-2 text-gray-500 mb-1">
-            <DollarSign size={18} />
+            <RussianRuble size={18} />
             <span className="text-sm">Всего продаж</span>
           </div>
           <p className="text-xl font-bold text-gray-900">{stats.totalSales}</p>
@@ -390,8 +404,7 @@ export default function ShiftsDesktop() {
                       {shift.totalItems || 0}
                     </td>
                     <td className="px-4 py-3 text-right font-medium text-gray-900">
-                      {formatMoney(shift.totalAmount)} ₽
-                    </td>
+                      {formatMoney(shift.totalAmount)}                    </td>
                     <td className="px-4 py-3 text-center">
                       <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${
                         shift.status === 'active'
@@ -402,13 +415,24 @@ export default function ShiftsDesktop() {
                       </span>
                     </td>
                     <td className="px-4 py-3 text-center">
-                      <button
-                        onClick={() => setSelectedShift(shift)}
-                        className="p-1 hover:bg-gray-100 rounded text-gray-400 hover:text-gray-600"
-                        title="Детали"
-                      >
-                        <Eye size={16} />
-                      </button>
+                      <div className="flex items-center justify-center gap-1">
+                        <button
+                          onClick={() => setSelectedShift(shift)}
+                          className="p-1 hover:bg-gray-100 rounded text-gray-400 hover:text-gray-600"
+                          title="Детали"
+                        >
+                          <Eye size={16} />
+                        </button>
+                        {isAdmin && (
+                          <button
+                            onClick={() => handleDeleteShift(shift)}
+                            className="p-1 hover:bg-red-50 rounded text-gray-400 hover:text-red-600"
+                            title="Удалить"
+                          >
+                            <Trash2 size={16} />
+                          </button>
+                        )}
+                      </div>
                     </td>
                   </tr>
                 ))
@@ -423,8 +447,7 @@ export default function ShiftsDesktop() {
               Показано: {filteredShifts.length} из {shifts.length}
             </span>
             <span className="font-semibold text-gray-900">
-              Итого: {formatMoney(stats.totalSum)} ₽
-            </span>
+              Итого: {formatMoney(stats.totalSum)}            </span>
           </div>
         )}
       </div>
@@ -442,9 +465,19 @@ export default function ShiftsDesktop() {
                   {formatDate(selectedShift.start)} {formatTime(selectedShift.start)} — {formatTime(selectedShift.end)} | {selectedShift.city || '—'}
                 </p>
               </div>
-              <button onClick={() => setSelectedShift(null)} className="p-1 hover:bg-gray-100 rounded">
-                <X size={20} className="text-gray-500" />
-              </button>
+              <div className="flex items-center gap-2">
+                {isAdmin && (
+                  <button
+                    onClick={() => handleDeleteShift(selectedShift)}
+                    className="px-3 py-1.5 text-xs bg-red-50 text-red-600 hover:bg-red-100 rounded-lg transition-colors"
+                  >
+                    Удалить
+                  </button>
+                )}
+                <button onClick={() => setSelectedShift(null)} className="p-1 hover:bg-gray-100 rounded">
+                  <X size={20} className="text-gray-500" />
+                </button>
+              </div>
             </div>
 
             <div className="p-6 space-y-4">
@@ -460,7 +493,7 @@ export default function ShiftsDesktop() {
                 </div>
                 <div className="bg-gray-50 rounded-lg p-3 text-center">
                   <p className="text-xs text-gray-500 mb-1">Выручка</p>
-                  <p className="font-semibold text-green-600">{formatMoney(selectedShift.totalAmount)} ₽</p>
+                  <p className="font-semibold text-green-600">{formatMoney(selectedShift.totalAmount)}</p>
                 </div>
               </div>
 
@@ -480,8 +513,7 @@ export default function ShiftsDesktop() {
                           </p>
                         </div>
                         <p className="text-sm font-medium text-gray-900">
-                          {formatMoney(sale.total)} ₽
-                        </p>
+                          {formatMoney(sale.total)}                        </p>
                       </div>
                     ))}
                   </div>

@@ -105,7 +105,7 @@ export default function AddItemModal({ isOpen, onClose, onAdd }) {
                         <div className="text-sm text-gray-500">Арт. {product.article}</div>
                       )}
                       {product.price && (
-                        <div className="text-sm text-blue-600">Цена: {product.price} ₽</div>
+                        <div className="text-sm text-blue-600">Цена: {product.price}</div>
                       )}
                     </button>
                   ))}
@@ -162,8 +162,7 @@ export default function AddItemModal({ isOpen, onClose, onAdd }) {
 
                 <div className="bg-blue-50 rounded-lg p-3">
                   <p className="text-sm text-blue-900">
-                    Сумма: {(quantity * cost).toLocaleString('ru-RU')} ₽
-                  </p>
+                    Сумма: {(quantity * cost).toLocaleString('ru-RU')}                  </p>
                 </div>
               </div>
             </div>
