@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { Calendar, RussianRuble, Percent, Clock, Package, Filter, X } from 'lucide-react';
-import { getOrders } from '../lib/pocketbase';
+import { Calendar, RussianRuble, Percent, Clock, Package, Filter, X, RotateCcw } from 'lucide-react';
+import { getOrders, refundOrder, getActiveShift } from '../lib/pocketbase';
+import pb from '../lib/pocketbase';
 
 export default function SalesHistory({ isOpen, onClose }) {
   const [orders, setOrders] = useState([]);
@@ -9,6 +10,9 @@ export default function SalesHistory({ isOpen, onClose }) {
   const [dateFilter, setDateFilter] = useState('');
   const [paymentFilter, setPaymentFilter] = useState('');
   const [showFilters, setShowFilters] = useState(false);
+  const [refundingId, setRefundingId] = useState(null);
+  const [refundConfirmId, setRefundConfirmId] = useState(null);
+  const [refundLoading, setRefundLoading] = useState(false);
 
   // Способы оплаты
   const paymentMethods = {
@@ -107,6 +111,29 @@ export default function SalesHistory({ isOpen, onClose }) {
   const clearFilters = () => {
     setDateFilter('');
     setPaymentFilter('');
+  };
+
+  const handleRefund = async (order) => {
+    if (refundConfirmId !== order.id) {
+      // Первый клик — тряска + запрос подтверждения
+      setRefundingId(order.id);
+      setTimeout(() => setRefundingId(null), 600);
+      setRefundConfirmId(order.id);
+      setTimeout(() => setRefundConfirmId(null), 5000);
+      return;
+    }
+    // Второй клик — подтверждение
+    try {
+      setRefundLoading(true);
+      await refundOrder(order.id);
+      setRefundConfirmId(null);
+      await loadOrders();
+    } catch (err) {
+      console.error('Ошибка вычета:', err);
+      alert('Ошибка вычета: ' + (err.message || ''));
+    } finally {
+      setRefundLoading(false);
+    }
   };
 
   // Форматирование даты и времени
@@ -240,7 +267,7 @@ export default function SalesHistory({ isOpen, onClose }) {
                 const discountType = getDiscountType(order.discount_type);
                 
                 return (
-                  <div key={order.id} className="bg-white border border-gray-200 rounded-lg p-4 shadow-sm hover:shadow-md transition-shadow">
+                  <div key={order.id} className={`bg-white border rounded-lg p-4 shadow-sm hover:shadow-md transition-shadow ${order.status === 'refund' ? 'border-red-200 bg-red-50/30' : 'border-gray-200'}`}>
                     {/* Дата и время */}
                     <div className="flex justify-between items-start mb-3">
                       <div className="flex items-center text-gray-600">
@@ -278,10 +305,29 @@ export default function SalesHistory({ isOpen, onClose }) {
                             </span>
                           </div>
                         )}
+                        {order.status !== 'refund' && (
+                          <button
+                            onClick={() => handleRefund(order)}
+                            disabled={refundLoading}
+                            className={`mt-1 px-3 py-1.5 text-xs rounded-lg transition-all flex items-center gap-1 ${
+                              refundConfirmId === order.id
+                                ? 'bg-red-600 text-white hover:bg-red-700'
+                                : 'bg-orange-50 text-orange-600 hover:bg-orange-100'
+                            } ${refundingId === order.id ? 'animate-shake' : ''} disabled:opacity-50`}
+                          >
+                            <RotateCcw size={14} />
+                            {refundLoading && refundConfirmId === order.id ? 'Вычет...' : refundConfirmId === order.id ? 'Подтвердить' : 'Вычет'}
+                          </button>
+                        )}
+                        {order.status === 'refund' && (
+                          <span className="mt-1 inline-flex items-center px-2 py-1 text-xs bg-red-100 text-red-700 rounded-lg font-medium">
+                            <RotateCcw size={12} className="mr-1" /> Вычет
+                          </span>
+                        )}
                       </div>
                       <div className="text-right">
                         <div className="text-sm text-gray-500">Итого:</div>
-                        <div className="text-lg font-bold text-gray-800">
+                        <div className={`text-lg font-bold ${order.status === 'refund' ? 'text-red-500 line-through' : 'text-gray-800'}`}>
                           {order.total.toLocaleString('ru-RU')}                        </div>
                       </div>
                     </div>
@@ -305,6 +351,17 @@ export default function SalesHistory({ isOpen, onClose }) {
           </div>
         )}
       </div>
+      {/* Shake animation */}
+      <style>{`
+        @keyframes shake {
+          0%, 100% { transform: translateX(0); }
+          10%, 30%, 50%, 70%, 90% { transform: translateX(-4px); }
+          20%, 40%, 60%, 80% { transform: translateX(4px); }
+        }
+        .animate-shake {
+          animation: shake 0.6s ease-in-out;
+        }
+      `}</style>
     </div>
   );
 }

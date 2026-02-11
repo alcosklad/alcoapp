@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { ShoppingCart, RussianRuble, TrendingUp, CreditCard, Banknote, Search, ChevronDown, ChevronUp, X, Eye, Trash2 } from 'lucide-react';
-import { getAllOrders, getUsers, deleteOrder } from '../../lib/pocketbase';
+import { ShoppingCart, RussianRuble, TrendingUp, CreditCard, Banknote, Search, ChevronDown, ChevronUp, X, Eye, Trash2, RotateCcw } from 'lucide-react';
+import { getAllOrders, getUsers, deleteOrder, refundOrder, getActiveShift } from '../../lib/pocketbase';
 import pb from '../../lib/pocketbase';
 
 export default function SalesDesktop() {
@@ -23,7 +23,38 @@ export default function SalesDesktop() {
   // Detail modal
   const [selectedOrder, setSelectedOrder] = useState(null);
 
+  // Refund
+  const [refundShaking, setRefundShaking] = useState(false);
+  const [refundConfirm, setRefundConfirm] = useState(false);
+  const [refundLoading, setRefundLoading] = useState(false);
+
   const isAdmin = pb.authStore.model?.role === 'admin';
+  const isWorker = pb.authStore.model?.role === 'worker';
+
+  const handleRefundOrder = async (order) => {
+    if (!refundConfirm) {
+      // Первый клик — анимация тряски и запрос подтверждения
+      setRefundShaking(true);
+      setTimeout(() => setRefundShaking(false), 600);
+      setRefundConfirm(true);
+      // Сброс подтверждения через 5 сек
+      setTimeout(() => setRefundConfirm(false), 5000);
+      return;
+    }
+    // Второй клик — подтверждение
+    try {
+      setRefundLoading(true);
+      await refundOrder(order.id);
+      setSelectedOrder(null);
+      setRefundConfirm(false);
+      await loadData();
+    } catch (err) {
+      console.error('Error refunding order:', err);
+      alert('Ошибка вычета: ' + (err.message || ''));
+    } finally {
+      setRefundLoading(false);
+    }
+  };
 
   const handleDeleteOrder = async (order) => {
     if (!window.confirm(`Удалить продажу #${order.id?.slice(-6)} на сумму ${(order.total || 0).toLocaleString('ru-RU')}?`)) return;
@@ -411,7 +442,11 @@ export default function SalesDesktop() {
                         {itemsCount} шт
                       </td>
                       <td className="px-4 py-3 text-right font-medium text-gray-900">
-                        {formatMoney(order.total)}                      </td>
+                        {formatMoney(order.total)}
+                        {order.status === 'refund' && (
+                          <span className="ml-2 inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium bg-red-100 text-red-700">Вычет</span>
+                        )}
+                      </td>
                       <td className="px-4 py-3 text-center">
                         {order.payment_method === '0' ? (
                           <span className="inline-flex items-center gap-1 text-xs text-green-600">
@@ -475,6 +510,23 @@ export default function SalesDesktop() {
                 </p>
               </div>
               <div className="flex items-center gap-2">
+                {selectedOrder.status !== 'refund' && (isAdmin || isWorker) && (
+                  <button
+                    onClick={() => handleRefundOrder(selectedOrder)}
+                    disabled={refundLoading}
+                    className={`px-3 py-1.5 text-xs rounded-lg transition-all flex items-center gap-1 ${
+                      refundConfirm
+                        ? 'bg-red-600 text-white hover:bg-red-700'
+                        : 'bg-orange-50 text-orange-600 hover:bg-orange-100'
+                    } ${refundShaking ? 'animate-shake' : ''} disabled:opacity-50`}
+                  >
+                    <RotateCcw size={14} />
+                    {refundLoading ? 'Вычет...' : refundConfirm ? 'Подтвердить вычет' : 'Вычет'}
+                  </button>
+                )}
+                {selectedOrder.status === 'refund' && (
+                  <span className="px-3 py-1.5 text-xs bg-red-100 text-red-700 rounded-lg font-medium">Вычет</span>
+                )}
                 {isAdmin && (
                   <button
                     onClick={() => handleDeleteOrder(selectedOrder)}
@@ -483,7 +535,10 @@ export default function SalesDesktop() {
                     Удалить
                   </button>
                 )}
-                <button onClick={() => setSelectedOrder(null)} className="p-1 hover:bg-gray-100 rounded">
+                <button onClick={() => {
+                  setSelectedOrder(null);
+                  setRefundConfirm(false);
+                }} className="p-1 hover:bg-gray-100 rounded">
                   <X size={20} className="text-gray-500" />
                 </button>
               </div>
@@ -526,6 +581,17 @@ export default function SalesDesktop() {
           </div>
         </div>
       )}
+      {/* Shake animation style */}
+      <style>{`
+        @keyframes shake {
+          0%, 100% { transform: translateX(0); }
+          10%, 30%, 50%, 70%, 90% { transform: translateX(-4px); }
+          20%, 40%, 60%, 80% { transform: translateX(4px); }
+        }
+        .animate-shake {
+          animation: shake 0.6s ease-in-out;
+        }
+      `}</style>
     </div>
   );
 }

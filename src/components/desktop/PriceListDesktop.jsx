@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { Search, ChevronUp, ChevronDown, RefreshCw, X, Plus, Check, Trash2, Copy } from 'lucide-react';
-import { getProducts, updateProduct, createProduct, deleteProduct, getStocksForProduct } from '../../lib/pocketbase';
+import { Search, ChevronUp, ChevronDown, RefreshCw, X, Plus, Check, Trash2, Copy, Merge } from 'lucide-react';
+import { getProducts, updateProduct, createProduct, deleteProduct, getStocksForProduct, mergeProducts } from '../../lib/pocketbase';
 import { detectSubcategory, ALL_SUBCATEGORIES } from '../../lib/subcategories';
 import pb from '../../lib/pocketbase';
 
@@ -21,6 +21,7 @@ export default function PriceListDesktop() {
   const [modalError, setModalError] = useState('');
   const [duplicates, setDuplicates] = useState([]);
   const [showDuplicates, setShowDuplicates] = useState(false);
+  const [merging, setMerging] = useState(false);
 
   const userRole = pb.authStore.model?.role;
   const canEdit = userRole === 'admin';
@@ -80,15 +81,32 @@ export default function PriceListDesktop() {
     return [...subs].sort();
   }, [products]);
 
-  // Поиск дублей по имени
+  // Поиск дублей по имени (улучшенный)
+  const COMMON_WORDS = new Set(['vino', 'вино', 'красн', 'бел', 'розов', 'полусладк', 'полусух', 'сух', 'сладк', 'игрист', 'тих', 'шампанск']);
   const findDuplicates = (name, currentId) => {
     if (!name || name.length < 3) return [];
-    const words = name.toLowerCase().split(/\s+/).filter(w => w.length >= 3);
+    const words = name.toLowerCase().split(/\s+/).filter(w => w.length >= 3 && !COMMON_WORDS.has(w));
     if (words.length === 0) return [];
+    
+    // Извлекаем объём из названия (напр. 0.75, 1.0, 0.5)
+    const volMatch = name.match(/(\d+[.,]\d+)\s*л/i) || name.match(/(\d+[.,]\d+)/i);
+    const volume = volMatch ? volMatch[1].replace(',', '.') : null;
+    
     return products.filter(p => {
       if (p.id === currentId) return false;
       const pName = (p.name || '').toLowerCase();
-      return words.some(w => pName.includes(w));
+      const matchCount = words.filter(w => pName.includes(w)).length;
+      if (matchCount === 0) return false;
+      
+      // Если есть объём — проверяем совпадение объёма
+      if (volume) {
+        const pVolMatch = pName.match(/(\d+[.,]\d+)\s*л/i) || pName.match(/(\d+[.,]\d+)/i);
+        const pVolume = pVolMatch ? pVolMatch[1].replace(',', '.') : null;
+        if (pVolume && pVolume !== volume) return false;
+      }
+      
+      // Минимум 1 значимое слово должно совпадать
+      return matchCount >= 1;
     }).slice(0, 10);
   };
 
@@ -102,7 +120,7 @@ export default function PriceListDesktop() {
       cost: product.cost || 0,
       price: product.price || 0,
     });
-    setDuplicates(findDuplicates(product.name, product.id));
+    setDuplicates([]);
     setShowDuplicates(false);
     setModalError('');
     setShowModal(true);
@@ -126,10 +144,29 @@ export default function PriceListDesktop() {
 
   const handleNameChange = (name) => {
     setModalForm(prev => ({ ...prev, name }));
-    if (name.length >= 3) {
-      setDuplicates(findDuplicates(name, modalProduct?.id));
+    // Дубли только при создании нового товара
+    if (!modalProduct && name.length >= 3) {
+      setDuplicates(findDuplicates(name, null));
     } else {
       setDuplicates([]);
+    }
+  };
+
+  const handleMerge = async (duplicateProduct) => {
+    if (!modalProduct) return;
+    const msg = `Объединить "${duplicateProduct.name}" в "${modalProduct.name}"?\n\nОстатки дубля перенесутся, дубль будет удалён.`;
+    if (!window.confirm(msg)) return;
+    try {
+      setMerging(true);
+      await mergeProducts(modalProduct.id, duplicateProduct.id);
+      setDuplicates(prev => prev.filter(d => d.id !== duplicateProduct.id));
+      loadProducts();
+      alert('Товары объединены!');
+    } catch (err) {
+      console.error('Error merging products:', err);
+      alert('Ошибка объединения: ' + (err?.message || ''));
+    } finally {
+      setMerging(false);
     }
   };
 
@@ -412,11 +449,21 @@ export default function PriceListDesktop() {
                         {duplicates.length}
                       </span>
                       {showDuplicates && (
-                        <div className="absolute right-0 top-full mt-1 bg-white border border-gray-200 rounded-lg shadow-lg z-10 w-72 max-h-48 overflow-y-auto">
+                        <div className="absolute right-0 top-full mt-1 bg-white border border-gray-200 rounded-lg shadow-lg z-10 w-80 max-h-56 overflow-y-auto">
                           <div className="p-2 text-xs text-gray-500 border-b">Похожие товары:</div>
                           {duplicates.map(d => (
-                            <div key={d.id} className="px-3 py-1.5 text-xs hover:bg-gray-50 border-b border-gray-50">
-                              <div className="font-medium text-gray-700">{d.name}</div>
+                            <div key={d.id} className="px-3 py-1.5 text-xs hover:bg-gray-50 border-b border-gray-50 flex items-center justify-between gap-2">
+                              <div className="font-medium text-gray-700 flex-1 min-w-0 truncate">{d.name}</div>
+                              {modalProduct && (
+                                <button
+                                  onClick={(e) => { e.stopPropagation(); handleMerge(d); }}
+                                  disabled={merging}
+                                  className="shrink-0 px-2 py-0.5 text-xs bg-blue-50 text-blue-600 hover:bg-blue-100 rounded transition-colors disabled:opacity-50"
+                                  title="Объединить"
+                                >
+                                  Объединить
+                                </button>
+                              )}
                             </div>
                           ))}
                         </div>

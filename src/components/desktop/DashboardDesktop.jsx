@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { getDashboardStats, getSuppliers, getAllOrders } from '../../lib/pocketbase';
+import { getDashboardStats, getSuppliers, getAllOrders, getReceptions } from '../../lib/pocketbase';
 import { Package, TrendingUp, ShoppingCart, AlertTriangle, FileText, Calendar, Clock, BarChart3 } from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
 import pb from '../../lib/pocketbase';
@@ -25,6 +25,8 @@ export default function DashboardDesktop({ user }) {
   const [showStaleProducts, setShowStaleProducts] = useState(false);
   const [showStockBreakdown, setShowStockBreakdown] = useState(false);
   const [salesData, setSalesData] = useState([]);
+  const [receptionsData, setReceptionsData] = useState([]);
+  const [showPurchaseChart, setShowPurchaseChart] = useState(false);
   
   const userRole = pb.authStore.model?.role;
   const isAdmin = userRole === 'admin';
@@ -32,6 +34,7 @@ export default function DashboardDesktop({ user }) {
   useEffect(() => {
     loadSuppliers();
     loadSalesForChart();
+    loadReceptionsForChart();
   }, []);
 
   useEffect(() => {
@@ -55,6 +58,15 @@ export default function DashboardDesktop({ user }) {
       setSalesData(orders || []);
     } catch (e) {
       console.error('Error loading sales for chart:', e);
+    }
+  };
+
+  const loadReceptionsForChart = async () => {
+    try {
+      const data = await getReceptions().catch(() => []);
+      setReceptionsData(data || []);
+    } catch (e) {
+      console.error('Error loading receptions for chart:', e);
     }
   };
 
@@ -121,6 +133,38 @@ export default function DashboardDesktop({ user }) {
     ];
   }, [salesData]);
 
+  // Данные для графика закупок по дням (последние 14 дней)
+  const dailyPurchaseChart = useMemo(() => {
+    const days = [];
+    for (let i = 13; i >= 0; i--) {
+      const d = new Date();
+      d.setDate(d.getDate() - i);
+      d.setHours(0, 0, 0, 0);
+      days.push({
+        date: d,
+        label: d.toLocaleDateString('ru-RU', { day: '2-digit', month: '2-digit' }),
+        amount: 0,
+        count: 0,
+      });
+    }
+    receptionsData.forEach(rec => {
+      const recDate = new Date(rec.date || rec.created);
+      recDate.setHours(0, 0, 0, 0);
+      const day = days.find(d => d.date.getTime() === recDate.getTime());
+      if (day && rec.items) {
+        const items = Array.isArray(rec.items) ? rec.items : [];
+        const sum = items.reduce((s, item) => {
+          const cost = item.cost ?? item.purchase_price ?? 0;
+          const qty = item.quantity || 0;
+          return s + (cost * qty);
+        }, 0);
+        day.amount += sum;
+        day.count += 1;
+      }
+    });
+    return days;
+  }, [receptionsData]);
+
   const PIE_COLORS = ['#22c55e', '#3b82f6'];
 
   const margin = stats.totalSaleValue - stats.totalPurchaseValue;
@@ -166,7 +210,7 @@ export default function DashboardDesktop({ user }) {
         <div className="grid grid-cols-2 lg:grid-cols-6 gap-3">
           <StatCard icon={Package} label="Товаров на складе" value={`${stats.totalProducts.toLocaleString('ru-RU')} шт`} color="blue" clickable onClick={() => setShowStockBreakdown(true)} />
           <StatCard icon={ShoppingCart} label="Сумма продажи" value={stats.totalSaleValue.toLocaleString('ru-RU')} color="green" />
-          <StatCard icon={TrendingUp} label="Сумма закупа" value={stats.totalPurchaseValue.toLocaleString('ru-RU')} color="purple" />
+          <StatCard icon={TrendingUp} label="Сумма закупа" value={stats.totalPurchaseValue.toLocaleString('ru-RU')} color="purple" clickable onClick={() => setShowPurchaseChart(v => !v)} />
           <StatCard icon={BarChart3} label="Маржа склада" value={margin.toLocaleString('ru-RU')} color={margin > 0 ? 'green' : 'orange'} />
           <StatCard icon={FileText} label="Приёмок за месяц" value={stats.receptionsCount} color="indigo" />
           <StatCard
@@ -237,6 +281,26 @@ export default function DashboardDesktop({ user }) {
               </div>
             )}
           </div>
+        </div>
+      )}
+
+      {/* График закупок по дням */}
+      {isAdmin && showPurchaseChart && (
+        <div className="bg-white rounded-lg border border-gray-200 p-4">
+          <h3 className="text-sm font-semibold text-gray-700 mb-3">Закупки за 14 дней</h3>
+          <ResponsiveContainer width="100%" height={220}>
+            <BarChart data={dailyPurchaseChart} margin={{ top: 5, right: 10, left: 0, bottom: 5 }}>
+              <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
+              <XAxis dataKey="label" tick={{ fontSize: 11, fill: '#9ca3af' }} />
+              <YAxis tick={{ fontSize: 11, fill: '#9ca3af' }} width={60} />
+              <Tooltip
+                formatter={(value) => [value.toLocaleString('ru-RU'), 'Сумма закупа']}
+                labelFormatter={(label) => `Дата: ${label}`}
+                contentStyle={{ fontSize: 12, borderRadius: 8 }}
+              />
+              <Bar dataKey="amount" fill="#8b5cf6" radius={[4, 4, 0, 0]} name="Закупка" />
+            </BarChart>
+          </ResponsiveContainer>
         </div>
       )}
 

@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import pb from '../lib/pocketbase';
-import { LogIn, Eye, EyeOff } from 'lucide-react';
+import { LogIn, Eye, EyeOff, AlertCircle } from 'lucide-react';
 
 export default function AuthScreen({ onAuth }) {
   const [login, setLogin] = useState('');
@@ -35,12 +35,23 @@ export default function AuthScreen({ onAuth }) {
     setError('');
 
     try {
+      console.log('AuthScreen: PB URL:', pb.baseUrl);
+      console.log('AuthScreen: Попытка входа с логином:', login);
       const authData = await pb.collection('users').authWithPassword(login, password);
       console.log('AuthScreen: Успешный вход:', authData.record);
       console.log('AuthScreen: Роль пользователя:', authData.record.role);
       onAuth(authData.record);
     } catch (err) {
-      setError('Неверный логин или пароль');
+      console.error('AuthScreen: Ошибка входа:', err);
+      console.error('AuthScreen: Детали:', err?.data || err?.message || err);
+      console.error('AuthScreen: PB URL:', pb.baseUrl);
+      
+      // Определяем тип ошибки для пользователя
+      if (err?.message?.includes('Failed to fetch') || err?.message?.includes('NetworkError') || err?.message?.includes('ERR_')) {
+        setError('Ошибка соединения с сервером. Проверьте подключение.');
+      } else {
+        setError('Неверный логин или пароль');
+      }
     } finally {
       setLoading(false);
     }

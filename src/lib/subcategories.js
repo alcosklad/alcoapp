@@ -8,6 +8,9 @@ const SUBCATEGORY_RULES = [
   { name: 'Просекко', test: (n) => /просекко|prosecco/i.test(n) },
   { name: 'Асти', test: (n) => /асти|asti/i.test(n) },
 
+  // Портвейн / вино ликёрное
+  { name: 'Портвейн', test: (n) => /портвейн|ликерн|ликёрн/i.test(n) },
+
   // Кагор
   { name: 'Кагор', test: (n) => /кагор/i.test(n) },
 
@@ -68,4 +71,5 @@ export const ALL_SUBCATEGORIES = [
   'Полусухое',
   'Сладкое',
   'Сухое',
+  'Портвейн',
 ];

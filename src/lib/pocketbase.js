@@ -23,13 +23,17 @@ const pb = new PocketBase(pbUrl);
 // Отключаем автоотмену запросов для мобильных устройств
 pb.autoCancellation(false);
 
-// Логирование только в dev режиме
+// Логируем URL всегда (для диагностики проблем на других устройствах)
+console.log('PocketBase: URL сервера:', pb.baseUrl);
+console.log('PocketBase: Протокол страницы:', window.location.protocol);
+console.log('PocketBase: Хост страницы:', window.location.host);
+
+// Детальное логирование только в dev режиме
 if (import.meta.env.DEV) {
   pb.beforeSend = function(url, options) {
     console.log('PocketBase Request:', url);
     return { url, options };
   };
-  console.log('PocketBase: URL сервера:', pb.baseUrl);
   console.log('PocketBase: Auth state:', pb.authStore.isValid);
 }
 
@@ -1041,6 +1045,103 @@ export const updateShift = async (shiftId, data) => {
     return record;
   } catch (error) {
     console.error('PocketBase: Error updating shift:', error);
+    throw error;
+  }
+};
+
+// === Объединение дублей товаров ===
+export const mergeProducts = async (targetProductId, duplicateProductId) => {
+  try {
+    // Получаем все остатки дубля
+    const dupStocks = await pb.collection('stocks').getFullList({
+      filter: `product = "${duplicateProductId}"`
+    });
+    
+    // Переносим остатки на основной товар
+    for (const stock of dupStocks) {
+      const supplierId = stock.supplier || null;
+      const quantity = stock.quantity || 0;
+      
+      if (quantity > 0) {
+        // Ищем существующий остаток основного товара у того же поставщика
+        const filterParts = [`product = "${targetProductId}"`];
+        if (supplierId) filterParts.push(`supplier = "${supplierId}"`);
+        
+        const existing = await pb.collection('stocks').getFirstListItem(
+          filterParts.join(' && ')
+        ).catch(() => null);
+        
+        if (existing) {
+          await pb.collection('stocks').update(existing.id, {
+            quantity: existing.quantity + quantity
+          });
+        } else {
+          await pb.collection('stocks').create({
+            product: targetProductId,
+            supplier: supplierId,
+            quantity: quantity,
+            cost: stock.cost || 0,
+          });
+        }
+      }
+      
+      // Удаляем остаток дубля
+      await pb.collection('stocks').delete(stock.id);
+    }
+    
+    // Удаляем дубль
+    await pb.collection('products').delete(duplicateProductId);
+    console.log('mergeProducts: дубль', duplicateProductId, 'объединён в', targetProductId);
+    return true;
+  } catch (error) {
+    console.error('PocketBase: Error merging products:', error);
+    throw error;
+  }
+};
+
+// === Вычет (возврат) заказа ===
+export const refundOrder = async (orderId) => {
+  try {
+    // Получаем заказ с деталями
+    const order = await pb.collection('orders').getOne(orderId, { expand: 'user' });
+    
+    if (order.status === 'refund') {
+      throw new Error('Этот заказ уже был возвращён');
+    }
+    
+    // Возвращаем все товары в остатки
+    const items = order.items || [];
+    const userId = order.user;
+    
+    // Получаем supplier пользователя для корректного возврата
+    let supplierId = null;
+    try {
+      const user = order.expand?.user || await pb.collection('users').getOne(userId);
+      supplierId = user.supplier || null;
+    } catch (e) {
+      console.warn('refundOrder: не удалось получить supplier пользователя', e);
+    }
+    
+    for (const item of items) {
+      const productId = item.productId || item.product;
+      const quantity = item.quantity || 1;
+      
+      if (productId) {
+        try {
+          await updateStock(productId, null, quantity, supplierId);
+          console.log(`refundOrder: возвращено ${quantity} шт товара ${productId}`);
+        } catch (e) {
+          console.error(`refundOrder: ошибка возврата товара ${productId}:`, e);
+        }
+      }
+    }
+    
+    // Обновляем статус заказа на 'refund'
+    const updated = await pb.collection('orders').update(orderId, { status: 'refund' });
+    console.log('refundOrder: заказ', orderId, 'помечен как вычет');
+    return updated;
+  } catch (error) {
+    console.error('PocketBase: Error refunding order:', error);
     throw error;
   }
 };
