@@ -743,66 +743,117 @@ export default function StockDesktop() {
       {/* Модалка: добавить товар на склад */}
       {showCreateModal && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50" onClick={closeCreateModal}>
-          <div className="bg-white rounded-xl max-w-md w-full mx-4" onClick={e => e.stopPropagation()}>
-            <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200">
-              <h3 className="text-lg font-semibold text-gray-900">Добавить на склад</h3>
-              <button onClick={closeCreateModal} className="p-1 hover:bg-gray-100 rounded">
-                <X size={20} className="text-gray-500" />
+          <div className="bg-white rounded-2xl max-w-2xl w-full mx-4 shadow-2xl" onClick={e => e.stopPropagation()}>
+            <div className="flex items-center justify-between px-8 py-5 border-b border-gray-100">
+              <div>
+                <h3 className="text-xl font-bold text-gray-900">Добавить на склад</h3>
+                <p className="text-sm text-gray-500 mt-0.5">Выберите товар и укажите параметры</p>
+              </div>
+              <button onClick={closeCreateModal} className="p-2 hover:bg-gray-100 rounded-lg transition-colors">
+                <X size={20} className="text-gray-400" />
               </button>
             </div>
-            <div className="p-6 space-y-4">
-              {createError && <div className="bg-red-50 text-red-600 p-3 rounded-lg text-sm">{createError}</div>}
+            <div className="px-8 py-6 space-y-5">
+              {createError && <div className="bg-red-50 text-red-600 p-3 rounded-xl text-sm font-medium">{createError}</div>}
 
+              {/* Поиск товара */}
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Товар</label>
-                <input
-                  type="text"
-                  placeholder="Поиск товара..."
-                  value={createSearch}
-                  onChange={e => setCreateSearch(e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 mb-2"
-                />
-                <select
-                  value={createForm.productId}
-                  onChange={e => setCreateForm({...createForm, productId: e.target.value})}
-                  size={5}
-                  className="w-full border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                >
-                  {filteredCreateProducts.map(p => (
-                    <option key={p.id} value={p.id}>{p.name} {p.article ? `(${p.article})` : ''}</option>
-                  ))}
-                </select>
+                <label className="block text-sm font-semibold text-gray-700 mb-2">Товар</label>
+                <div className="relative">
+                  <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+                  <input
+                    type="text"
+                    placeholder="Начните вводить название товара..."
+                    value={createSearch}
+                    onChange={e => setCreateSearch(e.target.value)}
+                    className="w-full pl-10 pr-4 py-3 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-gray-50"
+                  />
+                </div>
+                {/* Выбранный товар */}
+                {createForm.productId && (() => {
+                  const sel = allProducts.find(p => p.id === createForm.productId);
+                  if (!sel) return null;
+                  const cat = Array.isArray(sel.category) ? sel.category[0] : sel.category;
+                  return (
+                    <div className="mt-3 p-4 bg-blue-50 border border-blue-200 rounded-xl flex items-center justify-between">
+                      <div>
+                        <p className="font-semibold text-gray-900 text-sm">{sel.name}</p>
+                        <div className="flex items-center gap-3 mt-1 text-xs text-gray-500">
+                          {cat && <span className="px-2 py-0.5 bg-white rounded-md">{cat}</span>}
+                          {sel.subcategory && <span className="px-2 py-0.5 bg-white rounded-md">{sel.subcategory}</span>}
+                          <span>Закуп: <strong className="text-gray-700">{(sel.cost || 0).toLocaleString('ru-RU')}</strong></span>
+                          <span>Продажа: <strong className="text-green-600">{(sel.price || 0).toLocaleString('ru-RU')}</strong></span>
+                        </div>
+                      </div>
+                      <button onClick={() => setCreateForm({...createForm, productId: ''})} className="p-1.5 hover:bg-blue-100 rounded-lg">
+                        <X size={16} className="text-blue-500" />
+                      </button>
+                    </div>
+                  );
+                })()}
+                {/* Результаты поиска */}
+                {!createForm.productId && createSearch.length > 0 && (
+                  <div className="mt-2 border border-gray-200 rounded-xl overflow-hidden max-h-[200px] overflow-y-auto">
+                    {filteredCreateProducts.length === 0 ? (
+                      <p className="px-4 py-3 text-sm text-gray-400 text-center">Ничего не найдено</p>
+                    ) : (
+                      filteredCreateProducts.map(p => {
+                        const cat = Array.isArray(p.category) ? p.category[0] : p.category;
+                        return (
+                          <button
+                            key={p.id}
+                            onClick={() => { setCreateForm({...createForm, productId: p.id}); setCreateSearch(''); }}
+                            className="w-full px-4 py-3 text-left hover:bg-gray-50 flex items-center justify-between border-b border-gray-50 last:border-0 transition-colors"
+                          >
+                            <div>
+                              <p className="text-sm font-medium text-gray-900">{p.name}</p>
+                              <div className="flex items-center gap-2 mt-0.5 text-xs text-gray-400">
+                                {cat && <span>{cat}</span>}
+                                {p.subcategory && <span>· {p.subcategory}</span>}
+                                {p.cost > 0 && <span>· {p.cost.toLocaleString('ru-RU')}₽</span>}
+                              </div>
+                            </div>
+                            <Plus size={16} className="text-blue-500 shrink-0" />
+                          </button>
+                        );
+                      })
+                    )}
+                  </div>
+                )}
               </div>
 
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Город</label>
-                <select
-                  value={createForm.supplierId}
-                  onChange={e => setCreateForm({...createForm, supplierId: e.target.value})}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                >
-                  <option value="">Выберите город...</option>
-                  {suppliers.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
-                </select>
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Количество</label>
-                <input
-                  type="number"
-                  min="1"
-                  value={createForm.quantity}
-                  onChange={e => setCreateForm({...createForm, quantity: e.target.value})}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                />
+              {/* Город + Количество в ряд */}
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 mb-2">Город</label>
+                  <select
+                    value={createForm.supplierId}
+                    onChange={e => setCreateForm({...createForm, supplierId: e.target.value})}
+                    className="w-full px-4 py-3 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-gray-50"
+                  >
+                    <option value="">Выберите город...</option>
+                    {suppliers.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 mb-2">Количество</label>
+                  <input
+                    type="number"
+                    min="1"
+                    value={createForm.quantity}
+                    onChange={e => setCreateForm({...createForm, quantity: e.target.value})}
+                    className="w-full px-4 py-3 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-gray-50"
+                    placeholder="1"
+                  />
+                </div>
               </div>
             </div>
-            <div className="flex items-center justify-end gap-3 px-6 py-4 border-t border-gray-200 bg-gray-50 rounded-b-xl">
-              <button onClick={closeCreateModal} className="px-4 py-2 text-sm text-gray-600 hover:bg-gray-100 rounded-lg">Отмена</button>
+            <div className="flex items-center justify-end gap-3 px-8 py-5 border-t border-gray-100 bg-gray-50 rounded-b-2xl">
+              <button onClick={closeCreateModal} className="px-5 py-2.5 text-sm font-medium text-gray-600 hover:bg-gray-200 rounded-xl transition-colors">Отмена</button>
               <button onClick={saveCreateModal} disabled={createSaving}
-                className="px-4 py-2 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 flex items-center gap-2">
+                className="px-5 py-2.5 text-sm font-medium bg-blue-600 text-white rounded-xl hover:bg-blue-700 disabled:opacity-50 flex items-center gap-2 transition-colors shadow-sm">
                 {createSaving ? <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div> : <Plus size={16} />}
-                Добавить
+                Добавить на склад
               </button>
             </div>
           </div>

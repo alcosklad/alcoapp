@@ -300,6 +300,9 @@ export default function ReceptionDesktop() {
                   </div>
                 </th>
                 <th className="text-left px-3 py-2 font-medium text-gray-600">
+                  Магазины
+                </th>
+                <th className="text-left px-3 py-2 font-medium text-gray-600">
                   Товаров
                 </th>
                 <th 
@@ -318,7 +321,7 @@ export default function ReceptionDesktop() {
             <tbody>
               {loading ? (
                 <tr>
-                  <td colSpan={5} className="px-3 py-6 text-center text-gray-500">
+                  <td colSpan={6} className="px-3 py-6 text-center text-gray-500">
                     <div className="flex items-center justify-center gap-2">
                       <RefreshCw size={14} className="animate-spin" />
                       Загрузка...
@@ -327,7 +330,7 @@ export default function ReceptionDesktop() {
                 </tr>
               ) : filteredReceptions.length === 0 ? (
                 <tr>
-                  <td colSpan={5} className="px-3 py-6 text-center text-gray-500">
+                  <td colSpan={6} className="px-3 py-6 text-center text-gray-500">
                     {searchQuery ? 'Ничего не найдено' : 'Нет приёмок'}
                   </td>
                 </tr>
@@ -346,6 +349,20 @@ export default function ReceptionDesktop() {
                       </td>
                       <td className="px-3 py-1.5">
                         {reception?.expand?.supplier?.name || '—'}
+                      </td>
+                      <td className="px-3 py-1.5 text-gray-600">
+                        {reception.stores && reception.stores.length > 0 ? (
+                          <div className="flex flex-wrap gap-1">
+                            {reception.stores.map(storeId => {
+                              const store = storesList.find(s => s.id === storeId);
+                              return (
+                                <span key={storeId} className="px-1.5 py-0.5 bg-blue-50 text-blue-700 rounded text-[10px]">
+                                  {store?.name || storeId}
+                                </span>
+                              );
+                            })}
+                          </div>
+                        ) : '—'}
                       </td>
                       <td className="px-3 py-1.5 text-gray-600">
                         {itemsCount} шт

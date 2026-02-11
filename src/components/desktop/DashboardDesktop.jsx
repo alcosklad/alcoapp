@@ -27,6 +27,7 @@ export default function DashboardDesktop({ user }) {
   const [salesData, setSalesData] = useState([]);
   const [receptionsData, setReceptionsData] = useState([]);
   const [showPurchaseChart, setShowPurchaseChart] = useState(false);
+  const [showSalesChart, setShowSalesChart] = useState(false);
   
   const userRole = pb.authStore.model?.role;
   const isAdmin = userRole === 'admin';
@@ -209,7 +210,7 @@ export default function DashboardDesktop({ user }) {
       {isAdmin ? (
         <div className="grid grid-cols-2 lg:grid-cols-6 gap-3">
           <StatCard icon={Package} label="Товаров на складе" value={`${stats.totalProducts.toLocaleString('ru-RU')} шт`} color="blue" clickable onClick={() => setShowStockBreakdown(true)} />
-          <StatCard icon={ShoppingCart} label="Сумма продажи" value={stats.totalSaleValue.toLocaleString('ru-RU')} color="green" />
+          <StatCard icon={ShoppingCart} label="Сумма продажи" value={stats.totalSaleValue.toLocaleString('ru-RU')} color="green" clickable onClick={() => setShowSalesChart(v => !v)} />
           <StatCard icon={TrendingUp} label="Сумма закупа" value={stats.totalPurchaseValue.toLocaleString('ru-RU')} color="purple" clickable onClick={() => setShowPurchaseChart(v => !v)} />
           <StatCard icon={BarChart3} label="Маржа склада" value={margin.toLocaleString('ru-RU')} color={margin > 0 ? 'green' : 'orange'} />
           <StatCard icon={FileText} label="Приёмок за месяц" value={stats.receptionsCount} color="indigo" />
@@ -284,6 +285,26 @@ export default function DashboardDesktop({ user }) {
         </div>
       )}
 
+      {/* График продаж по дням (горизонтальный) */}
+      {isAdmin && showSalesChart && (
+        <div className="bg-white rounded-lg border border-gray-200 p-4">
+          <h3 className="text-sm font-semibold text-gray-700 mb-3">Сумма продаж за 14 дней</h3>
+          <ResponsiveContainer width="100%" height={280}>
+            <BarChart data={dailySalesChart} layout="vertical" margin={{ top: 5, right: 20, left: 60, bottom: 5 }}>
+              <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
+              <XAxis type="number" tick={{ fontSize: 11, fill: '#9ca3af' }} />
+              <YAxis type="category" dataKey="label" tick={{ fontSize: 11, fill: '#9ca3af' }} width={50} />
+              <Tooltip
+                formatter={(value) => [value.toLocaleString('ru-RU'), 'Выручка']}
+                labelFormatter={(label) => `Дата: ${label}`}
+                contentStyle={{ fontSize: 12, borderRadius: 8 }}
+              />
+              <Bar dataKey="revenue" fill="#22c55e" radius={[0, 4, 4, 0]} name="Выручка" />
+            </BarChart>
+          </ResponsiveContainer>
+        </div>
+      )}
+
       {/* График закупок по дням */}
       {isAdmin && showPurchaseChart && (
         <div className="bg-white rounded-lg border border-gray-200 p-4">
@@ -333,32 +354,67 @@ export default function DashboardDesktop({ user }) {
       {/* Модалка разбивки по складам */}
       {showStockBreakdown && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50" onClick={() => setShowStockBreakdown(false)}>
-          <div className="bg-white rounded-lg p-6 max-w-md w-full mx-4" onClick={(e) => e.stopPropagation()}>
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="text-lg font-semibold text-gray-900">Товары по складам</h3>
-              <button onClick={() => setShowStockBreakdown(false)} className="text-gray-400 hover:text-gray-600">✕</button>
+          <div className="bg-white rounded-2xl max-w-4xl w-full mx-6 shadow-2xl" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center justify-between px-8 py-5 border-b border-gray-100">
+              <div>
+                <h3 className="text-xl font-bold text-gray-900">Товары по складам</h3>
+                <p className="text-sm text-gray-500 mt-0.5">Общее количество: <span className="font-semibold text-gray-700">{stats.totalProducts.toLocaleString('ru-RU')} шт</span></p>
+              </div>
+              <button onClick={() => setShowStockBreakdown(false)} className="p-2 hover:bg-gray-100 rounded-lg transition-colors">
+                <X size={20} className="text-gray-400" />
+              </button>
             </div>
-            <div className="space-y-2">
+            <div className="px-8 py-6">
               {(stats.stockBreakdown || []).length === 0 ? (
-                <p className="text-gray-500 text-sm">Нет данных</p>
+                <p className="text-gray-500 text-sm text-center py-8">Нет данных</p>
               ) : (
-                (stats.stockBreakdown || []).map((item, idx) => (
-                  <div key={idx} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-                    <span className="font-medium text-gray-900">{item.name}</span>
-                    <div className="text-right">
-                      <p className="font-semibold text-gray-900">{item.count.toLocaleString('ru-RU')} шт</p>
-                      {isAdmin && (
-                        <p className="text-xs text-gray-500">Продажа: {item.saleValue.toLocaleString('ru-RU')} | Закуп: {item.purchaseValue.toLocaleString('ru-RU')}</p>
-                      )}
+                <div className="grid grid-cols-1 gap-3">
+                  {(stats.stockBreakdown || []).map((item, idx) => (
+                    <div key={idx} className="flex items-center justify-between p-4 bg-gray-50 rounded-xl hover:bg-gray-100 transition-colors">
+                      <div className="flex items-center gap-4">
+                        <div className="w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center">
+                          <Package size={20} className="text-blue-600" />
+                        </div>
+                        <span className="text-base font-semibold text-gray-900">{item.name}</span>
+                      </div>
+                      <div className="flex items-center gap-8">
+                        <div className="text-right">
+                          <p className="text-lg font-bold text-gray-900">{item.count.toLocaleString('ru-RU')} <span className="text-sm font-normal text-gray-500">шт</span></p>
+                        </div>
+                        {isAdmin && (
+                          <>
+                            <div className="text-right min-w-[120px]">
+                              <p className="text-xs text-gray-400 mb-0.5">Продажа</p>
+                              <p className="text-sm font-semibold text-green-600">{item.saleValue.toLocaleString('ru-RU')}</p>
+                            </div>
+                            <div className="text-right min-w-[120px]">
+                              <p className="text-xs text-gray-400 mb-0.5">Закуп</p>
+                              <p className="text-sm font-semibold text-purple-600">{item.purchaseValue.toLocaleString('ru-RU')}</p>
+                            </div>
+                          </>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+            {isAdmin && (stats.stockBreakdown || []).length > 0 && (
+              <div className="px-8 py-4 border-t border-gray-100 bg-gray-50 rounded-b-2xl">
+                <div className="flex items-center justify-between">
+                  <span className="text-base font-bold text-gray-900">Итого</span>
+                  <div className="flex items-center gap-8">
+                    <span className="text-lg font-bold text-gray-900">{stats.totalProducts.toLocaleString('ru-RU')} шт</span>
+                    <div className="text-right min-w-[120px]">
+                      <p className="text-sm font-bold text-green-600">{stats.totalSaleValue.toLocaleString('ru-RU')}</p>
+                    </div>
+                    <div className="text-right min-w-[120px]">
+                      <p className="text-sm font-bold text-purple-600">{stats.totalPurchaseValue.toLocaleString('ru-RU')}</p>
                     </div>
                   </div>
-                ))
-              )}
-              <div className="border-t pt-2 mt-2 flex justify-between font-semibold text-gray-900">
-                <span>Итого</span>
-                <span>{stats.totalProducts.toLocaleString('ru-RU')} шт</span>
+                </div>
               </div>
-            </div>
+            )}
           </div>
         </div>
       )}
