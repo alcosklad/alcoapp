@@ -20,7 +20,7 @@ export default function StockDesktop() {
   const [showEditModal, setShowEditModal] = useState(false);
   const [editStock, setEditStock] = useState(null); // stock row (aggregated)
   const [editProduct, setEditProduct] = useState(null); // product data
-  const [editForm, setEditForm] = useState({ name: '', article: '', category: '', subcategory: '', cost: 0, price: 0 });
+  const [editForm, setEditForm] = useState({ name: '', category: '', subcategory: '', cost: 0, price: 0 });
   const [editCities, setEditCities] = useState([]); // [{stockId, supplierId, supplierName, quantity}]
   const [editSaving, setEditSaving] = useState(false);
   const [editError, setEditError] = useState('');
@@ -115,7 +115,6 @@ export default function StockDesktop() {
     setEditProduct(product);
     setEditForm({
       name: product.name || '',
-      article: product.article || '',
       category: (Array.isArray(product.category) ? product.category[0] : product.category) || '',
       subcategory: product.subcategory || '',
       cost: product.cost || 0,
@@ -161,7 +160,6 @@ export default function StockDesktop() {
       if (productId) {
         await updateProduct(productId, {
           name: editForm.name.trim(),
-          article: editForm.article.trim(),
           category: editForm.category ? [editForm.category] : [],
           subcategory: editForm.subcategory || detectSubcategory(editForm.name),
           cost: Number(editForm.cost) || 0,
@@ -648,11 +646,6 @@ export default function StockDesktop() {
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Название</label>
                 <input type="text" value={editForm.name} onChange={e => setEditForm({...editForm, name: e.target.value})}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Артикул</label>
-                <input type="text" value={editForm.article} onChange={e => setEditForm({...editForm, article: e.target.value})}
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
               </div>
               <div className="grid grid-cols-2 gap-4">

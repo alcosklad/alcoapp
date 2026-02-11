@@ -16,7 +16,7 @@ export default function PriceListDesktop() {
   // Модалка редактирования/создания
   const [showModal, setShowModal] = useState(false);
   const [modalProduct, setModalProduct] = useState(null); // null = создание
-  const [modalForm, setModalForm] = useState({ name: '', article: '', category: '', subcategory: '', cost: 0, price: 0 });
+  const [modalForm, setModalForm] = useState({ name: '', category: '', subcategory: '', cost: 0, price: 0 });
   const [modalSaving, setModalSaving] = useState(false);
   const [modalError, setModalError] = useState('');
   const [duplicates, setDuplicates] = useState([]);
@@ -97,7 +97,6 @@ export default function PriceListDesktop() {
     setModalProduct(product);
     setModalForm({
       name: product.name || '',
-      article: product.article || '',
       category: (Array.isArray(product.category) ? product.category[0] : product.category) || '',
       subcategory: product.subcategory || '',
       cost: product.cost || 0,
@@ -111,7 +110,7 @@ export default function PriceListDesktop() {
 
   const openCreateModal = () => {
     setModalProduct(null);
-    setModalForm({ name: '', article: '', category: '', subcategory: '', cost: 0, price: 0 });
+    setModalForm({ name: '', category: '', subcategory: '', cost: 0, price: 0 });
     setDuplicates([]);
     setShowDuplicates(false);
     setModalError('');
@@ -144,12 +143,19 @@ export default function PriceListDesktop() {
     try {
       const data = {
         name: modalForm.name.trim(),
-        article: modalForm.article.trim(),
         category: modalForm.category ? [modalForm.category] : [],
         subcategory: modalForm.subcategory || detectSubcategory(modalForm.name),
         cost: Number(modalForm.cost) || 0,
         price: Number(modalForm.price) || 0,
       };
+      // Авто-генерация артикула для нового товара
+      if (!modalProduct) {
+        const maxArt = products.reduce((max, p) => {
+          const num = parseInt(p.article, 10);
+          return !isNaN(num) && num > max ? num : max;
+        }, 0);
+        data.article = String(maxArt + 1).padStart(4, '0');
+      }
       if (modalProduct) {
         await updateProduct(modalProduct.id, data);
       } else {
@@ -396,22 +402,21 @@ export default function PriceListDesktop() {
                 <div className="flex items-center justify-between mb-1">
                   <label className="block text-sm font-medium text-gray-700">Название</label>
                   {duplicates.length > 0 && (
-                    <div className="relative">
-                      <button
-                        onMouseEnter={() => setShowDuplicates(true)}
-                        onMouseLeave={() => setShowDuplicates(false)}
-                        className="flex items-center gap-1 text-xs text-amber-600 hover:text-amber-700"
-                      >
+                    <div
+                      className="relative"
+                      onMouseEnter={() => setShowDuplicates(true)}
+                      onMouseLeave={() => setShowDuplicates(false)}
+                    >
+                      <span className="flex items-center gap-1 text-xs text-amber-600 cursor-pointer">
                         <Copy size={12} />
-                        {duplicates.length} похож.
-                      </button>
+                        {duplicates.length}
+                      </span>
                       {showDuplicates && (
                         <div className="absolute right-0 top-full mt-1 bg-white border border-gray-200 rounded-lg shadow-lg z-10 w-72 max-h-48 overflow-y-auto">
                           <div className="p-2 text-xs text-gray-500 border-b">Похожие товары:</div>
                           {duplicates.map(d => (
                             <div key={d.id} className="px-3 py-1.5 text-xs hover:bg-gray-50 border-b border-gray-50">
                               <div className="font-medium text-gray-700">{d.name}</div>
-                              {d.article && <span className="text-gray-400">{d.article}</span>}
                             </div>
                           ))}
                         </div>
@@ -423,14 +428,6 @@ export default function PriceListDesktop() {
                   onChange={e => handleNameChange(e.target.value)}
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
                   placeholder="Название товара" />
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Артикул</label>
-                <input type="text" value={modalForm.article}
-                  onChange={e => setModalForm({...modalForm, article: e.target.value})}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  placeholder="Артикул" />
               </div>
 
               <div className="grid grid-cols-2 gap-4">
