@@ -110,13 +110,13 @@ export default function PriceListDesktop() {
     })
     .sort((a, b) => {
       // Первичная: по категории (для группировки)
-      const catA = Array.isArray(a?.category) ? a.category[0] : (a?.category || '');
-      const catB = Array.isArray(b?.category) ? b.category[0] : (b?.category || '');
+      const catA = (Array.isArray(a?.category) ? a.category[0] : (a?.category || '')) || '';
+      const catB = (Array.isArray(b?.category) ? b.category[0] : (b?.category || '')) || '';
       if (catA !== catB) return catA.localeCompare(catB);
 
       // Вторичная: по подкатегории
-      const subA = a?.subcategory || detectSubcategory(a?.name);
-      const subB = b?.subcategory || detectSubcategory(b?.name);
+      const subA = (a?.subcategory || detectSubcategory(a?.name)) || '';
+      const subB = (b?.subcategory || detectSubcategory(b?.name)) || '';
       if (subA !== subB) return subA.localeCompare(subB);
 
       // Третичная: по выбранному полю

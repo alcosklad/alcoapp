@@ -509,16 +509,33 @@ export const getDashboardStats = async (filterId = null) => {
     
     let totalStockQuantity = 0;
     let totalSaleValue = 0;
+    let totalPurchaseValue = 0;
+    
+    // Группируем остатки по supplier для модалки
+    const stockBySupplier = {};
     
     stocks.forEach(stock => {
       const quantity = stock.quantity || 0;
       const salePrice = stock?.expand?.product?.price || 0;
+      const costPrice = stock?.expand?.product?.cost || stock?.cost || 0;
       
       totalStockQuantity += quantity;
       totalSaleValue += salePrice * quantity;
+      totalPurchaseValue += costPrice * quantity;
+      
+      // Группируем по городу (supplier)
+      const supplierName = stock?.expand?.supplier?.name || 'Без города';
+      if (!stockBySupplier[supplierName]) {
+        stockBySupplier[supplierName] = { name: supplierName, count: 0, saleValue: 0, purchaseValue: 0 };
+      }
+      stockBySupplier[supplierName].count += quantity;
+      stockBySupplier[supplierName].saleValue += salePrice * quantity;
+      stockBySupplier[supplierName].purchaseValue += costPrice * quantity;
     });
     
-    // Получаем приемки для подсчета суммы закупа
+    const stockBreakdown = Object.values(stockBySupplier).sort((a, b) => b.count - a.count);
+    
+    // Получаем приемки для подсчета количества
     let receptionsFilter = '';
     if (filterId) {
       receptionsFilter = `supplier = "${filterId}"`;
@@ -529,18 +546,7 @@ export const getDashboardStats = async (filterId = null) => {
       expand: 'supplier,warehouse'
     }).catch(() => []);
     
-    let totalPurchaseValue = 0;
     let receptionsCount = receptions.length;
-    
-    receptions.forEach(reception => {
-      if (reception.items && Array.isArray(reception.items)) {
-        reception.items.forEach(item => {
-          const quantity = item.quantity || 0;
-          const purchasePrice = item.cost || item.purchase_price || item.price || 0;
-          totalPurchaseValue += purchasePrice * quantity;
-        });
-      }
-    });
     
     // Получаем товары с долгим сроком хранения (неликвид)
     const thirtyDaysAgo = new Date();
@@ -591,6 +597,7 @@ export const getDashboardStats = async (filterId = null) => {
       totalProducts: totalStockQuantity,
       totalSaleValue,
       totalPurchaseValue,
+      stockBreakdown,
       receptionsCount,
       staleProductsCount: staleProducts.length,
       staleProducts: staleProducts.slice(0, 10),
@@ -605,6 +612,7 @@ export const getDashboardStats = async (filterId = null) => {
       totalProducts: 0,
       totalSaleValue: 0,
       totalPurchaseValue: 0,
+      stockBreakdown: [],
       receptionsCount: 0,
       staleProductsCount: 0,
       staleProducts: [],

@@ -85,13 +85,13 @@ export default function StockDesktop() {
         const pB = getProduct(b);
 
         // Первичная сортировка — по категории всегда (для группировки)
-        const catA = Array.isArray(pA.category) ? pA.category[0] : (pA.category || '');
-        const catB = Array.isArray(pB.category) ? pB.category[0] : (pB.category || '');
+        const catA = (Array.isArray(pA?.category) ? pA.category[0] : (pA?.category || '')) || '';
+        const catB = (Array.isArray(pB?.category) ? pB.category[0] : (pB?.category || '')) || '';
         if (catA !== catB) return catA.localeCompare(catB);
 
         // Внутри категории — сортировка по подкатегории
-        const subA = pA.subcategory || detectSubcategory(pA.name);
-        const subB = pB.subcategory || detectSubcategory(pB.name);
+        const subA = (pA?.subcategory || detectSubcategory(pA?.name)) || '';
+        const subB = (pB?.subcategory || detectSubcategory(pB?.name)) || '';
         if (subA !== subB) return subA.localeCompare(subB);
 
         // Внутри подкатегории — по выбранному полю

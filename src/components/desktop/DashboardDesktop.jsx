@@ -9,6 +9,7 @@ export default function DashboardDesktop({ user }) {
     totalProducts: 0,
     totalSaleValue: 0,
     totalPurchaseValue: 0,
+    stockBreakdown: [],
     receptionsCount: 0,
     staleProductsCount: 0,
     staleProducts: [],
@@ -22,6 +23,7 @@ export default function DashboardDesktop({ user }) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [showStaleProducts, setShowStaleProducts] = useState(false);
+  const [showStockBreakdown, setShowStockBreakdown] = useState(false);
   const [salesData, setSalesData] = useState([]);
   
   const userRole = pb.authStore.model?.role;
@@ -162,9 +164,9 @@ export default function DashboardDesktop({ user }) {
       {/* Карточки статистики */}
       {isAdmin ? (
         <div className="grid grid-cols-2 lg:grid-cols-6 gap-3">
-          <StatCard icon={Package} label="Товаров на складе" value={`${stats.totalProducts.toLocaleString('ru-RU')} шт`} color="blue" />
-          <StatCard icon={ShoppingCart} label="Стоимость (продажа)" value={stats.totalSaleValue.toLocaleString('ru-RU')} color="green" />
-          <StatCard icon={TrendingUp} label="Стоимость (закуп)" value={stats.totalPurchaseValue.toLocaleString('ru-RU')} color="purple" />
+          <StatCard icon={Package} label="Товаров на складе" value={`${stats.totalProducts.toLocaleString('ru-RU')} шт`} color="blue" clickable onClick={() => setShowStockBreakdown(true)} />
+          <StatCard icon={ShoppingCart} label="Сумма продажи" value={stats.totalSaleValue.toLocaleString('ru-RU')} color="green" />
+          <StatCard icon={TrendingUp} label="Сумма закупа" value={stats.totalPurchaseValue.toLocaleString('ru-RU')} color="purple" />
           <StatCard icon={BarChart3} label="Маржа склада" value={margin.toLocaleString('ru-RU')} color={margin > 0 ? 'green' : 'orange'} />
           <StatCard icon={FileText} label="Приёмок за месяц" value={stats.receptionsCount} color="indigo" />
           <StatCard
@@ -178,7 +180,7 @@ export default function DashboardDesktop({ user }) {
         </div>
       ) : (
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-          <StatCard icon={Package} label="Товаров на складе" value={`${stats.totalProducts.toLocaleString('ru-RU')} шт`} color="blue" />
+          <StatCard icon={Package} label="Товаров на складе" value={`${stats.totalProducts.toLocaleString('ru-RU')} шт`} color="blue" clickable onClick={() => setShowStockBreakdown(true)} />
           <StatCard icon={Clock} label="Продаж за день" value={stats.salesDay.count} color="indigo" />
           <StatCard icon={Calendar} label="Продаж за неделю" value={stats.salesWeek.count} color="purple" />
           <StatCard icon={Calendar} label="Продаж за месяц" value={stats.salesMonth.count} color="orange" />
@@ -260,6 +262,39 @@ export default function DashboardDesktop({ user }) {
             <p className="text-xs text-gray-500 mb-1">За полгода</p>
             <p className="text-lg font-bold text-gray-900">{stats.salesHalfYear.count} <span className="text-xs font-normal text-gray-400">продаж</span></p>
             <p className="text-sm text-green-600">{(stats.salesHalfYear.totalAmount || 0).toLocaleString('ru-RU')}</p>
+          </div>
+        </div>
+      )}
+
+      {/* Модалка разбивки по складам */}
+      {showStockBreakdown && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50" onClick={() => setShowStockBreakdown(false)}>
+          <div className="bg-white rounded-lg p-6 max-w-md w-full mx-4" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-semibold text-gray-900">Товары по складам</h3>
+              <button onClick={() => setShowStockBreakdown(false)} className="text-gray-400 hover:text-gray-600">✕</button>
+            </div>
+            <div className="space-y-2">
+              {(stats.stockBreakdown || []).length === 0 ? (
+                <p className="text-gray-500 text-sm">Нет данных</p>
+              ) : (
+                (stats.stockBreakdown || []).map((item, idx) => (
+                  <div key={idx} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                    <span className="font-medium text-gray-900">{item.name}</span>
+                    <div className="text-right">
+                      <p className="font-semibold text-gray-900">{item.count.toLocaleString('ru-RU')} шт</p>
+                      {isAdmin && (
+                        <p className="text-xs text-gray-500">Продажа: {item.saleValue.toLocaleString('ru-RU')} | Закуп: {item.purchaseValue.toLocaleString('ru-RU')}</p>
+                      )}
+                    </div>
+                  </div>
+                ))
+              )}
+              <div className="border-t pt-2 mt-2 flex justify-between font-semibold text-gray-900">
+                <span>Итого</span>
+                <span>{stats.totalProducts.toLocaleString('ru-RU')} шт</span>
+              </div>
+            </div>
           </div>
         </div>
       )}
