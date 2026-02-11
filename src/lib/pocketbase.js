@@ -8,11 +8,16 @@ if (!pbUrl) {
   const isLocalNetwork = window.location.hostname.startsWith('192.168.') || 
                          window.location.hostname.startsWith('10.') ||
                          window.location.hostname.startsWith('172.');
+  const isHTTPS = window.location.protocol === 'https:';
 
   if (isLocalhost) {
     pbUrl = 'http://localhost:8090';
   } else if (isLocalNetwork) {
     pbUrl = 'http://192.168.1.4:8090';
+  } else if (isHTTPS) {
+    // На HTTPS используем тот же origin — запросы пойдут через Vite proxy
+    // /api/* → http://127.0.0.1:8090/api/*  (без mixed content)
+    pbUrl = window.location.origin;
   } else {
     pbUrl = 'http://146.103.121.96:8090';
   }
