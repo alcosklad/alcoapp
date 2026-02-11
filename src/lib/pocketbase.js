@@ -947,7 +947,7 @@ export const updateUser = async (userId, data) => {
     const record = await pb.collection('users').update(userId, updateData);
     return record;
   } catch (error) {
-    console.error('PocketBase: Error updating user:', error);
+    console.error('PocketBase: Error updating user:', error?.data || error);
     throw error;
   }
 };

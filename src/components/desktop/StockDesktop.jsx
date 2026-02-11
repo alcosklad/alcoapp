@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { Search, ChevronUp, ChevronDown, RefreshCw, MapPin, X } from 'lucide-react';
-import { getStocksAggregated, getSuppliers } from '../../lib/pocketbase';
+import { Search, ChevronUp, ChevronDown, RefreshCw, MapPin, X, Plus, Edit2, Check } from 'lucide-react';
+import { getStocksAggregated, getSuppliers, getProducts, updateProduct, createProduct } from '../../lib/pocketbase';
 import { detectSubcategory } from '../../lib/subcategories';
 import pb from '../../lib/pocketbase';
 
@@ -14,6 +14,11 @@ export default function StockDesktop() {
   const [sortField, setSortField] = useState('name');
   const [sortDir, setSortDir] = useState('asc');
   const [cityModal, setCityModal] = useState(null);
+  const [showEditModal, setShowEditModal] = useState(false);
+  const [editModalProduct, setEditModalProduct] = useState(null);
+  const [editModalForm, setEditModalForm] = useState({ name: '', article: '', category: '', subcategory: '', cost: 0, price: 0 });
+  const [editModalSaving, setEditModalSaving] = useState(false);
+  const [editModalError, setEditModalError] = useState('');
 
   const userRole = pb.authStore.model?.role;
   const isAdmin = userRole === 'admin';
@@ -57,14 +62,83 @@ export default function StockDesktop() {
     }
   };
 
+  // Хелпер для получения данных продукта
+  const getProduct = (stock) => stock?.expand?.product || stock?.product || {};
+
+  // Категории для select в модалке
+  const allCategories = useMemo(() => {
+    const cats = new Set();
+    stocks.forEach(s => {
+      const p = getProduct(s);
+      const c = Array.isArray(p?.category) ? p.category[0] : p?.category;
+      if (c) cats.add(c);
+    });
+    return [...cats].sort();
+  }, [stocks]);
+
+  const openEditModal = (product) => {
+    setEditModalProduct(product);
+    setEditModalForm({
+      name: product.name || '',
+      article: product.article || '',
+      category: (Array.isArray(product.category) ? product.category[0] : product.category) || '',
+      subcategory: product.subcategory || '',
+      cost: product.cost || 0,
+      price: product.price || 0,
+    });
+    setEditModalError('');
+    setShowEditModal(true);
+  };
+
+  const openCreateModal = () => {
+    setEditModalProduct(null);
+    setEditModalForm({ name: '', article: '', category: '', subcategory: '', cost: 0, price: 0 });
+    setEditModalError('');
+    setShowEditModal(true);
+  };
+
+  const closeEditModal = () => {
+    setShowEditModal(false);
+    setEditModalProduct(null);
+    setEditModalError('');
+  };
+
+  const saveEditModal = async () => {
+    if (!editModalForm.name.trim()) {
+      setEditModalError('Введите название товара');
+      return;
+    }
+    setEditModalSaving(true);
+    setEditModalError('');
+    try {
+      const data = {
+        name: editModalForm.name.trim(),
+        article: editModalForm.article.trim(),
+        category: editModalForm.category ? [editModalForm.category] : [],
+        subcategory: editModalForm.subcategory || detectSubcategory(editModalForm.name),
+        cost: Number(editModalForm.cost) || 0,
+        price: Number(editModalForm.price) || 0,
+      };
+      if (editModalProduct) {
+        await updateProduct(editModalProduct.id, data);
+      } else {
+        await createProduct(data);
+      }
+      closeEditModal();
+      loadStocks();
+    } catch (err) {
+      console.error('Error saving product:', err);
+      setEditModalError('Ошибка сохранения: ' + (err?.message || ''));
+    } finally {
+      setEditModalSaving(false);
+    }
+  };
+
   // Получаем уникальные категории (category — массив в PocketBase)
   const categories = [...new Set(stocks.map(stock => {
     const cat = stock?.expand?.product?.category || stock?.product?.category || '';
     return Array.isArray(cat) ? cat[0] : cat;
   }).filter(Boolean))].sort();
-
-  // Хелпер для получения данных продукта
-  const getProduct = (stock) => stock?.expand?.product || stock?.product || {};
 
   // Фильтрация и сортировка данных
   const filteredStocks = useMemo(() => {
@@ -215,6 +289,16 @@ export default function StockDesktop() {
           <RefreshCw size={16} className={loading ? 'animate-spin' : ''} />
         </button>
 
+        {isAdmin && (
+          <button
+            onClick={openCreateModal}
+            className="flex items-center gap-1.5 px-3 py-1 bg-blue-600 text-white rounded text-xs hover:bg-blue-700 transition-colors"
+          >
+            <Plus size={14} />
+            Добавить товар
+          </button>
+        )}
+
         <span className="text-xs text-gray-500 ml-auto">
           Найдено: {filteredStocks.length}
         </span>
@@ -356,7 +440,10 @@ export default function StockDesktop() {
                               </td>
                             </tr>
                           )}
-                          <tr className="border-b border-gray-100 hover:bg-gray-50">
+                          <tr 
+                            className="border-b border-gray-100 hover:bg-gray-50 cursor-pointer"
+                            onDoubleClick={() => isAdmin && openEditModal(product)}
+                          >
                             <td className="px-2 py-1.5 font-mono text-xs text-gray-500 w-[70px] max-w-[70px] truncate">
                               {product.article || '—'}
                             </td>
@@ -453,6 +540,109 @@ export default function StockDesktop() {
                   <span className="text-sm font-medium text-gray-900">{city.quantity} шт</span>
                 </div>
               ))}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Модалка редактирования/создания товара */}
+      {showEditModal && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50" onClick={closeEditModal}>
+          <div className="bg-white rounded-xl max-w-md w-full mx-4" onClick={e => e.stopPropagation()}>
+            <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200">
+              <h3 className="text-lg font-semibold text-gray-900">
+                {editModalProduct ? 'Редактировать товар' : 'Новый товар'}
+              </h3>
+              <button onClick={closeEditModal} className="p-1 hover:bg-gray-100 rounded">
+                <X size={20} className="text-gray-500" />
+              </button>
+            </div>
+            <div className="p-6 space-y-4">
+              {editModalError && (
+                <div className="bg-red-50 text-red-600 p-3 rounded-lg text-sm">{editModalError}</div>
+              )}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Название</label>
+                <input
+                  type="text"
+                  value={editModalForm.name}
+                  onChange={e => setEditModalForm({...editModalForm, name: e.target.value})}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  placeholder="Название товара"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Артикул</label>
+                <input
+                  type="text"
+                  value={editModalForm.article}
+                  onChange={e => setEditModalForm({...editModalForm, article: e.target.value})}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  placeholder="Артикул"
+                />
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Категория</label>
+                  <select
+                    value={editModalForm.category}
+                    onChange={e => setEditModalForm({...editModalForm, category: e.target.value})}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  >
+                    <option value="">Не указана</option>
+                    {allCategories.map(c => (
+                      <option key={c} value={c}>{c}</option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Подкатегория</label>
+                  <input
+                    type="text"
+                    value={editModalForm.subcategory}
+                    onChange={e => setEditModalForm({...editModalForm, subcategory: e.target.value})}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    placeholder="Подкатегория"
+                  />
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Закуп</label>
+                  <input
+                    type="number"
+                    value={editModalForm.cost}
+                    onChange={e => setEditModalForm({...editModalForm, cost: e.target.value})}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Продажа</label>
+                  <input
+                    type="number"
+                    value={editModalForm.price}
+                    onChange={e => setEditModalForm({...editModalForm, price: e.target.value})}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  />
+                </div>
+              </div>
+            </div>
+            <div className="flex items-center justify-end gap-3 px-6 py-4 border-t border-gray-200 bg-gray-50 rounded-b-xl">
+              <button onClick={closeEditModal} className="px-4 py-2 text-sm text-gray-600 hover:bg-gray-100 rounded-lg">
+                Отмена
+              </button>
+              <button
+                onClick={saveEditModal}
+                disabled={editModalSaving}
+                className="px-4 py-2 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 flex items-center gap-2"
+              >
+                {editModalSaving ? (
+                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                ) : (
+                  <Check size={16} />
+                )}
+                {editModalProduct ? 'Сохранить' : 'Создать'}
+              </button>
             </div>
           </div>
         </div>
