@@ -57,10 +57,11 @@ export default function StockDesktop() {
     }
   };
 
-  // Получаем уникальные категории
-  const categories = [...new Set(stocks.map(stock => 
-    stock?.expand?.product?.category || stock?.product?.category || ''
-  ).filter(Boolean))].sort();
+  // Получаем уникальные категории (category — массив в PocketBase)
+  const categories = [...new Set(stocks.map(stock => {
+    const cat = stock?.expand?.product?.category || stock?.product?.category || '';
+    return Array.isArray(cat) ? cat[0] : cat;
+  }).filter(Boolean))].sort();
 
   // Хелпер для получения данных продукта
   const getProduct = (stock) => stock?.expand?.product || stock?.product || {};
