@@ -153,6 +153,47 @@ export const deleteProduct = async (id) => {
   }
 };
 
+// CRUD для stocks (раздел Остатки)
+export const createStockRecord = async (data) => {
+  try {
+    return await pb.collection('stocks').create(data);
+  } catch (error) {
+    console.error('PocketBase: Error creating stock record:', error);
+    throw error;
+  }
+};
+
+export const updateStockRecord = async (id, data) => {
+  try {
+    return await pb.collection('stocks').update(id, data);
+  } catch (error) {
+    console.error('PocketBase: Error updating stock record:', error);
+    throw error;
+  }
+};
+
+export const deleteStockRecord = async (id) => {
+  try {
+    await pb.collection('stocks').delete(id);
+    return true;
+  } catch (error) {
+    console.error('PocketBase: Error deleting stock record:', error);
+    throw error;
+  }
+};
+
+export const getStocksForProduct = async (productId) => {
+  try {
+    return await pb.collection('stocks').getFullList({
+      filter: `product = "${productId}"`,
+      expand: 'supplier'
+    });
+  } catch (error) {
+    console.error('PocketBase: Error loading stocks for product:', error);
+    return [];
+  }
+};
+
 // Функции для работы с приемками
 export const createReception = async (data) => {
   try {

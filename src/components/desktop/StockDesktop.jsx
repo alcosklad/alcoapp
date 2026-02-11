@@ -1,12 +1,13 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { Search, ChevronUp, ChevronDown, RefreshCw, MapPin, X, Plus, Edit2, Check } from 'lucide-react';
-import { getStocksAggregated, getSuppliers, getProducts, updateProduct, createProduct } from '../../lib/pocketbase';
-import { detectSubcategory } from '../../lib/subcategories';
+import { Search, ChevronUp, ChevronDown, RefreshCw, MapPin, X, Plus, Trash2, Check } from 'lucide-react';
+import { getStocksAggregated, getSuppliers, getProducts, updateProduct, createStockRecord, deleteStockRecord, updateStockRecord } from '../../lib/pocketbase';
+import { detectSubcategory, ALL_SUBCATEGORIES } from '../../lib/subcategories';
 import pb from '../../lib/pocketbase';
 
 export default function StockDesktop() {
   const [stocks, setStocks] = useState([]);
   const [suppliers, setSuppliers] = useState([]);
+  const [allProducts, setAllProducts] = useState([]);
   const [selectedSupplier, setSelectedSupplier] = useState('');
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
@@ -14,11 +15,22 @@ export default function StockDesktop() {
   const [sortField, setSortField] = useState('name');
   const [sortDir, setSortDir] = useState('asc');
   const [cityModal, setCityModal] = useState(null);
+
+  // Модалка редактирования (двойной клик)
   const [showEditModal, setShowEditModal] = useState(false);
-  const [editModalProduct, setEditModalProduct] = useState(null);
-  const [editModalForm, setEditModalForm] = useState({ name: '', article: '', category: '', subcategory: '', cost: 0, price: 0 });
-  const [editModalSaving, setEditModalSaving] = useState(false);
-  const [editModalError, setEditModalError] = useState('');
+  const [editStock, setEditStock] = useState(null); // stock row (aggregated)
+  const [editProduct, setEditProduct] = useState(null); // product data
+  const [editForm, setEditForm] = useState({ name: '', article: '', category: '', subcategory: '', cost: 0, price: 0 });
+  const [editCities, setEditCities] = useState([]); // [{stockId, supplierId, supplierName, quantity}]
+  const [editSaving, setEditSaving] = useState(false);
+  const [editError, setEditError] = useState('');
+
+  // Модалка создания остатка
+  const [showCreateModal, setShowCreateModal] = useState(false);
+  const [createForm, setCreateForm] = useState({ productId: '', supplierId: '', quantity: 1 });
+  const [createSearch, setCreateSearch] = useState('');
+  const [createSaving, setCreateSaving] = useState(false);
+  const [createError, setCreateError] = useState('');
 
   const userRole = pb.authStore.model?.role;
   const isAdmin = userRole === 'admin';
@@ -26,6 +38,7 @@ export default function StockDesktop() {
   useEffect(() => {
     loadSuppliers();
     loadStocks();
+    loadAllProducts();
   }, []);
 
   useEffect(() => {
@@ -53,6 +66,15 @@ export default function StockDesktop() {
     }
   };
 
+  const loadAllProducts = async () => {
+    try {
+      const data = await getProducts().catch(() => []);
+      setAllProducts(data || []);
+    } catch (error) {
+      console.error('Error loading products:', error);
+    }
+  };
+
   const handleSort = (field) => {
     if (sortField === field) {
       setSortDir(sortDir === 'asc' ? 'desc' : 'asc');
@@ -65,7 +87,7 @@ export default function StockDesktop() {
   // Хелпер для получения данных продукта
   const getProduct = (stock) => stock?.expand?.product || stock?.product || {};
 
-  // Категории для select в модалке
+  // Категории для фильтра
   const allCategories = useMemo(() => {
     const cats = new Set();
     stocks.forEach(s => {
@@ -76,9 +98,22 @@ export default function StockDesktop() {
     return [...cats].sort();
   }, [stocks]);
 
-  const openEditModal = (product) => {
-    setEditModalProduct(product);
-    setEditModalForm({
+  // Подкатегории для select
+  const allSubcategories = useMemo(() => {
+    const subs = new Set(ALL_SUBCATEGORIES);
+    stocks.forEach(s => {
+      const p = getProduct(s);
+      if (p?.subcategory) subs.add(p.subcategory);
+    });
+    return [...subs].sort();
+  }, [stocks]);
+
+  // === EDIT MODAL (двойной клик) ===
+  const openEditModal = (stock) => {
+    const product = getProduct(stock);
+    setEditStock(stock);
+    setEditProduct(product);
+    setEditForm({
       name: product.name || '',
       article: product.article || '',
       category: (Array.isArray(product.category) ? product.category[0] : product.category) || '',
@@ -86,51 +121,182 @@ export default function StockDesktop() {
       cost: product.cost || 0,
       price: product.price || 0,
     });
-    setEditModalError('');
-    setShowEditModal(true);
-  };
-
-  const openCreateModal = () => {
-    setEditModalProduct(null);
-    setEditModalForm({ name: '', article: '', category: '', subcategory: '', cost: 0, price: 0 });
-    setEditModalError('');
+    // Города: если агрегировано — из _cityBreakdown, если нет — одна запись
+    if (stock._cityBreakdown && stock._cityBreakdown.length > 0) {
+      setEditCities(stock._cityBreakdown.map(c => ({
+        stockId: null, // мы не храним stockId в breakdown, поищем потом
+        supplierId: c.supplierId,
+        supplierName: c.supplierName,
+        quantity: c.quantity,
+      })));
+    } else {
+      setEditCities([{
+        stockId: stock.id,
+        supplierId: stock.supplier,
+        supplierName: stock.expand?.supplier?.name || '—',
+        quantity: stock.quantity || 0,
+      }]);
+    }
+    setEditError('');
     setShowEditModal(true);
   };
 
   const closeEditModal = () => {
     setShowEditModal(false);
-    setEditModalProduct(null);
-    setEditModalError('');
+    setEditStock(null);
+    setEditProduct(null);
+    setEditError('');
   };
 
   const saveEditModal = async () => {
-    if (!editModalForm.name.trim()) {
-      setEditModalError('Введите название товара');
+    if (!editForm.name.trim()) {
+      setEditError('Введите название товара');
       return;
     }
-    setEditModalSaving(true);
-    setEditModalError('');
+    setEditSaving(true);
+    setEditError('');
     try {
-      const data = {
-        name: editModalForm.name.trim(),
-        article: editModalForm.article.trim(),
-        category: editModalForm.category ? [editModalForm.category] : [],
-        subcategory: editModalForm.subcategory || detectSubcategory(editModalForm.name),
-        cost: Number(editModalForm.cost) || 0,
-        price: Number(editModalForm.price) || 0,
-      };
-      if (editModalProduct) {
-        await updateProduct(editModalProduct.id, data);
-      } else {
-        await createProduct(data);
+      // Сохраняем данные продукта
+      const productId = editProduct?.id;
+      if (productId) {
+        await updateProduct(productId, {
+          name: editForm.name.trim(),
+          article: editForm.article.trim(),
+          category: editForm.category ? [editForm.category] : [],
+          subcategory: editForm.subcategory || detectSubcategory(editForm.name),
+          cost: Number(editForm.cost) || 0,
+          price: Number(editForm.price) || 0,
+        });
       }
       closeEditModal();
       loadStocks();
+      loadAllProducts();
     } catch (err) {
-      console.error('Error saving product:', err);
-      setEditModalError('Ошибка сохранения: ' + (err?.message || ''));
+      console.error('Error saving:', err);
+      setEditError('Ошибка сохранения: ' + (err?.message || ''));
     } finally {
-      setEditModalSaving(false);
+      setEditSaving(false);
+    }
+  };
+
+  const handleDeleteCity = async (cityEntry) => {
+    // Найти stock record по product + supplier и удалить
+    const productId = editProduct?.id;
+    if (!productId) return;
+    if (!window.confirm(`Удалить остаток в "${cityEntry.supplierName}"?`)) return;
+    try {
+      // Ищем точный stock record
+      const stockRecord = await pb.collection('stocks').getFirstListItem(
+        `product = "${productId}" && supplier = "${cityEntry.supplierId}"`
+      ).catch(() => null);
+      if (stockRecord) {
+        await deleteStockRecord(stockRecord.id);
+        setEditCities(prev => prev.filter(c => c.supplierId !== cityEntry.supplierId));
+        // Если больше нет городов — закрываем модалку
+        if (editCities.length <= 1) {
+          closeEditModal();
+        }
+        loadStocks();
+      }
+    } catch (err) {
+      console.error('Error deleting stock:', err);
+      setEditError('Ошибка удаления: ' + (err?.message || ''));
+    }
+  };
+
+  const handleUpdateCityQty = async (cityEntry, newQty) => {
+    const productId = editProduct?.id;
+    if (!productId) return;
+    try {
+      const stockRecord = await pb.collection('stocks').getFirstListItem(
+        `product = "${productId}" && supplier = "${cityEntry.supplierId}"`
+      ).catch(() => null);
+      if (stockRecord) {
+        await updateStockRecord(stockRecord.id, { quantity: Number(newQty) || 0 });
+        setEditCities(prev => prev.map(c =>
+          c.supplierId === cityEntry.supplierId ? { ...c, quantity: Number(newQty) || 0 } : c
+        ));
+      }
+    } catch (err) {
+      console.error('Error updating stock qty:', err);
+    }
+  };
+
+  const handleAddCity = async (supplierId) => {
+    const productId = editProduct?.id;
+    if (!productId || !supplierId) return;
+    // Проверяем что такого города ещё нет
+    if (editCities.some(c => c.supplierId === supplierId)) {
+      setEditError('Этот город уже добавлен');
+      return;
+    }
+    try {
+      await createStockRecord({
+        product: productId,
+        supplier: supplierId,
+        quantity: 1,
+      });
+      const sup = suppliers.find(s => s.id === supplierId);
+      setEditCities(prev => [...prev, {
+        stockId: null,
+        supplierId,
+        supplierName: sup?.name || '—',
+        quantity: 1,
+      }]);
+      loadStocks();
+    } catch (err) {
+      console.error('Error adding city:', err);
+      setEditError('Ошибка добавления: ' + (err?.message || ''));
+    }
+  };
+
+  // === CREATE MODAL ===
+  const openCreateModal = () => {
+    setCreateForm({ productId: '', supplierId: '', quantity: 1 });
+    setCreateSearch('');
+    setCreateError('');
+    setShowCreateModal(true);
+  };
+
+  const closeCreateModal = () => {
+    setShowCreateModal(false);
+    setCreateError('');
+  };
+
+  const filteredCreateProducts = useMemo(() => {
+    if (!createSearch.trim()) return allProducts.slice(0, 50);
+    const q = createSearch.toLowerCase();
+    return allProducts.filter(p => (p.name || '').toLowerCase().includes(q)).slice(0, 50);
+  }, [allProducts, createSearch]);
+
+  const saveCreateModal = async () => {
+    if (!createForm.productId) {
+      setCreateError('Выберите товар');
+      return;
+    }
+    if (!createForm.supplierId) {
+      setCreateError('Выберите город');
+      return;
+    }
+    if (!createForm.quantity || createForm.quantity <= 0) {
+      setCreateError('Укажите количество');
+      return;
+    }
+    setCreateSaving(true);
+    setCreateError('');
+    try {
+      await createStockRecord({
+        product: createForm.productId,
+        supplier: createForm.supplierId,
+        quantity: Number(createForm.quantity),
+      });
+      closeCreateModal();
+      loadStocks();
+    } catch (err) {
+      console.error('Error creating stock:', err);
+      setCreateError('Ошибка создания: ' + (err?.message || ''));
+    } finally {
+      setCreateSaving(false);
     }
   };
 
@@ -159,17 +325,14 @@ export default function StockDesktop() {
         const pA = getProduct(a);
         const pB = getProduct(b);
 
-        // Первичная сортировка — по категории всегда (для группировки)
         const catA = (Array.isArray(pA?.category) ? pA.category[0] : (pA?.category || '')) || '';
         const catB = (Array.isArray(pB?.category) ? pB.category[0] : (pB?.category || '')) || '';
         if (catA !== catB) return catA.localeCompare(catB);
 
-        // Внутри категории — сортировка по подкатегории
         const subA = (pA?.subcategory || detectSubcategory(pA?.name)) || '';
         const subB = (pB?.subcategory || detectSubcategory(pB?.name)) || '';
         if (subA !== subB) return subA.localeCompare(subB);
 
-        // Внутри подкатегории — по выбранному полю
         let aVal, bVal;
         switch (sortField) {
           case 'name':
@@ -233,7 +396,6 @@ export default function StockDesktop() {
   }, 0);
   const totalMargin = totalSaleValue - totalCostValue;
 
-  // Кол-во колонок зависит от роли
   const colCount = isAdmin ? 10 : 7;
 
   return (
@@ -295,7 +457,7 @@ export default function StockDesktop() {
             className="flex items-center gap-1.5 px-3 py-1 bg-blue-600 text-white rounded text-xs hover:bg-blue-700 transition-colors"
           >
             <Plus size={14} />
-            Добавить товар
+            Добавить на склад
           </button>
         )}
 
@@ -310,77 +472,35 @@ export default function StockDesktop() {
           <table className="w-full text-xs">
             <thead>
               <tr className="bg-gray-50 border-b border-gray-200">
-                <th 
-                  className="text-left px-2 py-2 font-medium text-gray-600 cursor-pointer hover:bg-gray-100 w-[70px] max-w-[70px]"
-                  onClick={() => handleSort('article')}
-                >
-                  <div className="flex items-center gap-1">
-                    Арт. <SortIcon field="article" />
-                  </div>
+                <th className="text-left px-2 py-2 font-medium text-gray-600 cursor-pointer hover:bg-gray-100 w-[70px] max-w-[70px]" onClick={() => handleSort('article')}>
+                  <div className="flex items-center gap-1">Арт. <SortIcon field="article" /></div>
                 </th>
-                <th 
-                  className="text-left px-3 py-2 font-medium text-gray-600 cursor-pointer hover:bg-gray-100"
-                  onClick={() => handleSort('name')}
-                >
-                  <div className="flex items-center gap-1">
-                    Наименование <SortIcon field="name" />
-                  </div>
+                <th className="text-left px-3 py-2 font-medium text-gray-600 cursor-pointer hover:bg-gray-100" onClick={() => handleSort('name')}>
+                  <div className="flex items-center gap-1">Наименование <SortIcon field="name" /></div>
                 </th>
-                <th className="text-left px-2 py-2 font-medium text-gray-600">
-                  Подкатегория
+                <th className="text-left px-2 py-2 font-medium text-gray-600">Подкатегория</th>
+                <th className="text-left px-2 py-2 font-medium text-gray-600 cursor-pointer hover:bg-gray-100" onClick={() => handleSort('volume')}>
+                  <div className="flex items-center gap-1">Объём <SortIcon field="volume" /></div>
                 </th>
-                <th 
-                  className="text-left px-2 py-2 font-medium text-gray-600 cursor-pointer hover:bg-gray-100"
-                  onClick={() => handleSort('volume')}
-                >
-                  <div className="flex items-center gap-1">
-                    Объём <SortIcon field="volume" />
-                  </div>
-                </th>
-                <th 
-                  className="text-right px-3 py-2 font-medium text-gray-600 cursor-pointer hover:bg-gray-100"
-                  onClick={() => handleSort('quantity')}
-                >
-                  <div className="flex items-center justify-end gap-1">
-                    Остаток <SortIcon field="quantity" />
-                  </div>
+                <th className="text-right px-3 py-2 font-medium text-gray-600 cursor-pointer hover:bg-gray-100" onClick={() => handleSort('quantity')}>
+                  <div className="flex items-center justify-end gap-1">Остаток <SortIcon field="quantity" /></div>
                 </th>
                 {isAdmin && (
-                  <th 
-                    className="text-right px-3 py-2 font-medium text-gray-600 cursor-pointer hover:bg-gray-100"
-                    onClick={() => handleSort('purchasePrice')}
-                  >
-                    <div className="flex items-center justify-end gap-1">
-                      Закуп <SortIcon field="purchasePrice" />
-                    </div>
+                  <th className="text-right px-3 py-2 font-medium text-gray-600 cursor-pointer hover:bg-gray-100" onClick={() => handleSort('purchasePrice')}>
+                    <div className="flex items-center justify-end gap-1">Закуп <SortIcon field="purchasePrice" /></div>
                   </th>
                 )}
-                <th 
-                  className="text-right px-3 py-2 font-medium text-gray-600 cursor-pointer hover:bg-gray-100"
-                  onClick={() => handleSort('price')}
-                >
-                  <div className="flex items-center justify-end gap-1">
-                    Продажа <SortIcon field="price" />
-                  </div>
+                <th className="text-right px-3 py-2 font-medium text-gray-600 cursor-pointer hover:bg-gray-100" onClick={() => handleSort('price')}>
+                  <div className="flex items-center justify-end gap-1">Продажа <SortIcon field="price" /></div>
                 </th>
                 {isAdmin && (
-                  <th 
-                    className="text-right px-3 py-2 font-medium text-gray-600 cursor-pointer hover:bg-gray-100"
-                    onClick={() => handleSort('margin')}
-                  >
-                    <div className="flex items-center justify-end gap-1">
-                      Маржа <SortIcon field="margin" />
-                    </div>
+                  <th className="text-right px-3 py-2 font-medium text-gray-600 cursor-pointer hover:bg-gray-100" onClick={() => handleSort('margin')}>
+                    <div className="flex items-center justify-end gap-1">Маржа <SortIcon field="margin" /></div>
                   </th>
                 )}
                 {isAdmin && (
-                  <th 
-                    className="text-right px-3 py-2 font-medium text-gray-600 cursor-pointer hover:bg-gray-100"
-                    onClick={() => handleSort('stockValue')}
-                  >
-                    <div className="flex items-center justify-end gap-1">
-                      Сумма <SortIcon field="stockValue" />
-                    </div>
+                  <th className="text-right px-3 py-2 font-medium text-gray-600 cursor-pointer hover:bg-gray-100" onClick={() => handleSort('stockValue')}>
+                    <div className="flex items-center justify-end gap-1">Сумма <SortIcon field="stockValue" /></div>
                   </th>
                 )}
               </tr>
@@ -390,8 +510,7 @@ export default function StockDesktop() {
                 <tr>
                   <td colSpan={colCount} className="px-3 py-6 text-center text-gray-500">
                     <div className="flex items-center justify-center gap-2">
-                      <RefreshCw size={14} className="animate-spin" />
-                      Загрузка...
+                      <RefreshCw size={14} className="animate-spin" /> Загрузка...
                     </div>
                   </td>
                 </tr>
@@ -428,40 +547,29 @@ export default function StockDesktop() {
                         <React.Fragment key={stock.id}>
                           {showCategoryHeader && category && (
                             <tr className="bg-blue-50 border-y border-blue-200">
-                              <td colSpan={colCount} className="px-3 py-1.5 font-semibold text-blue-800 text-xs sticky top-0">
-                                {category}
-                              </td>
+                              <td colSpan={colCount} className="px-3 py-1.5 font-semibold text-blue-800 text-xs sticky top-0">{category}</td>
                             </tr>
                           )}
                           {showSubcategoryHeader && subcategory && (
                             <tr className="bg-gray-50 border-y border-gray-200">
-                              <td colSpan={colCount} className="px-6 py-1 font-medium text-gray-600 text-xs">
-                                {subcategory}
-                              </td>
+                              <td colSpan={colCount} className="px-6 py-1 font-medium text-gray-600 text-xs">{subcategory}</td>
                             </tr>
                           )}
-                          <tr 
+                          <tr
                             className="border-b border-gray-100 hover:bg-gray-50 cursor-pointer"
-                            onDoubleClick={() => isAdmin && openEditModal(product)}
+                            onDoubleClick={() => isAdmin && openEditModal(stock)}
+                            title={isAdmin ? 'Двойной клик для редактирования' : ''}
                           >
-                            <td className="px-2 py-1.5 font-mono text-xs text-gray-500 w-[70px] max-w-[70px] truncate">
-                              {product.article || '—'}
-                            </td>
-                            <td className="px-3 py-1.5">
-                              {product.name || 'Без названия'}
-                            </td>
-                            <td className="px-2 py-1.5 text-gray-500 text-xs">
-                              {subcategory || '—'}
-                            </td>
-                            <td className="px-2 py-1.5 text-gray-600">
-                              {product.volume || '—'}
-                            </td>
+                            <td className="px-2 py-1.5 font-mono text-xs text-gray-500 w-[70px] max-w-[70px] truncate">{product.article || '—'}</td>
+                            <td className="px-3 py-1.5">{product.name || 'Без названия'}</td>
+                            <td className="px-2 py-1.5 text-gray-500 text-xs">{subcategory || '—'}</td>
+                            <td className="px-2 py-1.5 text-gray-600">{product.volume || '—'}</td>
                             <td className={`px-3 py-1.5 text-right font-medium ${quantity < 3 ? 'text-red-600' : ''}`}>
                               <span className="inline-flex items-center gap-1">
                                 {quantity} шт
                                 {hasCityBreakdown && (
                                   <button
-                                    onClick={() => setCityModal({ product, breakdown: stock._cityBreakdown, totalQty: quantity })}
+                                    onClick={(e) => { e.stopPropagation(); setCityModal({ product, breakdown: stock._cityBreakdown, totalQty: quantity }); }}
                                     className="text-blue-400 hover:text-blue-600"
                                     title="Наличие в городах"
                                   >
@@ -470,43 +578,22 @@ export default function StockDesktop() {
                                 )}
                               </span>
                             </td>
-                            {isAdmin && (
-                              <td className="px-3 py-1.5 text-right text-gray-600">
-                                {cost.toLocaleString('ru-RU')}
-                              </td>
-                            )}
-                            <td className="px-3 py-1.5 text-right font-medium">
-                              {price.toLocaleString('ru-RU')}
-                            </td>
-                            {isAdmin && (
-                              <td className={`px-3 py-1.5 text-right font-medium ${margin > 0 ? 'text-green-600' : 'text-red-600'}`}>
-                                {margin.toLocaleString('ru-RU')}
-                              </td>
-                            )}
-                            {isAdmin && (
-                              <td className="px-3 py-1.5 text-right font-medium">
-                                {stockValue.toLocaleString('ru-RU')}
-                              </td>
-                            )}
+                            {isAdmin && <td className="px-3 py-1.5 text-right text-gray-600">{cost.toLocaleString('ru-RU')}</td>}
+                            <td className="px-3 py-1.5 text-right font-medium">{price.toLocaleString('ru-RU')}</td>
+                            {isAdmin && <td className={`px-3 py-1.5 text-right font-medium ${margin > 0 ? 'text-green-600' : 'text-red-600'}`}>{margin.toLocaleString('ru-RU')}</td>}
+                            {isAdmin && <td className="px-3 py-1.5 text-right font-medium">{stockValue.toLocaleString('ru-RU')}</td>}
                           </tr>
                         </React.Fragment>
                       );
                     });
                   })()}
-                  {/* Строка итогов */}
                   <tr className="bg-gray-100 border-t-2 border-gray-300 font-semibold text-xs">
                     <td colSpan={4} className="px-3 py-2 text-right text-gray-700">Итого:</td>
                     <td className="px-3 py-2 text-right text-gray-900">{totalQuantity} шт</td>
-                    {isAdmin && (
-                      <td className="px-3 py-2 text-right text-gray-600">{totalCostValue.toLocaleString('ru-RU')}</td>
-                    )}
+                    {isAdmin && <td className="px-3 py-2 text-right text-gray-600">{totalCostValue.toLocaleString('ru-RU')}</td>}
                     <td className="px-3 py-2 text-right text-gray-900">{totalSaleValue.toLocaleString('ru-RU')}</td>
-                    {isAdmin && (
-                      <td className={`px-3 py-2 text-right ${totalMargin > 0 ? 'text-green-700' : 'text-red-700'}`}>{totalMargin.toLocaleString('ru-RU')}</td>
-                    )}
-                    {isAdmin && (
-                      <td className="px-3 py-2 text-right text-gray-900">{totalSaleValue.toLocaleString('ru-RU')}</td>
-                    )}
+                    {isAdmin && <td className={`px-3 py-2 text-right ${totalMargin > 0 ? 'text-green-700' : 'text-red-700'}`}>{totalMargin.toLocaleString('ru-RU')}</td>}
+                    {isAdmin && <td className="px-3 py-2 text-right text-gray-900">{totalSaleValue.toLocaleString('ru-RU')}</td>}
                   </tr>
                 </>
               )}
@@ -545,103 +632,184 @@ export default function StockDesktop() {
         </div>
       )}
 
-      {/* Модалка редактирования/создания товара */}
-      {showEditModal && (
+      {/* Модалка: редактирование товара + остатки по городам */}
+      {showEditModal && editProduct && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50" onClick={closeEditModal}>
-          <div className="bg-white rounded-xl max-w-md w-full mx-4" onClick={e => e.stopPropagation()}>
+          <div className="bg-white rounded-xl max-w-lg w-full mx-4 max-h-[90vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
             <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200">
-              <h3 className="text-lg font-semibold text-gray-900">
-                {editModalProduct ? 'Редактировать товар' : 'Новый товар'}
-              </h3>
+              <h3 className="text-lg font-semibold text-gray-900">Редактировать товар</h3>
               <button onClick={closeEditModal} className="p-1 hover:bg-gray-100 rounded">
                 <X size={20} className="text-gray-500" />
               </button>
             </div>
             <div className="p-6 space-y-4">
-              {editModalError && (
-                <div className="bg-red-50 text-red-600 p-3 rounded-lg text-sm">{editModalError}</div>
-              )}
+              {editError && <div className="bg-red-50 text-red-600 p-3 rounded-lg text-sm">{editError}</div>}
+
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Название</label>
-                <input
-                  type="text"
-                  value={editModalForm.name}
-                  onChange={e => setEditModalForm({...editModalForm, name: e.target.value})}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  placeholder="Название товара"
-                />
+                <input type="text" value={editForm.name} onChange={e => setEditForm({...editForm, name: e.target.value})}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Артикул</label>
-                <input
-                  type="text"
-                  value={editModalForm.article}
-                  onChange={e => setEditModalForm({...editModalForm, article: e.target.value})}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  placeholder="Артикул"
-                />
+                <input type="text" value={editForm.article} onChange={e => setEditForm({...editForm, article: e.target.value})}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">Категория</label>
-                  <select
-                    value={editModalForm.category}
-                    onChange={e => setEditModalForm({...editModalForm, category: e.target.value})}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  >
+                  <select value={editForm.category} onChange={e => setEditForm({...editForm, category: e.target.value})}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
                     <option value="">Не указана</option>
-                    {allCategories.map(c => (
-                      <option key={c} value={c}>{c}</option>
-                    ))}
+                    {allCategories.map(c => <option key={c} value={c}>{c}</option>)}
                   </select>
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">Подкатегория</label>
-                  <input
-                    type="text"
-                    value={editModalForm.subcategory}
-                    onChange={e => setEditModalForm({...editModalForm, subcategory: e.target.value})}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    placeholder="Подкатегория"
-                  />
+                  <select value={editForm.subcategory} onChange={e => setEditForm({...editForm, subcategory: e.target.value})}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+                    <option value="">Авто</option>
+                    {allSubcategories.map(s => <option key={s} value={s}>{s}</option>)}
+                  </select>
                 </div>
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">Закуп</label>
-                  <input
-                    type="number"
-                    value={editModalForm.cost}
-                    onChange={e => setEditModalForm({...editModalForm, cost: e.target.value})}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  />
+                  <input type="number" value={editForm.cost} onChange={e => setEditForm({...editForm, cost: e.target.value})}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">Продажа</label>
-                  <input
-                    type="number"
-                    value={editModalForm.price}
-                    onChange={e => setEditModalForm({...editModalForm, price: e.target.value})}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  />
+                  <input type="number" value={editForm.price} onChange={e => setEditForm({...editForm, price: e.target.value})}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
+                </div>
+              </div>
+
+              {/* Остатки по городам */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Остатки по городам</label>
+                <div className="space-y-2">
+                  {editCities.map((city, idx) => (
+                    <div key={idx} className="flex items-center gap-2 bg-gray-50 rounded-lg px-3 py-2">
+                      <MapPin size={14} className="text-gray-400 shrink-0" />
+                      <span className="text-sm text-gray-700 flex-1">{city.supplierName}</span>
+                      <input
+                        type="number"
+                        value={city.quantity}
+                        onChange={e => {
+                          const val = e.target.value;
+                          setEditCities(prev => prev.map((c, i) => i === idx ? {...c, quantity: val} : c));
+                        }}
+                        onBlur={e => handleUpdateCityQty(city, e.target.value)}
+                        className="w-20 px-2 py-1 border border-gray-300 rounded text-sm text-right"
+                      />
+                      <span className="text-xs text-gray-500">шт</span>
+                      <button onClick={() => handleDeleteCity(city)} className="p-1 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded" title="Удалить остаток">
+                        <Trash2 size={14} />
+                      </button>
+                    </div>
+                  ))}
+                  {/* Добавить город */}
+                  <div className="flex items-center gap-2">
+                    <select
+                      id="addCitySelect"
+                      className="flex-1 px-2 py-1.5 border border-gray-300 rounded text-sm"
+                      defaultValue=""
+                    >
+                      <option value="" disabled>+ Добавить город...</option>
+                      {suppliers.filter(s => !editCities.some(c => c.supplierId === s.id)).map(s => (
+                        <option key={s.id} value={s.id}>{s.name}</option>
+                      ))}
+                    </select>
+                    <button
+                      onClick={() => {
+                        const sel = document.getElementById('addCitySelect');
+                        if (sel.value) { handleAddCity(sel.value); sel.value = ''; }
+                      }}
+                      className="px-3 py-1.5 bg-green-600 text-white rounded text-sm hover:bg-green-700"
+                    >
+                      <Plus size={14} />
+                    </button>
+                  </div>
                 </div>
               </div>
             </div>
             <div className="flex items-center justify-end gap-3 px-6 py-4 border-t border-gray-200 bg-gray-50 rounded-b-xl">
-              <button onClick={closeEditModal} className="px-4 py-2 text-sm text-gray-600 hover:bg-gray-100 rounded-lg">
-                Отмена
+              <button onClick={closeEditModal} className="px-4 py-2 text-sm text-gray-600 hover:bg-gray-100 rounded-lg">Отмена</button>
+              <button onClick={saveEditModal} disabled={editSaving}
+                className="px-4 py-2 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 flex items-center gap-2">
+                {editSaving ? <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div> : <Check size={16} />}
+                Сохранить
               </button>
-              <button
-                onClick={saveEditModal}
-                disabled={editModalSaving}
-                className="px-4 py-2 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 flex items-center gap-2"
-              >
-                {editModalSaving ? (
-                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
-                ) : (
-                  <Check size={16} />
-                )}
-                {editModalProduct ? 'Сохранить' : 'Создать'}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Модалка: добавить товар на склад */}
+      {showCreateModal && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50" onClick={closeCreateModal}>
+          <div className="bg-white rounded-xl max-w-md w-full mx-4" onClick={e => e.stopPropagation()}>
+            <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200">
+              <h3 className="text-lg font-semibold text-gray-900">Добавить на склад</h3>
+              <button onClick={closeCreateModal} className="p-1 hover:bg-gray-100 rounded">
+                <X size={20} className="text-gray-500" />
+              </button>
+            </div>
+            <div className="p-6 space-y-4">
+              {createError && <div className="bg-red-50 text-red-600 p-3 rounded-lg text-sm">{createError}</div>}
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Товар</label>
+                <input
+                  type="text"
+                  placeholder="Поиск товара..."
+                  value={createSearch}
+                  onChange={e => setCreateSearch(e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 mb-2"
+                />
+                <select
+                  value={createForm.productId}
+                  onChange={e => setCreateForm({...createForm, productId: e.target.value})}
+                  size={5}
+                  className="w-full border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                >
+                  {filteredCreateProducts.map(p => (
+                    <option key={p.id} value={p.id}>{p.name} {p.article ? `(${p.article})` : ''}</option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Город</label>
+                <select
+                  value={createForm.supplierId}
+                  onChange={e => setCreateForm({...createForm, supplierId: e.target.value})}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                >
+                  <option value="">Выберите город...</option>
+                  {suppliers.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Количество</label>
+                <input
+                  type="number"
+                  min="1"
+                  value={createForm.quantity}
+                  onChange={e => setCreateForm({...createForm, quantity: e.target.value})}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
+            </div>
+            <div className="flex items-center justify-end gap-3 px-6 py-4 border-t border-gray-200 bg-gray-50 rounded-b-xl">
+              <button onClick={closeCreateModal} className="px-4 py-2 text-sm text-gray-600 hover:bg-gray-100 rounded-lg">Отмена</button>
+              <button onClick={saveCreateModal} disabled={createSaving}
+                className="px-4 py-2 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 flex items-center gap-2">
+                {createSaving ? <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div> : <Plus size={16} />}
+                Добавить
               </button>
             </div>
           </div>

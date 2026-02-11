@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { Search, ChevronUp, ChevronDown, RefreshCw, Edit2, Check, X, Plus } from 'lucide-react';
-import { getProducts, updateProduct, createProduct, getSuppliers } from '../../lib/pocketbase';
-import { detectSubcategory } from '../../lib/subcategories';
+import { Search, ChevronUp, ChevronDown, RefreshCw, X, Plus, Check, Trash2, Copy } from 'lucide-react';
+import { getProducts, updateProduct, createProduct, deleteProduct, getStocksForProduct } from '../../lib/pocketbase';
+import { detectSubcategory, ALL_SUBCATEGORIES } from '../../lib/subcategories';
 import pb from '../../lib/pocketbase';
 
 export default function PriceListDesktop() {
@@ -12,27 +12,27 @@ export default function PriceListDesktop() {
   const [searchQuery, setSearchQuery] = useState('');
   const [sortField, setSortField] = useState('name');
   const [sortDir, setSortDir] = useState('asc');
-  const [editingId, setEditingId] = useState(null);
-  const [editValues, setEditValues] = useState({});
-  const [showEditModal, setShowEditModal] = useState(false);
-  const [editModalProduct, setEditModalProduct] = useState(null);
-  const [editModalForm, setEditModalForm] = useState({ name: '', article: '', category: '', subcategory: '', cost: 0, price: 0 });
-  const [editModalSaving, setEditModalSaving] = useState(false);
-  const [editModalError, setEditModalError] = useState('');
+
+  // Модалка редактирования/создания
+  const [showModal, setShowModal] = useState(false);
+  const [modalProduct, setModalProduct] = useState(null); // null = создание
+  const [modalForm, setModalForm] = useState({ name: '', article: '', category: '', subcategory: '', cost: 0, price: 0 });
+  const [modalSaving, setModalSaving] = useState(false);
+  const [modalError, setModalError] = useState('');
+  const [duplicates, setDuplicates] = useState([]);
+  const [showDuplicates, setShowDuplicates] = useState(false);
 
   const userRole = pb.authStore.model?.role;
   const canEdit = userRole === 'admin';
 
   useEffect(() => {
     loadSuppliers();
-  }, []);
-
-  useEffect(() => {
     loadProducts();
   }, []);
 
   const loadSuppliers = async () => {
     try {
+      const { getSuppliers } = await import('../../lib/pocketbase');
       const data = await getSuppliers().catch(() => []);
       setSuppliers(data || []);
     } catch (error) {
@@ -61,34 +61,7 @@ export default function PriceListDesktop() {
     }
   };
 
-  const startEdit = (product) => {
-    setEditingId(product.id);
-    setEditValues({
-      purchasePrice: product.cost || 0,
-      price: product.price || 0,
-    });
-  };
-
-  const cancelEdit = () => {
-    setEditingId(null);
-    setEditValues({});
-  };
-
-  const saveEdit = async (productId) => {
-    try {
-      await updateProduct(productId, {
-        cost: Number(editValues.purchasePrice),
-        price: Number(editValues.price),
-      });
-      setEditingId(null);
-      loadProducts();
-    } catch (error) {
-      console.error('Error updating product:', error);
-      alert('Ошибка сохранения');
-    }
-  };
-
-  // Категории для select в модалке
+  // Категории для select
   const allCategories = useMemo(() => {
     const cats = new Set();
     products.forEach(p => {
@@ -98,9 +71,31 @@ export default function PriceListDesktop() {
     return [...cats].sort();
   }, [products]);
 
+  // Подкатегории для select
+  const allSubcategories = useMemo(() => {
+    const subs = new Set(ALL_SUBCATEGORIES);
+    products.forEach(p => {
+      if (p?.subcategory) subs.add(p.subcategory);
+    });
+    return [...subs].sort();
+  }, [products]);
+
+  // Поиск дублей по имени
+  const findDuplicates = (name, currentId) => {
+    if (!name || name.length < 3) return [];
+    const words = name.toLowerCase().split(/\s+/).filter(w => w.length >= 3);
+    if (words.length === 0) return [];
+    return products.filter(p => {
+      if (p.id === currentId) return false;
+      const pName = (p.name || '').toLowerCase();
+      return words.some(w => pName.includes(w));
+    }).slice(0, 10);
+  };
+
+  // === MODAL ===
   const openEditModal = (product) => {
-    setEditModalProduct(product);
-    setEditModalForm({
+    setModalProduct(product);
+    setModalForm({
       name: product.name || '',
       article: product.article || '',
       category: (Array.isArray(product.category) ? product.category[0] : product.category) || '',
@@ -108,51 +103,96 @@ export default function PriceListDesktop() {
       cost: product.cost || 0,
       price: product.price || 0,
     });
-    setEditModalError('');
-    setShowEditModal(true);
+    setDuplicates(findDuplicates(product.name, product.id));
+    setShowDuplicates(false);
+    setModalError('');
+    setShowModal(true);
   };
 
   const openCreateModal = () => {
-    setEditModalProduct(null);
-    setEditModalForm({ name: '', article: '', category: '', subcategory: '', cost: 0, price: 0 });
-    setEditModalError('');
-    setShowEditModal(true);
+    setModalProduct(null);
+    setModalForm({ name: '', article: '', category: '', subcategory: '', cost: 0, price: 0 });
+    setDuplicates([]);
+    setShowDuplicates(false);
+    setModalError('');
+    setShowModal(true);
   };
 
-  const closeEditModal = () => {
-    setShowEditModal(false);
-    setEditModalProduct(null);
-    setEditModalError('');
+  const closeModal = () => {
+    setShowModal(false);
+    setModalProduct(null);
+    setModalError('');
+    setDuplicates([]);
   };
 
-  const saveEditModal = async () => {
-    if (!editModalForm.name.trim()) {
-      setEditModalError('Введите название товара');
+  const handleNameChange = (name) => {
+    setModalForm(prev => ({ ...prev, name }));
+    if (name.length >= 3) {
+      setDuplicates(findDuplicates(name, modalProduct?.id));
+    } else {
+      setDuplicates([]);
+    }
+  };
+
+  const saveModal = async () => {
+    if (!modalForm.name.trim()) {
+      setModalError('Введите название товара');
       return;
     }
-    setEditModalSaving(true);
-    setEditModalError('');
+    setModalSaving(true);
+    setModalError('');
     try {
       const data = {
-        name: editModalForm.name.trim(),
-        article: editModalForm.article.trim(),
-        category: editModalForm.category ? [editModalForm.category] : [],
-        subcategory: editModalForm.subcategory || detectSubcategory(editModalForm.name),
-        cost: Number(editModalForm.cost) || 0,
-        price: Number(editModalForm.price) || 0,
+        name: modalForm.name.trim(),
+        article: modalForm.article.trim(),
+        category: modalForm.category ? [modalForm.category] : [],
+        subcategory: modalForm.subcategory || detectSubcategory(modalForm.name),
+        cost: Number(modalForm.cost) || 0,
+        price: Number(modalForm.price) || 0,
       };
-      if (editModalProduct) {
-        await updateProduct(editModalProduct.id, data);
+      if (modalProduct) {
+        await updateProduct(modalProduct.id, data);
       } else {
         await createProduct(data);
       }
-      closeEditModal();
+      closeModal();
       loadProducts();
     } catch (err) {
       console.error('Error saving product:', err);
-      setEditModalError('Ошибка сохранения: ' + (err?.message || ''));
+      setModalError('Ошибка сохранения: ' + (err?.message || ''));
     } finally {
-      setEditModalSaving(false);
+      setModalSaving(false);
+    }
+  };
+
+  const handleDelete = async () => {
+    if (!modalProduct) return;
+    try {
+      // Проверяем есть ли остатки
+      const stockRecords = await getStocksForProduct(modalProduct.id);
+      const hasStocks = stockRecords && stockRecords.length > 0;
+      const totalQty = hasStocks ? stockRecords.reduce((s, r) => s + (r.quantity || 0), 0) : 0;
+
+      let confirmMsg = `Удалить товар "${modalProduct.name}"?`;
+      if (hasStocks && totalQty > 0) {
+        confirmMsg = `⚠️ Товар "${modalProduct.name}" есть на складе (${totalQty} шт).\n\nВсе остатки будут удалены! Продолжить?`;
+      }
+
+      if (!window.confirm(confirmMsg)) return;
+
+      // Удаляем stock записи если есть
+      if (hasStocks) {
+        for (const sr of stockRecords) {
+          try { await pb.collection('stocks').delete(sr.id); } catch (e) { console.warn('Error deleting stock:', e); }
+        }
+      }
+
+      await deleteProduct(modalProduct.id);
+      closeModal();
+      loadProducts();
+    } catch (err) {
+      console.error('Error deleting product:', err);
+      setModalError('Ошибка удаления: ' + (err?.message || ''));
     }
   };
 
@@ -170,8 +210,6 @@ export default function PriceListDesktop() {
       const query = searchQuery.toLowerCase();
       const matchesSearch = name.toLowerCase().includes(query) || article.toLowerCase().includes(query);
 
-      // Фильтр по городу: если выбран город, показываем товары у которых этот город в cities
-      // Фоллбек: если у товара нет cities вообще — показываем его в любом случае (base_price)
       if (selectedCityName) {
         const cities = product?.cities || [];
         if (cities.length > 0 && !cities.some(c => c === selectedCityName || c.includes(selectedCityName) || selectedCityName.includes(c))) {
@@ -182,38 +220,21 @@ export default function PriceListDesktop() {
       return matchesSearch;
     })
     .sort((a, b) => {
-      // Первичная: по категории (для группировки)
       const catA = (Array.isArray(a?.category) ? a.category[0] : (a?.category || '')) || '';
       const catB = (Array.isArray(b?.category) ? b.category[0] : (b?.category || '')) || '';
       if (catA !== catB) return catA.localeCompare(catB);
 
-      // Вторичная: по подкатегории
       const subA = (a?.subcategory || detectSubcategory(a?.name)) || '';
       const subB = (b?.subcategory || detectSubcategory(b?.name)) || '';
       if (subA !== subB) return subA.localeCompare(subB);
 
-      // Третичная: по выбранному полю
       let aVal, bVal;
       switch (sortField) {
-        case 'name':
-          aVal = a?.name || '';
-          bVal = b?.name || '';
-          break;
-        case 'article':
-          aVal = a?.article || '';
-          bVal = b?.article || '';
-          break;
-        case 'purchasePrice':
-          aVal = a?.cost || 0;
-          bVal = b?.cost || 0;
-          break;
-        case 'price':
-          aVal = a?.price || 0;
-          bVal = b?.price || 0;
-          break;
-        default:
-          aVal = a?.name || '';
-          bVal = b?.name || '';
+        case 'name': aVal = a?.name || ''; bVal = b?.name || ''; break;
+        case 'article': aVal = a?.article || ''; bVal = b?.article || ''; break;
+        case 'purchasePrice': aVal = a?.cost || 0; bVal = b?.cost || 0; break;
+        case 'price': aVal = a?.price || 0; bVal = b?.price || 0; break;
+        default: aVal = a?.name || ''; bVal = b?.name || '';
       }
 
       if (typeof aVal === 'string') {
@@ -240,9 +261,7 @@ export default function PriceListDesktop() {
           >
             <option value="">Все города</option>
             {suppliers.map(supplier => (
-              <option key={supplier.id} value={supplier.id}>
-                {supplier.name}
-              </option>
+              <option key={supplier.id} value={supplier.id}>{supplier.name}</option>
             ))}
           </select>
         </div>
@@ -258,27 +277,18 @@ export default function PriceListDesktop() {
           />
         </div>
 
-        <button
-          onClick={loadProducts}
-          className="p-1.5 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded"
-          title="Обновить"
-        >
+        <button onClick={loadProducts} className="p-1.5 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded" title="Обновить">
           <RefreshCw size={18} className={loading ? 'animate-spin' : ''} />
         </button>
 
         {canEdit && (
-          <button
-            onClick={openCreateModal}
-            className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-600 text-white rounded text-sm hover:bg-blue-700 transition-colors"
-          >
-            <Plus size={16} />
-            Добавить товар
+          <button onClick={openCreateModal}
+            className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-600 text-white rounded text-sm hover:bg-blue-700 transition-colors">
+            <Plus size={16} /> Добавить товар
           </button>
         )}
 
-        <span className="text-sm text-gray-500 ml-auto">
-          Найдено: {filteredProducts.length}
-        </span>
+        <span className="text-sm text-gray-500 ml-auto">Найдено: {filteredProducts.length}</span>
       </div>
 
       {/* Таблица */}
@@ -287,64 +297,33 @@ export default function PriceListDesktop() {
           <table className="w-full text-xs">
             <thead>
               <tr className="bg-gray-50 border-b border-gray-200">
-                <th 
-                  className="text-left px-2 py-2 font-medium text-gray-600 cursor-pointer hover:bg-gray-100 w-[70px] max-w-[70px]"
-                  onClick={() => handleSort('article')}
-                >
-                  <div className="flex items-center gap-1">
-                    Арт. <SortIcon field="article" />
-                  </div>
+                <th className="text-left px-2 py-2 font-medium text-gray-600 cursor-pointer hover:bg-gray-100 w-[70px] max-w-[70px]" onClick={() => handleSort('article')}>
+                  <div className="flex items-center gap-1">Арт. <SortIcon field="article" /></div>
                 </th>
-                <th 
-                  className="text-left px-3 py-2 font-medium text-gray-600 cursor-pointer hover:bg-gray-100"
-                  onClick={() => handleSort('name')}
-                >
-                  <div className="flex items-center gap-1">
-                    Наименование <SortIcon field="name" />
-                  </div>
+                <th className="text-left px-3 py-2 font-medium text-gray-600 cursor-pointer hover:bg-gray-100" onClick={() => handleSort('name')}>
+                  <div className="flex items-center gap-1">Наименование <SortIcon field="name" /></div>
                 </th>
-                <th 
-                  className="text-left px-3 py-2 font-medium text-gray-600 cursor-pointer hover:bg-gray-100"
-                  onClick={() => handleSort('category')}
-                >
-                  <div className="flex items-center gap-1">
-                    Категория <SortIcon field="category" />
-                  </div>
+                <th className="text-left px-3 py-2 font-medium text-gray-600 cursor-pointer hover:bg-gray-100" onClick={() => handleSort('category')}>
+                  <div className="flex items-center gap-1">Категория <SortIcon field="category" /></div>
                 </th>
-                <th 
-                  className="text-right px-3 py-2 font-medium text-gray-600 cursor-pointer hover:bg-gray-100"
-                  onClick={() => handleSort('purchasePrice')}
-                >
-                  <div className="flex items-center justify-end gap-1">
-                    Закуп <SortIcon field="purchasePrice" />
-                  </div>
+                <th className="text-right px-3 py-2 font-medium text-gray-600 cursor-pointer hover:bg-gray-100" onClick={() => handleSort('purchasePrice')}>
+                  <div className="flex items-center justify-end gap-1">Закуп <SortIcon field="purchasePrice" /></div>
                 </th>
-                <th 
-                  className="text-right px-3 py-2 font-medium text-gray-600 cursor-pointer hover:bg-gray-100"
-                  onClick={() => handleSort('price')}
-                >
-                  <div className="flex items-center justify-end gap-1">
-                    Продажа <SortIcon field="price" />
-                  </div>
+                <th className="text-right px-3 py-2 font-medium text-gray-600 cursor-pointer hover:bg-gray-100" onClick={() => handleSort('price')}>
+                  <div className="flex items-center justify-end gap-1">Продажа <SortIcon field="price" /></div>
                 </th>
-                {canEdit && (
-                  <th className="w-16 px-3 py-2"></th>
-                )}
               </tr>
             </thead>
             <tbody>
               {loading ? (
                 <tr>
-                  <td colSpan={canEdit ? 6 : 5} className="px-4 py-8 text-center text-gray-500">
-                    <div className="flex items-center justify-center gap-2">
-                      <RefreshCw size={16} className="animate-spin" />
-                      Загрузка...
-                    </div>
+                  <td colSpan={5} className="px-4 py-8 text-center text-gray-500">
+                    <div className="flex items-center justify-center gap-2"><RefreshCw size={16} className="animate-spin" /> Загрузка...</div>
                   </td>
                 </tr>
               ) : filteredProducts.length === 0 ? (
                 <tr>
-                  <td colSpan={canEdit ? 6 : 5} className="px-4 py-8 text-center text-gray-500">
+                  <td colSpan={5} className="px-4 py-8 text-center text-gray-500">
                     {searchQuery ? 'Ничего не найдено' : 'Нет данных'}
                   </td>
                 </tr>
@@ -353,7 +332,6 @@ export default function PriceListDesktop() {
                 let lastCategory = null;
                 let lastSubcategory = null;
                 return filteredProducts.map((product) => {
-                  const isEditing = editingId === product.id;
                   const category = Array.isArray(product.category) ? product.category[0] : (product.category || '');
                   const subcategory = product.subcategory || detectSubcategory(product.name);
                   const showCategoryHeader = category !== lastCategory;
@@ -366,84 +344,28 @@ export default function PriceListDesktop() {
                     <React.Fragment key={product.id}>
                       {showCategoryHeader && category && (
                         <tr className="bg-blue-50 border-y border-blue-200">
-                          <td colSpan={canEdit ? 6 : 5} className="px-3 py-1.5 font-semibold text-blue-800 text-xs sticky top-0">
-                            {category}
-                          </td>
+                          <td colSpan={5} className="px-3 py-1.5 font-semibold text-blue-800 text-xs sticky top-0">{category}</td>
                         </tr>
                       )}
                       {showSubcategoryHeader && subcategory && (
                         <tr className="bg-gray-50 border-y border-gray-200">
-                          <td colSpan={canEdit ? 6 : 5} className="px-6 py-1 font-medium text-gray-600 text-xs">
-                            {subcategory}
-                          </td>
+                          <td colSpan={5} className="px-6 py-1 font-medium text-gray-600 text-xs">{subcategory}</td>
                         </tr>
                       )}
-                    <tr 
-                      className="border-b border-gray-100 hover:bg-gray-50"
+                    <tr
+                      className="border-b border-gray-100 hover:bg-gray-50 cursor-pointer"
+                      onDoubleClick={() => canEdit && openEditModal(product)}
+                      title={canEdit ? 'Двойной клик для редактирования' : ''}
                     >
-                      <td className="px-2 py-1.5 font-mono text-xs text-gray-500 w-[70px] max-w-[70px] truncate">
-                        {product.article || '—'}
-                      </td>
-                      <td className="px-3 py-1.5">
-                        {product.name || 'Без названия'}
-                      </td>
-                      <td className="px-3 py-1.5 text-gray-600">
-                        {product.category || '—'}
-                      </td>
+                      <td className="px-2 py-1.5 font-mono text-xs text-gray-500 w-[70px] max-w-[70px] truncate">{product.article || '—'}</td>
+                      <td className="px-3 py-1.5">{product.name || 'Без названия'}</td>
+                      <td className="px-3 py-1.5 text-gray-600">{category || '—'}</td>
                       <td className="px-3 py-1.5 text-right">
-                        {isEditing ? (
-                          <input
-                            type="number"
-                            value={editValues.purchasePrice}
-                            onChange={(e) => setEditValues({...editValues, purchasePrice: e.target.value})}
-                            className="w-24 px-2 py-1 border border-gray-300 rounded text-right text-sm"
-                          />
-                        ) : (
-                          <span className="text-gray-600">
-                            {(product.cost || 0).toLocaleString('ru-RU')}                          </span>
-                        )}
+                        <span className="text-gray-600">{(product.cost || 0).toLocaleString('ru-RU')}</span>
                       </td>
                       <td className="px-4 py-2.5 text-right">
-                        {isEditing ? (
-                          <input
-                            type="number"
-                            value={editValues.price}
-                            onChange={(e) => setEditValues({...editValues, price: e.target.value})}
-                            className="w-24 px-2 py-1 border border-gray-300 rounded text-right text-sm"
-                          />
-                        ) : (
-                          <span className="font-medium">
-                            {(product.price || 0).toLocaleString('ru-RU')}                          </span>
-                        )}
+                        <span className="font-medium">{(product.price || 0).toLocaleString('ru-RU')}</span>
                       </td>
-                      {canEdit && (
-                        <td className="px-3 py-1.5">
-                          {isEditing ? (
-                            <div className="flex items-center justify-end gap-1">
-                              <button
-                                onClick={() => saveEdit(product.id)}
-                                className="p-1 text-green-600 hover:bg-green-50 rounded"
-                              >
-                                <Check size={16} />
-                              </button>
-                              <button
-                                onClick={cancelEdit}
-                                className="p-1 text-gray-400 hover:bg-gray-100 rounded"
-                              >
-                                <X size={16} />
-                              </button>
-                            </div>
-                          ) : (
-                            <button
-                              onClick={() => openEditModal(product)}
-                              className="p-1 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded"
-                              title="Редактировать товар"
-                            >
-                              <Edit2 size={16} />
-                            </button>
-                          )}
-                        </td>
-                      )}
                     </tr>
                     </React.Fragment>
                   );
@@ -456,103 +378,113 @@ export default function PriceListDesktop() {
       </div>
 
       {/* Модалка редактирования/создания товара */}
-      {showEditModal && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50" onClick={closeEditModal}>
-          <div className="bg-white rounded-xl max-w-md w-full mx-4" onClick={e => e.stopPropagation()}>
+      {showModal && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50" onClick={closeModal}>
+          <div className="bg-white rounded-xl max-w-md w-full mx-4 max-h-[90vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
             <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200">
               <h3 className="text-lg font-semibold text-gray-900">
-                {editModalProduct ? 'Редактировать товар' : 'Новый товар'}
+                {modalProduct ? 'Редактировать товар' : 'Новый товар'}
               </h3>
-              <button onClick={closeEditModal} className="p-1 hover:bg-gray-100 rounded">
+              <button onClick={closeModal} className="p-1 hover:bg-gray-100 rounded">
                 <X size={20} className="text-gray-500" />
               </button>
             </div>
             <div className="p-6 space-y-4">
-              {editModalError && (
-                <div className="bg-red-50 text-red-600 p-3 rounded-lg text-sm">{editModalError}</div>
-              )}
+              {modalError && <div className="bg-red-50 text-red-600 p-3 rounded-lg text-sm">{modalError}</div>}
+
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Название</label>
-                <input
-                  type="text"
-                  value={editModalForm.name}
-                  onChange={e => setEditModalForm({...editModalForm, name: e.target.value})}
+                <div className="flex items-center justify-between mb-1">
+                  <label className="block text-sm font-medium text-gray-700">Название</label>
+                  {duplicates.length > 0 && (
+                    <div className="relative">
+                      <button
+                        onMouseEnter={() => setShowDuplicates(true)}
+                        onMouseLeave={() => setShowDuplicates(false)}
+                        className="flex items-center gap-1 text-xs text-amber-600 hover:text-amber-700"
+                      >
+                        <Copy size={12} />
+                        {duplicates.length} похож.
+                      </button>
+                      {showDuplicates && (
+                        <div className="absolute right-0 top-full mt-1 bg-white border border-gray-200 rounded-lg shadow-lg z-10 w-72 max-h-48 overflow-y-auto">
+                          <div className="p-2 text-xs text-gray-500 border-b">Похожие товары:</div>
+                          {duplicates.map(d => (
+                            <div key={d.id} className="px-3 py-1.5 text-xs hover:bg-gray-50 border-b border-gray-50">
+                              <div className="font-medium text-gray-700">{d.name}</div>
+                              {d.article && <span className="text-gray-400">{d.article}</span>}
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+                <input type="text" value={modalForm.name}
+                  onChange={e => handleNameChange(e.target.value)}
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  placeholder="Название товара"
-                />
+                  placeholder="Название товара" />
               </div>
+
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Артикул</label>
-                <input
-                  type="text"
-                  value={editModalForm.article}
-                  onChange={e => setEditModalForm({...editModalForm, article: e.target.value})}
+                <input type="text" value={modalForm.article}
+                  onChange={e => setModalForm({...modalForm, article: e.target.value})}
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  placeholder="Артикул"
-                />
+                  placeholder="Артикул" />
               </div>
+
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">Категория</label>
-                  <select
-                    value={editModalForm.category}
-                    onChange={e => setEditModalForm({...editModalForm, category: e.target.value})}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  >
+                  <select value={modalForm.category} onChange={e => setModalForm({...modalForm, category: e.target.value})}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
                     <option value="">Не указана</option>
-                    {allCategories.map(c => (
-                      <option key={c} value={c}>{c}</option>
-                    ))}
+                    {allCategories.map(c => <option key={c} value={c}>{c}</option>)}
                   </select>
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">Подкатегория</label>
-                  <input
-                    type="text"
-                    value={editModalForm.subcategory}
-                    onChange={e => setEditModalForm({...editModalForm, subcategory: e.target.value})}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    placeholder="Подкатегория"
-                  />
+                  <select value={modalForm.subcategory} onChange={e => setModalForm({...modalForm, subcategory: e.target.value})}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+                    <option value="">Авто</option>
+                    {allSubcategories.map(s => <option key={s} value={s}>{s}</option>)}
+                  </select>
                 </div>
               </div>
+
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">Закуп</label>
-                  <input
-                    type="number"
-                    value={editModalForm.cost}
-                    onChange={e => setEditModalForm({...editModalForm, cost: e.target.value})}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  />
+                  <input type="number" value={modalForm.cost}
+                    onChange={e => setModalForm({...modalForm, cost: e.target.value})}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">Продажа</label>
-                  <input
-                    type="number"
-                    value={editModalForm.price}
-                    onChange={e => setEditModalForm({...editModalForm, price: e.target.value})}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  />
+                  <input type="number" value={modalForm.price}
+                    onChange={e => setModalForm({...modalForm, price: e.target.value})}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
                 </div>
               </div>
             </div>
-            <div className="flex items-center justify-end gap-3 px-6 py-4 border-t border-gray-200 bg-gray-50 rounded-b-xl">
-              <button onClick={closeEditModal} className="px-4 py-2 text-sm text-gray-600 hover:bg-gray-100 rounded-lg">
-                Отмена
-              </button>
-              <button
-                onClick={saveEditModal}
-                disabled={editModalSaving}
-                className="px-4 py-2 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 flex items-center gap-2"
-              >
-                {editModalSaving ? (
-                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
-                ) : (
-                  <Check size={16} />
+
+            <div className="flex items-center justify-between px-6 py-4 border-t border-gray-200 bg-gray-50 rounded-b-xl">
+              <div>
+                {modalProduct && (
+                  <button onClick={handleDelete}
+                    className="flex items-center gap-1.5 px-3 py-2 text-sm text-red-600 hover:bg-red-50 rounded-lg transition-colors">
+                    <Trash2 size={16} /> Удалить
+                  </button>
                 )}
-                {editModalProduct ? 'Сохранить' : 'Создать'}
-              </button>
+              </div>
+              <div className="flex items-center gap-3">
+                <button onClick={closeModal} className="px-4 py-2 text-sm text-gray-600 hover:bg-gray-100 rounded-lg">Отмена</button>
+                <button onClick={saveModal} disabled={modalSaving}
+                  className="px-4 py-2 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 flex items-center gap-2">
+                  {modalSaving ? <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div> : <Check size={16} />}
+                  {modalProduct ? 'Сохранить' : 'Создать'}
+                </button>
+              </div>
             </div>
           </div>
         </div>
