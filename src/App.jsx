@@ -1,14 +1,14 @@
 import React, { useState, useEffect } from 'react';
 // Mobile components
 import Navigation from './components/Navigation';
-import WorkerSidebar from './components/WorkerSidebar';
 import Dashboard from './components/Dashboard';
 import Reception from './components/Reception';
 import Stock from './components/Stock';
 import PriceList from './components/PriceList';
-import ShiftScreen from './components/ShiftScreen';
-import WorkerHistory from './components/WorkerHistory';
 import AuthScreen from './components/AuthScreen';
+// Worker mobile (new)
+import WorkerApp from './components/worker/WorkerApp';
+import WorkerLogin from './components/worker/WorkerLogin';
 // Desktop components
 import DesktopLayout from './layouts/DesktopLayout';
 import DashboardDesktop from './components/desktop/DashboardDesktop';
@@ -54,7 +54,7 @@ function App() {
 
   // Показываем экран авторизации если пользователь не вошел
   if (!loading && !user) {
-    return <AuthScreen onAuth={handleAuth} />;
+    return <WorkerLogin onAuth={handleAuth} />;
   }
 
   const isWorker = user?.role === 'worker';
@@ -95,7 +95,12 @@ function App() {
     );
   }
 
-  // Mobile версия для воркера (курьера)
+  // Worker — полностью новый мобильный UI
+  if (isWorker) {
+    return <WorkerApp user={user} onLogout={handleLogout} />;
+  }
+
+  // Mobile версия для остальных ролей (admin/operator на мобиле — fallback)
   const renderMobileContent = () => {
     switch (activeTab) {
       case 'dashboard':
@@ -106,10 +111,6 @@ function App() {
         return <Stock />;
       case 'pricelist':
         return <PriceList />;
-      case 'shift':
-        return <ShiftScreen />;
-      case 'history':
-        return <WorkerHistory />;
       default:
         return <Dashboard user={user} onLogout={handleLogout} />;
     }
@@ -118,17 +119,11 @@ function App() {
   return (
     <div className="relative">
       {renderMobileContent()}
-      {!loading && user && !isWorker && (
+      {!loading && user && (
         <Navigation 
           activeTab={activeTab} 
           onTabChange={setActiveTab} 
           userRole={user?.role}
-        />
-      )}
-      {!loading && user && isWorker && (
-        <WorkerSidebar 
-          activeTab={activeTab} 
-          onTabChange={setActiveTab} 
         />
       )}
     </div>
