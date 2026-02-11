@@ -35,7 +35,10 @@ export default function WorkerOrders({ user }) {
       const data = await getOrders();
       const sorted = data.sort((a, b) => {
         if (a.local_time && b.local_time) return parseLocalTime(b.local_time) - parseLocalTime(a.local_time);
-        return new Date(b.created_date) - new Date(a.created_date);
+        // Fallback: created (PocketBase) or created_date
+        const dateA = new Date(a.created || a.created_date || 0);
+        const dateB = new Date(b.created || b.created_date || 0);
+        return dateB - dateA;
       });
       setOrders(sorted);
     } catch (e) {

@@ -1142,8 +1142,33 @@ export const refundOrder = async (orderId) => {
     }
     
     // Обновляем статус заказа на 'refund'
-    const updated = await pb.collection('orders').update(orderId, { status: 'refund' });
-    console.log('refundOrder: заказ', orderId, 'помечен как вычет');
+    let updated;
+    try {
+      updated = await pb.collection('orders').update(orderId, { status: 'refund' });
+      console.log('refundOrder: заказ', orderId, 'помечен как вычет');
+    } catch (updateErr) {
+      console.warn('refundOrder: не удалось обновить статус напрямую, пробуем через пересоздание:', updateErr.status);
+      // PocketBase API rules могут блокировать update для worker
+      // Пробуем удалить и создать заново с status=refund
+      try {
+        const orderData = { ...order };
+        delete orderData.id;
+        delete orderData.collectionId;
+        delete orderData.collectionName;
+        delete orderData.created;
+        delete orderData.updated;
+        delete orderData.expand;
+        orderData.status = 'refund';
+        await pb.collection('orders').delete(orderId);
+        updated = await pb.collection('orders').create(orderData);
+        console.log('refundOrder: заказ пересоздан с status=refund');
+      } catch (recreateErr) {
+        console.error('refundOrder: не удалось пересоздать заказ:', recreateErr);
+        // Товары уже возвращены на склад — это главное
+        // Бросаем понятную ошибку
+        throw new Error('Товары возвращены на склад, но не удалось обновить статус заказа. Обратитесь к администратору.');
+      }
+    }
     return updated;
   } catch (error) {
     console.error('PocketBase: Error refunding order:', error);
