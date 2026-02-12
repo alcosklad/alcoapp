@@ -353,10 +353,6 @@ export default function StockDesktop() {
             aVal = pA.price || 0;
             bVal = pB.price || 0;
             break;
-          case 'volume':
-            aVal = pA.volume || '';
-            bVal = pB.volume || '';
-            break;
           case 'margin':
             aVal = (pA.price || 0) - (pA.cost || 0);
             bVal = (pB.price || 0) - (pB.cost || 0);
@@ -394,7 +390,7 @@ export default function StockDesktop() {
   }, 0);
   const totalMargin = totalSaleValue - totalCostValue;
 
-  const colCount = isAdmin ? 10 : 7;
+  const colCount = isAdmin ? 9 : 6;
 
   return (
     <div className="space-y-4">
@@ -477,9 +473,6 @@ export default function StockDesktop() {
                   <div className="flex items-center gap-1">Наименование <SortIcon field="name" /></div>
                 </th>
                 <th className="text-left px-2 py-2 font-medium text-gray-600">Подкатегория</th>
-                <th className="text-left px-2 py-2 font-medium text-gray-600 cursor-pointer hover:bg-gray-100" onClick={() => handleSort('volume')}>
-                  <div className="flex items-center gap-1">Объём <SortIcon field="volume" /></div>
-                </th>
                 <th className="text-right px-3 py-2 font-medium text-gray-600 cursor-pointer hover:bg-gray-100" onClick={() => handleSort('quantity')}>
                   <div className="flex items-center justify-end gap-1">Остаток <SortIcon field="quantity" /></div>
                 </th>
@@ -549,8 +542,8 @@ export default function StockDesktop() {
                             </tr>
                           )}
                           {showSubcategoryHeader && subcategory && (
-                            <tr className="bg-gray-50 border-y border-gray-200">
-                              <td colSpan={colCount} className="px-6 py-1 font-medium text-gray-600 text-xs">{subcategory}</td>
+                            <tr className="bg-indigo-50/60 border-y border-indigo-100">
+                              <td colSpan={colCount} className="px-6 py-1.5 font-semibold text-indigo-700 text-xs border-l-[3px] border-indigo-400">{subcategory}</td>
                             </tr>
                           )}
                           <tr
@@ -561,7 +554,6 @@ export default function StockDesktop() {
                             <td className="px-2 py-1.5 font-mono text-xs text-gray-500 w-[70px] max-w-[70px] truncate">{product.article || '—'}</td>
                             <td className="px-3 py-1.5">{product.name || 'Без названия'}</td>
                             <td className="px-2 py-1.5 text-gray-500 text-xs">{subcategory || '—'}</td>
-                            <td className="px-2 py-1.5 text-gray-600">{product.volume || '—'}</td>
                             <td className={`px-3 py-1.5 text-right font-medium ${quantity < 3 ? 'text-red-600' : ''}`}>
                               <span className="inline-flex items-center gap-1">
                                 {quantity} шт
@@ -586,7 +578,7 @@ export default function StockDesktop() {
                     });
                   })()}
                   <tr className="bg-gray-100 border-t-2 border-gray-300 font-semibold text-xs">
-                    <td colSpan={4} className="px-3 py-2 text-right text-gray-700">Итого:</td>
+                    <td colSpan={3} className="px-3 py-2 text-right text-gray-700">Итого:</td>
                     <td className="px-3 py-2 text-right text-gray-900">{totalQuantity} шт</td>
                     {isAdmin && <td className="px-3 py-2 text-right text-gray-600">{totalCostValue.toLocaleString('ru-RU')}</td>}
                     <td className="px-3 py-2 text-right text-gray-900">{totalSaleValue.toLocaleString('ru-RU')}</td>

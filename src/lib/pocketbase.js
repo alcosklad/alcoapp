@@ -752,9 +752,24 @@ export const updateReception = async (id, data) => {
   }
 };
 
-// Удаление приемки
+// Удаление приемки (с откатом остатков)
 export const deleteReception = async (id) => {
   try {
+    // Сначала читаем приёмку, чтобы откатить остатки
+    const reception = await pb.collection('receptions').getOne(id);
+    
+    if (reception.items && Array.isArray(reception.items) && reception.supplier) {
+      for (const item of reception.items) {
+        if (item.product && item.quantity) {
+          try {
+            await updateStock(item.product, null, -(item.quantity), reception.supplier);
+          } catch (e) {
+            console.warn('deleteReception: не удалось откатить остаток для', item.product, e);
+          }
+        }
+      }
+    }
+    
     await pb.collection('receptions').delete(id);
   } catch (error) {
     console.error('PocketBase: Error deleting reception:', error);

@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { Search, ChevronUp, ChevronDown, RefreshCw, X, Plus, Check, Trash2, Copy, Merge } from 'lucide-react';
+import { Search, ChevronUp, ChevronDown, RefreshCw, X, Plus, Check, Trash2, Copy, Merge, Filter, SlidersHorizontal } from 'lucide-react';
 import { getProducts, updateProduct, createProduct, deleteProduct, getStocksForProduct, mergeProducts } from '../../lib/pocketbase';
 import { detectSubcategory, ALL_SUBCATEGORIES } from '../../lib/subcategories';
 import pb from '../../lib/pocketbase';
@@ -12,6 +12,15 @@ export default function PriceListDesktop() {
   const [searchQuery, setSearchQuery] = useState('');
   const [sortField, setSortField] = useState('name');
   const [sortDir, setSortDir] = useState('asc');
+
+  // Фильтры
+  const [showFilters, setShowFilters] = useState(false);
+  const [filterCategory, setFilterCategory] = useState('');
+  const [filterSubcategory, setFilterSubcategory] = useState('');
+  const [filterPriceMin, setFilterPriceMin] = useState('');
+  const [filterPriceMax, setFilterPriceMax] = useState('');
+
+  const activeFiltersCount = [filterCategory, filterSubcategory, filterPriceMin, filterPriceMax].filter(Boolean).length;
 
   // Модалка редактирования/создания
   const [showModal, setShowModal] = useState(false);
@@ -246,6 +255,25 @@ export default function PriceListDesktop() {
     return sup?.name || '';
   }, [selectedSupplier, suppliers]);
 
+  const resetFilters = () => {
+    setFilterCategory('');
+    setFilterSubcategory('');
+    setFilterPriceMin('');
+    setFilterPriceMax('');
+  };
+
+  // Диапазон цен для ползунка
+  const priceRange = useMemo(() => {
+    let min = Infinity, max = 0;
+    products.forEach(p => {
+      if (p?.price > 0) {
+        if (p.price < min) min = p.price;
+        if (p.price > max) max = p.price;
+      }
+    });
+    return { min: min === Infinity ? 0 : min, max: max || 10000 };
+  }, [products]);
+
   const filteredProducts = products
     .filter(product => {
       const name = product?.name || '';
@@ -259,6 +287,23 @@ export default function PriceListDesktop() {
           return false;
         }
       }
+
+      // Фильтр по категории
+      if (filterCategory) {
+        const cat = Array.isArray(product?.category) ? product.category[0] : (product?.category || '');
+        if (cat !== filterCategory) return false;
+      }
+
+      // Фильтр по подкатегории
+      if (filterSubcategory) {
+        const sub = product?.subcategory || detectSubcategory(product?.name);
+        if (sub !== filterSubcategory) return false;
+      }
+
+      // Фильтр по цене
+      const price = product?.price || 0;
+      if (filterPriceMin && price < Number(filterPriceMin)) return false;
+      if (filterPriceMax && price > Number(filterPriceMax)) return false;
 
       return matchesSearch;
     })
@@ -320,6 +365,21 @@ export default function PriceListDesktop() {
           />
         </div>
 
+        <button
+          onClick={() => setShowFilters(v => !v)}
+          className={`flex items-center gap-1.5 px-3 py-1.5 border rounded text-sm transition-colors ${
+            showFilters || activeFiltersCount > 0
+              ? 'bg-indigo-50 border-indigo-300 text-indigo-700'
+              : 'border-gray-300 text-gray-600 hover:bg-gray-50'
+          }`}
+        >
+          <SlidersHorizontal size={16} />
+          Фильтры
+          {activeFiltersCount > 0 && (
+            <span className="ml-1 w-5 h-5 bg-indigo-600 text-white text-xs rounded-full flex items-center justify-center">{activeFiltersCount}</span>
+          )}
+        </button>
+
         <button onClick={loadProducts} className="p-1.5 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded" title="Обновить">
           <RefreshCw size={18} className={loading ? 'animate-spin' : ''} />
         </button>
@@ -332,6 +392,90 @@ export default function PriceListDesktop() {
         )}
 
         <span className="text-sm text-gray-500 ml-auto">Найдено: {filteredProducts.length}</span>
+      </div>
+
+      {/* Панель фильтров (анимированная) */}
+      <div
+        className="overflow-hidden transition-all duration-300 ease-in-out"
+        style={{ maxHeight: showFilters ? '300px' : '0px', opacity: showFilters ? 1 : 0 }}
+      >
+        <div className="bg-white rounded-lg border border-gray-200 p-4">
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+            {/* Категория */}
+            <div>
+              <label className="block text-xs font-medium text-gray-600 mb-1">Категория</label>
+              <select
+                value={filterCategory}
+                onChange={(e) => setFilterCategory(e.target.value)}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+              >
+                <option value="">Все категории</option>
+                {allCategories.map(c => <option key={c} value={c}>{c}</option>)}
+              </select>
+            </div>
+
+            {/* Подкатегория */}
+            <div>
+              <label className="block text-xs font-medium text-gray-600 mb-1">Подкатегория</label>
+              <select
+                value={filterSubcategory}
+                onChange={(e) => setFilterSubcategory(e.target.value)}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+              >
+                <option value="">Все подкатегории</option>
+                {allSubcategories.map(s => <option key={s} value={s}>{s}</option>)}
+              </select>
+            </div>
+
+            {/* Цена от */}
+            <div>
+              <label className="block text-xs font-medium text-gray-600 mb-1">Цена от</label>
+              <input
+                type="number"
+                value={filterPriceMin}
+                onChange={(e) => setFilterPriceMin(e.target.value)}
+                placeholder={`${priceRange.min}`}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+              />
+            </div>
+
+            {/* Цена до */}
+            <div>
+              <label className="block text-xs font-medium text-gray-600 mb-1">Цена до</label>
+              <input
+                type="number"
+                value={filterPriceMax}
+                onChange={(e) => setFilterPriceMax(e.target.value)}
+                placeholder={`${priceRange.max}`}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+              />
+            </div>
+          </div>
+
+          {/* Кнопки фильтров */}
+          <div className="flex items-center justify-between mt-3 pt-3 border-t border-gray-100">
+            <span className="text-xs text-gray-400">
+              {activeFiltersCount > 0 ? `Активных фильтров: ${activeFiltersCount}` : 'Фильтры не применены'}
+            </span>
+            <div className="flex items-center gap-2">
+              {activeFiltersCount > 0 && (
+                <button
+                  onClick={resetFilters}
+                  className="flex items-center gap-1 px-3 py-1.5 text-xs text-gray-600 hover:bg-gray-100 rounded-lg transition-colors"
+                >
+                  <X size={14} />
+                  Сбросить
+                </button>
+              )}
+              <button
+                onClick={() => setShowFilters(false)}
+                className="px-3 py-1.5 text-xs bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors"
+              >
+                Готово
+              </button>
+            </div>
+          </div>
+        </div>
       </div>
 
       {/* Таблица */}
@@ -391,8 +535,8 @@ export default function PriceListDesktop() {
                         </tr>
                       )}
                       {showSubcategoryHeader && subcategory && (
-                        <tr className="bg-gray-50 border-y border-gray-200">
-                          <td colSpan={5} className="px-6 py-1 font-medium text-gray-600 text-xs">{subcategory}</td>
+                        <tr className="bg-indigo-50/60 border-y border-indigo-100">
+                          <td colSpan={5} className="px-6 py-1.5 font-semibold text-indigo-700 text-xs border-l-[3px] border-indigo-400">{subcategory}</td>
                         </tr>
                       )}
                     <tr

@@ -15,13 +15,16 @@ export default function WorkerStock({ user }) {
   const [addedId, setAddedId] = useState(null); // for animation
 
   const userSupplier = user?.supplier;
+  const [noSupplier, setNoSupplier] = useState(false);
 
   useEffect(() => {
     loadSuppliers();
   }, []);
 
   useEffect(() => {
-    loadStocks();
+    if (selectedSupplier) {
+      loadStocks();
+    }
   }, [selectedSupplier]);
 
   const loadSuppliers = async () => {
@@ -30,18 +33,41 @@ export default function WorkerStock({ user }) {
       setSuppliers(data || []);
       if (userSupplier) {
         setSelectedSupplier(userSupplier);
-      } else if (data && data.length > 0) {
-        setSelectedSupplier(data[0].id);
+      } else {
+        // Пробуем получить supplier из актуальных данных юзера в PocketBase
+        try {
+          const freshUser = await pb.collection('users').getOne(pb.authStore.model?.id);
+          if (freshUser?.supplier) {
+            setSelectedSupplier(freshUser.supplier);
+          } else if (data && data.length > 0) {
+            // Нет привязки к городу — показать первый город, но предупредить
+            setSelectedSupplier(data[0].id);
+            setNoSupplier(true);
+          } else {
+            setLoading(false);
+            setNoSupplier(true);
+          }
+        } catch (e) {
+          if (data && data.length > 0) {
+            setSelectedSupplier(data[0].id);
+            setNoSupplier(true);
+          } else {
+            setLoading(false);
+            setNoSupplier(true);
+          }
+        }
       }
     } catch (e) {
       console.error('Error loading suppliers:', e);
+      setLoading(false);
     }
   };
 
   const loadStocks = async () => {
+    if (!selectedSupplier) return;
     try {
       setLoading(true);
-      const data = await getStocksWithDetails(selectedSupplier || null).catch(() => []);
+      const data = await getStocksWithDetails(selectedSupplier).catch(() => []);
       setStocks(data || []);
     } catch (e) {
       console.error('Error loading stocks:', e);
@@ -137,8 +163,20 @@ export default function WorkerStock({ user }) {
     );
   }
 
+  const currentCityName = suppliers.find(s => s.id === selectedSupplier)?.name || '';
+
   return (
     <div className="px-4 pt-4 pb-4 space-y-4">
+      {/* City indicator */}
+      {currentCityName && (
+        <div className="bg-blue-50 rounded-2xl px-4 py-2.5 flex items-center justify-between">
+          <span className="text-sm font-medium text-blue-700">{currentCityName}</span>
+          {noSupplier && (
+            <span className="text-xs text-amber-600 bg-amber-50 px-2 py-0.5 rounded-lg">Город не привязан</span>
+          )}
+        </div>
+      )}
+
       {/* Stats */}
       <div className="grid grid-cols-2 gap-3">
         <div className="bg-white rounded-2xl p-4 shadow-sm">
