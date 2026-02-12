@@ -21,7 +21,7 @@ export default function WorkerStock({ user }) {
   }, []);
 
   useEffect(() => {
-    if (selectedSupplier) loadStocks();
+    loadStocks();
   }, [selectedSupplier]);
 
   const loadSuppliers = async () => {
