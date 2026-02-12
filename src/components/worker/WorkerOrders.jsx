@@ -204,21 +204,21 @@ export default function WorkerOrders({ user }) {
                   <div
                     className={`rounded-2xl p-4 shadow-sm transition-all border-l-[3px] ${
                       isRefund
-                        ? 'bg-orange-50/60 border-l-orange-400 border border-orange-100'
+                        ? 'bg-red-50 border-l-red-500 border border-red-200'
                         : 'bg-white border-l-emerald-400'
                     } ${refundShakeId === order.id ? 'animate-shake' : ''}`}
                   >
                     {/* Header */}
                     <div className="flex items-center justify-between mb-2.5">
                       <div className="flex items-center gap-2">
-                        <Clock size={14} className={isRefund ? 'text-orange-400' : 'text-gray-400'} />
-                        <span className="text-xs font-medium text-gray-500">{dt.time}</span>
+                        {isRefund ? <RotateCcw size={14} className="text-red-500" /> : <Clock size={14} className="text-gray-400" />}
+                        <span className={`text-xs font-medium ${isRefund ? 'text-red-400' : 'text-gray-500'}`}>{dt.time}</span>
                         {isRefund && (
-                          <span className="text-[10px] font-bold text-orange-600 bg-orange-100 px-1.5 py-0.5 rounded">ВЫЧЕТ</span>
+                          <span className="text-[10px] font-bold text-white bg-red-500 px-1.5 py-0.5 rounded">ВЫЧЕТ</span>
                         )}
                       </div>
                       <span className={`text-xs font-medium px-2 py-0.5 rounded-lg ${
-                        isRefund ? 'text-orange-500 bg-orange-50' : 'text-gray-400 bg-gray-50'
+                        isRefund ? 'text-red-500 bg-red-100' : 'text-gray-400 bg-gray-50'
                       }`}>
                         {paymentLabels[order.payment_method] || '—'}
                       </span>
@@ -228,21 +228,21 @@ export default function WorkerOrders({ user }) {
                     <div className="mb-2.5 space-y-0.5">
                       {(order.items || []).slice(0, 3).map((item, i) => (
                         <div key={i} className="flex justify-between text-sm">
-                          <span className="text-gray-700 truncate flex-1 mr-2">
-                            {item.name} <span className="text-gray-400">×{item.quantity}</span>
+                          <span className={`truncate flex-1 mr-2 ${isRefund ? 'text-red-400 line-through' : 'text-gray-700'}`}>
+                            {item.name} <span className={isRefund ? 'text-red-300' : 'text-gray-400'}>×{item.quantity}</span>
                           </span>
-                          <span className="text-gray-500 shrink-0">{(item.price * item.quantity).toLocaleString('ru-RU')}</span>
+                          <span className={`shrink-0 ${isRefund ? 'text-red-300 line-through' : 'text-gray-500'}`}>{(item.price * item.quantity).toLocaleString('ru-RU')}</span>
                         </div>
                       ))}
                       {(order.items || []).length > 3 && (
-                        <p className="text-xs text-gray-400">ещё {order.items.length - 3} товаров...</p>
+                        <p className={`text-xs ${isRefund ? 'text-red-300' : 'text-gray-400'}`}>ещё {order.items.length - 3} товаров...</p>
                       )}
                     </div>
 
                     {/* Footer */}
-                    <div className="flex items-center justify-between pt-2.5 border-t border-gray-100">
+                    <div className={`flex items-center justify-between pt-2.5 border-t ${isRefund ? 'border-red-200' : 'border-gray-100'}`}>
                       <div className="flex items-center gap-2">
-                        {order.discount > 0 && (
+                        {order.discount > 0 && !isRefund && (
                           <span className="text-xs text-green-600 bg-green-50 px-2 py-0.5 rounded-lg">
                             {discountType === 'percentage' ? `-${order.discount}%` : `-${order.discount}`}
                           </span>
@@ -262,12 +262,12 @@ export default function WorkerOrders({ user }) {
                           </button>
                         )}
                         {isRefund && (
-                          <span className="px-2.5 py-1 text-xs bg-orange-100 text-orange-600 rounded-lg font-medium flex items-center gap-1">
-                            <RotateCcw size={12} /> Вычет
+                          <span className="px-2.5 py-1 text-xs bg-red-500 text-white rounded-lg font-bold flex items-center gap-1">
+                            <RotateCcw size={12} /> Возврат
                           </span>
                         )}
                       </div>
-                      <p className={`text-base font-bold ${isRefund ? 'text-orange-500 line-through' : 'text-gray-900'}`}>
+                      <p className={`text-base font-bold ${isRefund ? 'text-red-500 line-through' : 'text-gray-900'}`}>
                         {(order.total || 0).toLocaleString('ru-RU')} ₽
                       </p>
                     </div>
