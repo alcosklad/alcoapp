@@ -86,12 +86,14 @@ export default function WorkerOrders({ user }) {
     setSelectedOrder(order);
     setRefundConfirm(false);
     setShakeModal(false);
+    document.body.style.overflow = 'hidden';
   };
 
   const closeOrderModal = () => {
     setSelectedOrder(null);
     setRefundConfirm(false);
     setShakeModal(false);
+    document.body.style.overflow = '';
   };
 
   const handleRefund = async () => {
