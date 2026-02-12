@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Search, Calendar, History, RussianRuble, Clock, RotateCcw, X } from 'lucide-react';
+import { Search, Calendar, History, RussianRuble, Clock, RotateCcw, X, CreditCard, Package, ChevronRight } from 'lucide-react';
 import { getOrders, refundOrder } from '../../lib/pocketbase';
 
 export default function WorkerOrders({ user }) {
@@ -8,8 +8,9 @@ export default function WorkerOrders({ user }) {
   const [searchTerm, setSearchTerm] = useState('');
   const [dateFilter, setDateFilter] = useState('');
   const [showFilters, setShowFilters] = useState(false);
-  const [refundConfirmId, setRefundConfirmId] = useState(null);
-  const [refundShakeId, setRefundShakeId] = useState(null);
+  const [selectedOrder, setSelectedOrder] = useState(null);
+  const [refundConfirm, setRefundConfirm] = useState(false);
+  const [shakeModal, setShakeModal] = useState(false);
   const [refundLoading, setRefundLoading] = useState(false);
 
   const ruMonths = {'января':'01','февраля':'02','марта':'03','апреля':'04','мая':'05','июня':'06',
@@ -82,18 +83,30 @@ export default function WorkerOrders({ user }) {
 
   const paymentLabels = { '0': 'Наличные', '1': 'Перевод', '2': 'Предоплата', 'cash': 'Наличные', 'transfer': 'Перевод', 'prepaid': 'Предоплата' };
 
-  const handleRefund = async (order) => {
-    if (refundConfirmId !== order.id) {
-      setRefundShakeId(order.id);
-      setTimeout(() => setRefundShakeId(null), 600);
-      setRefundConfirmId(order.id);
-      setTimeout(() => setRefundConfirmId(null), 5000);
+  const openOrderModal = (order) => {
+    setSelectedOrder(order);
+    setRefundConfirm(false);
+    setShakeModal(false);
+  };
+
+  const closeOrderModal = () => {
+    setSelectedOrder(null);
+    setRefundConfirm(false);
+    setShakeModal(false);
+  };
+
+  const handleRefund = async () => {
+    if (!selectedOrder) return;
+    if (!refundConfirm) {
+      setShakeModal(true);
+      setTimeout(() => setShakeModal(false), 600);
+      setRefundConfirm(true);
       return;
     }
     try {
       setRefundLoading(true);
-      await refundOrder(order.id);
-      setRefundConfirmId(null);
+      await refundOrder(selectedOrder.id);
+      closeOrderModal();
       await loadOrders();
     } catch (err) {
       alert('Ошибка вычета: ' + (err.message || ''));
@@ -185,7 +198,6 @@ export default function WorkerOrders({ user }) {
             return filteredOrders.map(order => {
               const dt = getDateTime(order);
               const isRefund = order.status === 'refund';
-              const discountType = getDiscountType(order.discount_type);
 
               // Day separator
               const dateLabel = dt.date;
@@ -201,77 +213,67 @@ export default function WorkerOrders({ user }) {
                       <div className="h-px bg-gray-200 flex-1"></div>
                     </div>
                   )}
-                  <div
-                    className={`rounded-2xl p-4 shadow-sm transition-all border-l-[3px] ${
+                  <button
+                    onClick={() => openOrderModal(order)}
+                    className={`w-full text-left rounded-2xl p-4 shadow-sm transition-all border-l-[3px] active:scale-[0.98] ${
                       isRefund
-                        ? 'bg-red-50 border-l-red-500 border border-red-200'
+                        ? 'bg-blue-50 border-l-blue-500 border border-blue-200'
                         : 'bg-white border-l-emerald-400'
-                    } ${refundShakeId === order.id ? 'animate-shake' : ''}`}
+                    }`}
                   >
                     {/* Header */}
                     <div className="flex items-center justify-between mb-2.5">
                       <div className="flex items-center gap-2">
-                        {isRefund ? <RotateCcw size={14} className="text-red-500" /> : <Clock size={14} className="text-gray-400" />}
-                        <span className={`text-xs font-medium ${isRefund ? 'text-red-400' : 'text-gray-500'}`}>{dt.time}</span>
+                        {isRefund ? <RotateCcw size={14} className="text-blue-500" /> : <Clock size={14} className="text-gray-400" />}
+                        <span className={`text-xs font-medium ${isRefund ? 'text-blue-400' : 'text-gray-500'}`}>{dt.time}</span>
                         {isRefund && (
-                          <span className="text-[10px] font-bold text-white bg-red-500 px-1.5 py-0.5 rounded">ВЫЧЕТ</span>
+                          <span className="text-[10px] font-bold text-white bg-blue-500 px-1.5 py-0.5 rounded">ВЫЧЕТ</span>
                         )}
                       </div>
-                      <span className={`text-xs font-medium px-2 py-0.5 rounded-lg ${
-                        isRefund ? 'text-red-500 bg-red-100' : 'text-gray-400 bg-gray-50'
-                      }`}>
-                        {paymentLabels[order.payment_method] || '—'}
-                      </span>
+                      <div className="flex items-center gap-1.5">
+                        <span className={`text-xs font-medium px-2 py-0.5 rounded-lg ${
+                          isRefund ? 'text-blue-500 bg-blue-100' : 'text-gray-400 bg-gray-50'
+                        }`}>
+                          {paymentLabels[order.payment_method] || '—'}
+                        </span>
+                        <ChevronRight size={14} className="text-gray-300" />
+                      </div>
                     </div>
 
                     {/* Items */}
                     <div className="mb-2.5 space-y-0.5">
                       {(order.items || []).slice(0, 3).map((item, i) => (
                         <div key={i} className="flex justify-between text-sm">
-                          <span className={`truncate flex-1 mr-2 ${isRefund ? 'text-red-400 line-through' : 'text-gray-700'}`}>
-                            {item.name} <span className={isRefund ? 'text-red-300' : 'text-gray-400'}>×{item.quantity}</span>
+                          <span className={`truncate flex-1 mr-2 ${isRefund ? 'text-blue-400 line-through' : 'text-gray-700'}`}>
+                            {item.name} <span className={isRefund ? 'text-blue-300' : 'text-gray-400'}>×{item.quantity}</span>
                           </span>
-                          <span className={`shrink-0 ${isRefund ? 'text-red-300 line-through' : 'text-gray-500'}`}>{(item.price * item.quantity).toLocaleString('ru-RU')}</span>
+                          <span className={`shrink-0 ${isRefund ? 'text-blue-300 line-through' : 'text-gray-500'}`}>{(item.price * item.quantity).toLocaleString('ru-RU')}</span>
                         </div>
                       ))}
                       {(order.items || []).length > 3 && (
-                        <p className={`text-xs ${isRefund ? 'text-red-300' : 'text-gray-400'}`}>ещё {order.items.length - 3} товаров...</p>
+                        <p className={`text-xs ${isRefund ? 'text-blue-300' : 'text-gray-400'}`}>ещё {order.items.length - 3} товаров...</p>
                       )}
                     </div>
 
                     {/* Footer */}
-                    <div className={`flex items-center justify-between pt-2.5 border-t ${isRefund ? 'border-red-200' : 'border-gray-100'}`}>
+                    <div className={`flex items-center justify-between pt-2.5 border-t ${isRefund ? 'border-blue-200' : 'border-gray-100'}`}>
                       <div className="flex items-center gap-2">
-                        {order.discount > 0 && !isRefund && (
-                          <span className="text-xs text-green-600 bg-green-50 px-2 py-0.5 rounded-lg">
-                            {discountType === 'percentage' ? `-${order.discount}%` : `-${order.discount}`}
+                        {isRefund && (
+                          <span className="px-2.5 py-1 text-xs bg-blue-500 text-white rounded-lg font-bold flex items-center gap-1">
+                            <RotateCcw size={12} /> Вычет
                           </span>
                         )}
-                        {!isRefund && (
-                          <button
-                            onClick={() => handleRefund(order)}
-                            disabled={refundLoading}
-                            className={`px-2.5 py-1 text-xs rounded-lg transition-all flex items-center gap-1 ${
-                              refundConfirmId === order.id
-                                ? 'bg-red-500 text-white'
-                                : 'bg-orange-50 text-orange-500'
-                            } disabled:opacity-50`}
-                          >
-                            <RotateCcw size={12} />
-                            {refundLoading && refundConfirmId === order.id ? '...' : refundConfirmId === order.id ? 'Да' : 'Вычет'}
-                          </button>
-                        )}
-                        {isRefund && (
-                          <span className="px-2.5 py-1 text-xs bg-red-500 text-white rounded-lg font-bold flex items-center gap-1">
-                            <RotateCcw size={12} /> Возврат
+                        {order.discount > 0 && !isRefund && (
+                          <span className="text-xs text-green-600 bg-green-50 px-2 py-0.5 rounded-lg">
+                            {getDiscountType(order.discount_type) === 'percentage' ? `-${order.discount}%` : `-${order.discount}`}
                           </span>
                         )}
                       </div>
-                      <p className={`text-base font-bold ${isRefund ? 'text-red-500 line-through' : 'text-gray-900'}`}>
+                      <p className={`text-base font-bold ${isRefund ? 'text-blue-500 line-through' : 'text-gray-900'}`}>
                         {(order.total || 0).toLocaleString('ru-RU')} ₽
                       </p>
                     </div>
-                  </div>
+                  </button>
                 </React.Fragment>
               );
             });
@@ -279,12 +281,124 @@ export default function WorkerOrders({ user }) {
         </div>
       )}
 
+      {/* Order Detail Modal */}
+      {selectedOrder && (() => {
+        const order = selectedOrder;
+        const dt = getDateTime(order);
+        const isRefund = order.status === 'refund';
+        const discountType = getDiscountType(order.discount_type);
+        return (
+          <div className="fixed inset-0 bg-black/50 z-50 flex items-end justify-center" onClick={closeOrderModal}>
+            <div
+              className={`bg-white rounded-t-3xl w-full max-h-[85vh] overflow-y-auto ${shakeModal ? 'animate-shake' : ''}`}
+              onClick={e => e.stopPropagation()}
+            >
+              <div className="sticky top-0 bg-white px-5 pt-5 pb-3 border-b border-gray-100 z-10">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h3 className="text-lg font-bold text-gray-900">Продажа</h3>
+                    <p className="text-xs text-gray-400">{dt.date}, {dt.time}</p>
+                  </div>
+                  <button onClick={closeOrderModal} className="p-2 hover:bg-gray-100 rounded-xl">
+                    <X size={20} className="text-gray-400" />
+                  </button>
+                </div>
+              </div>
+
+              <div className="px-5 py-4 space-y-4">
+                {/* Status banner */}
+                {isRefund && (
+                  <div className="bg-blue-50 border border-blue-200 rounded-xl px-4 py-3 flex items-center gap-3">
+                    <RotateCcw size={20} className="text-blue-500 shrink-0" />
+                    <div>
+                      <p className="text-sm font-bold text-blue-700">Вычет оформлен</p>
+                      <p className="text-xs text-blue-400">Товары возвращены в остаток</p>
+                    </div>
+                  </div>
+                )}
+
+                {/* Summary stats */}
+                <div className="grid grid-cols-3 gap-3">
+                  <div className="bg-gray-50 rounded-xl p-3 text-center">
+                    <Package size={18} className="mx-auto text-gray-400 mb-1" />
+                    <p className="text-xs text-gray-400">Товары</p>
+                    <p className="text-sm font-bold text-gray-900">{(order.items || []).reduce((s, it) => s + (it.quantity || 0), 0)} шт</p>
+                  </div>
+                  <div className="bg-gray-50 rounded-xl p-3 text-center">
+                    <CreditCard size={18} className="mx-auto text-gray-400 mb-1" />
+                    <p className="text-xs text-gray-400">Оплата</p>
+                    <p className="text-sm font-bold text-gray-900">{paymentLabels[order.payment_method] || '—'}</p>
+                  </div>
+                  <div className="bg-gray-50 rounded-xl p-3 text-center">
+                    <RussianRuble size={18} className="mx-auto text-green-500 mb-1" />
+                    <p className="text-xs text-gray-400">Сумма</p>
+                    <p className={`text-sm font-bold ${isRefund ? 'text-blue-500 line-through' : 'text-green-600'}`}>{(order.total || 0).toLocaleString('ru-RU')}</p>
+                  </div>
+                </div>
+
+                {/* Discount */}
+                {order.discount > 0 && (
+                  <div className="bg-green-50 rounded-xl px-4 py-2.5 flex items-center justify-between">
+                    <span className="text-sm text-green-700">Скидка</span>
+                    <span className="text-sm font-bold text-green-600">
+                      {discountType === 'percentage' ? `-${order.discount}%` : `-${order.discount} ₽`}
+                    </span>
+                  </div>
+                )}
+
+                {/* Items list */}
+                <div>
+                  <p className="text-sm font-semibold text-gray-700 mb-2">Товары в заказе</p>
+                  <div className="space-y-2">
+                    {(order.items || []).map((item, i) => (
+                      <div key={i} className={`rounded-xl px-4 py-3 ${isRefund ? 'bg-blue-50 border border-blue-100' : 'bg-gray-50'}`}>
+                        <div className="flex justify-between items-start">
+                          <div className="flex-1 mr-3">
+                            <p className={`text-sm font-medium ${isRefund ? 'text-blue-400 line-through' : 'text-gray-800'}`}>{item.name}</p>
+                            <p className={`text-xs mt-0.5 ${isRefund ? 'text-blue-300' : 'text-gray-400'}`}>
+                              {(item.price || 0).toLocaleString('ru-RU')} ₽ × {item.quantity} шт
+                            </p>
+                          </div>
+                          <p className={`text-sm font-bold shrink-0 ${isRefund ? 'text-blue-400 line-through' : 'text-gray-900'}`}>
+                            {((item.price || 0) * (item.quantity || 0)).toLocaleString('ru-RU')} ₽
+                          </p>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Refund button — only if NOT already refunded */}
+                {!isRefund && (
+                  <button
+                    onClick={handleRefund}
+                    disabled={refundLoading}
+                    className={`w-full py-3.5 rounded-xl font-semibold text-sm transition-all active:scale-[0.98] disabled:opacity-50 flex items-center justify-center gap-2 ${
+                      refundConfirm
+                        ? 'bg-red-500 text-white'
+                        : 'bg-orange-50 text-orange-600 border border-orange-200'
+                    }`}
+                  >
+                    <RotateCcw size={16} />
+                    {refundLoading ? 'Оформление...' : refundConfirm ? 'Подтвердить вычет' : 'Сделать вычет'}
+                  </button>
+                )}
+
+                {refundConfirm && !isRefund && (
+                  <p className="text-center text-xs text-red-400">Нажмите ещё раз для подтверждения. Товар вернётся в остаток.</p>
+                )}
+              </div>
+            </div>
+          </div>
+        );
+      })()}
+
       {/* Shake animation */}
       <style>{`
         @keyframes shake {
           0%, 100% { transform: translateX(0); }
-          10%, 30%, 50%, 70%, 90% { transform: translateX(-3px); }
-          20%, 40%, 60%, 80% { transform: translateX(3px); }
+          10%, 30%, 50%, 70%, 90% { transform: translateX(-4px); }
+          20%, 40%, 60%, 80% { transform: translateX(4px); }
         }
         .animate-shake { animation: shake 0.5s ease-in-out; }
       `}</style>
