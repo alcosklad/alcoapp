@@ -9,6 +9,9 @@ export default defineConfig({
     host: '0.0.0.0',
     port: 5173,
     allowedHosts: ['nashsklad.store', 'www.nashsklad.store', 'localhost', '127.0.0.1'],
+    watch: {
+      ignored: ['**/.git/**'],
+    },
     proxy: {
       '/api': {
         target: 'http://127.0.0.1:8090',
