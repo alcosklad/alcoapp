@@ -34,9 +34,8 @@ export default function WorkerOrders({ user }) {
     try {
       setLoading(true);
       const data = await getOrders();
+      // Сортируем по created (PocketBase timestamp) — надёжнее чем текстовое local_time
       const sorted = data.sort((a, b) => {
-        if (a.local_time && b.local_time) return parseLocalTime(b.local_time) - parseLocalTime(a.local_time);
-        // Fallback: created (PocketBase) or created_date
         const dateA = new Date(a.created || a.created_date || 0);
         const dateB = new Date(b.created || b.created_date || 0);
         return dateB - dateA;
@@ -97,6 +96,7 @@ export default function WorkerOrders({ user }) {
 
   const handleRefund = async () => {
     if (!selectedOrder) return;
+    if (selectedOrder.status === 'refund') return; // уже вычтен — блокируем
     if (!refundConfirm) {
       setShakeModal(true);
       setTimeout(() => setShakeModal(false), 600);
@@ -106,10 +106,21 @@ export default function WorkerOrders({ user }) {
     try {
       setRefundLoading(true);
       await refundOrder(selectedOrder.id);
-      closeOrderModal();
-      await loadOrders();
+      // Перезагружаем список и обновляем выбранный заказ
+      const freshOrders = await getOrders();
+      const sorted = freshOrders.sort((a, b) => new Date(b.created || 0) - new Date(a.created || 0));
+      setOrders(sorted);
+      // Находим обновлённый заказ в списке
+      const updated = sorted.find(o => o.id === selectedOrder.id) || sorted.find(o => o.local_time === selectedOrder.local_time && o.total === selectedOrder.total);
+      if (updated) {
+        setSelectedOrder(updated); // покажем синюю модалку
+        setRefundConfirm(false);
+      } else {
+        closeOrderModal();
+      }
     } catch (err) {
       alert('Ошибка вычета: ' + (err.message || ''));
+      setRefundConfirm(false); // сбросить, чтобы пользователь мог попробовать снова
     } finally {
       setRefundLoading(false);
     }

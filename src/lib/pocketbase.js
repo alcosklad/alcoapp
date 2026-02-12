@@ -782,7 +782,7 @@ export const getOrders = async () => {
   try {
     const orders = await pb.collection('orders').getFullList({
       filter: `user = "${pb.authStore.model?.id}"`,
-      sort: '-local_time',
+      sort: '-created',
       expand: 'user'
     });
     return orders;
@@ -1162,9 +1162,7 @@ export const refundOrder = async (orderId) => {
       updated = await pb.collection('orders').update(orderId, { status: 'refund' });
       console.log('refundOrder: заказ', orderId, 'помечен как вычет');
     } catch (updateErr) {
-      console.warn('refundOrder: не удалось обновить статус напрямую, пробуем через пересоздание:', updateErr.status);
-      // PocketBase API rules могут блокировать update для worker
-      // Пробуем удалить и создать заново с status=refund
+      console.warn('refundOrder: update не удался, пробуем пересоздание:', updateErr);
       try {
         const orderData = { ...order };
         delete orderData.id;
@@ -1178,12 +1176,25 @@ export const refundOrder = async (orderId) => {
         updated = await pb.collection('orders').create(orderData);
         console.log('refundOrder: заказ пересоздан с status=refund');
       } catch (recreateErr) {
-        console.error('refundOrder: не удалось пересоздать заказ:', recreateErr);
-        // Товары уже возвращены на склад — это главное
-        // Бросаем понятную ошибку
+        console.error('refundOrder: пересоздание не удалось:', recreateErr);
         throw new Error('Товары возвращены на склад, но не удалось обновить статус заказа. Обратитесь к администратору.');
       }
     }
+
+    // Верификация: перечитываем заказ и проверяем что status = 'refund'
+    try {
+      const finalId = updated?.id || orderId;
+      const verify = await pb.collection('orders').getOne(finalId);
+      if (verify.status !== 'refund') {
+        console.error('refundOrder: верификация не пройдена! status =', verify.status);
+        throw new Error('Не удалось пометить заказ как вычет. Попробуйте ещё раз.');
+      }
+      console.log('refundOrder: верификация пройдена, status =', verify.status);
+    } catch (verifyErr) {
+      if (verifyErr.message?.includes('Не удалось пометить')) throw verifyErr;
+      console.warn('refundOrder: ошибка верификации:', verifyErr);
+    }
+
     return updated;
   } catch (error) {
     console.error('PocketBase: Error refunding order:', error);
