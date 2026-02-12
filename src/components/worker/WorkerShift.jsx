@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Clock, RussianRuble, Package, X, CheckCircle, ChevronRight } from 'lucide-react';
+import { Clock, RussianRuble, Package, X, CheckCircle, ChevronRight, RotateCcw } from 'lucide-react';
 import { getActiveShift, getShifts, endShift, getSales } from '../../lib/pocketbase';
 import pb from '../../lib/pocketbase';
 
@@ -93,6 +93,68 @@ export default function WorkerShift({ user }) {
   const formatDate = (d) => new Date(d).toLocaleString('ru-RU');
   const formatShortDate = (d) => new Date(d).toLocaleDateString('ru-RU', { day: 'numeric', month: 'short' });
   const formatTime = (d) => new Date(d).toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' });
+
+  const paymentLabels = { '0': 'Наличные', '1': 'Перевод', '2': 'Предоплата', 'cash': 'Наличные', 'transfer': 'Перевод', 'prepaid': 'Предоплата' };
+  const getPaymentLabel = (pm) => paymentLabels[pm] || '—';
+
+  const renderSalesList = (sales) => {
+    if (!sales || sales.length === 0) return <p className="text-center text-gray-400 text-sm py-4">Продаж не было</p>;
+
+    const refundsCount = sales.filter(s => s.status === 'refund').length;
+    const cashCount = sales.filter(s => s.payment_method === '0' || s.payment_method === 'cash').length;
+    const transferCount = sales.filter(s => s.payment_method === '1' || s.payment_method === 'transfer').length;
+
+    return (
+      <div>
+        <div className="flex items-center justify-between mb-2">
+          <p className="text-sm font-semibold text-gray-700">Продажи ({sales.length})</p>
+          <div className="flex gap-2 text-[10px]">
+            {cashCount > 0 && <span className="bg-gray-100 text-gray-500 px-1.5 py-0.5 rounded">Нал: {cashCount}</span>}
+            {transferCount > 0 && <span className="bg-blue-50 text-blue-500 px-1.5 py-0.5 rounded">Перевод: {transferCount}</span>}
+            {refundsCount > 0 && <span className="bg-orange-50 text-orange-500 px-1.5 py-0.5 rounded">Вычет: {refundsCount}</span>}
+          </div>
+        </div>
+        <div className="space-y-2 max-h-[45vh] overflow-y-auto">
+          {sales.map((sale, i) => {
+            const isRefund = sale.status === 'refund';
+            return (
+              <div key={i} className={`rounded-xl px-3 py-2.5 border-l-[3px] ${
+                isRefund ? 'bg-orange-50/60 border-l-orange-400' : 'bg-gray-50 border-l-emerald-400'
+              }`}>
+                <div className="flex items-center justify-between mb-1.5">
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs font-semibold text-gray-700">
+                      {new Date(sale.created || sale.local_time).toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' })}
+                    </span>
+                    <span className={`text-[10px] px-1.5 py-0.5 rounded ${
+                      isRefund ? 'bg-orange-100 text-orange-600 font-bold' : 'bg-gray-100 text-gray-500'
+                    }`}>
+                      {isRefund ? 'ВЫЧЕТ' : getPaymentLabel(sale.payment_method)}
+                    </span>
+                  </div>
+                  <p className={`text-sm font-bold ${isRefund ? 'text-orange-500 line-through' : 'text-gray-900'}`}>
+                    {(sale.total || 0).toLocaleString('ru-RU')} ₽
+                  </p>
+                </div>
+                {sale.items && sale.items.length > 0 && (
+                  <div className="space-y-0.5 ml-0.5">
+                    {sale.items.map((item, j) => (
+                      <div key={j} className="flex justify-between text-xs">
+                        <span className="text-gray-600 truncate flex-1 mr-2">
+                          {item.name} <span className="text-gray-400">×{item.quantity}</span>
+                        </span>
+                        <span className="text-gray-400 shrink-0">{((item.price || 0) * (item.quantity || 0)).toLocaleString('ru-RU')}</span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      </div>
+    );
+  };
 
   if (loading) {
     return (
@@ -209,24 +271,7 @@ export default function WorkerShift({ user }) {
                 </div>
               </div>
 
-              {shiftData.sales && shiftData.sales.length > 0 && (
-                <div>
-                  <p className="text-sm font-semibold text-gray-700 mb-2">Продажи за смену</p>
-                  <div className="space-y-1.5 max-h-48 overflow-y-auto">
-                    {shiftData.sales.map((sale, i) => (
-                      <div key={i} className="flex justify-between items-center bg-gray-50 rounded-xl px-3 py-2.5">
-                        <div>
-                          <p className="text-xs font-medium text-gray-700">
-                            {new Date(sale.created).toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' })}
-                          </p>
-                          <p className="text-[10px] text-gray-400">{sale.items?.length || 0} товаров</p>
-                        </div>
-                        <p className="text-sm font-semibold text-gray-900">{(sale.total || 0).toLocaleString('ru-RU')} ₽</p>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
+              {renderSalesList(shiftData.sales)}
 
               <div className="flex gap-3 pt-2">
                 <button
@@ -278,28 +323,7 @@ export default function WorkerShift({ user }) {
                 </div>
               </div>
 
-              {selectedShift.sales && selectedShift.sales.length > 0 ? (
-                <div>
-                  <p className="text-sm font-semibold text-gray-700 mb-2">Продажи</p>
-                  <div className="space-y-1.5">
-                    {selectedShift.sales.map((sale, i) => (
-                      <div key={i} className="flex justify-between items-center bg-gray-50 rounded-xl px-3 py-2.5">
-                        <div>
-                          <p className="text-xs font-medium text-gray-700">
-                            {new Date(sale.created).toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' })}
-                          </p>
-                          <p className="text-[10px] text-gray-400">
-                            {sale.payment_method === 'cash' ? 'Наличные' : sale.payment_method === 'transfer' ? 'Перевод' : 'Предоплата'}
-                          </p>
-                        </div>
-                        <p className="text-sm font-semibold">{(sale.total || 0).toLocaleString('ru-RU')} ₽</p>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              ) : (
-                <p className="text-center text-gray-400 text-sm py-4">Продаж не было</p>
-              )}
+              {renderSalesList(selectedShift.sales)}
             </div>
           </div>
         </div>

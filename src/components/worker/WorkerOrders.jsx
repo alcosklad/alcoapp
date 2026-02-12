@@ -180,79 +180,102 @@ export default function WorkerOrders({ user }) {
         </div>
       ) : (
         <div className="space-y-2">
-          {filteredOrders.map(order => {
-            const dt = getDateTime(order);
-            const isRefund = order.status === 'refund';
-            const discountType = getDiscountType(order.discount_type);
+          {(() => {
+            let lastDateLabel = '';
+            return filteredOrders.map(order => {
+              const dt = getDateTime(order);
+              const isRefund = order.status === 'refund';
+              const discountType = getDiscountType(order.discount_type);
 
-            return (
-              <div
-                key={order.id}
-                className={`bg-white rounded-2xl p-4 shadow-sm transition-all ${
-                  isRefund ? 'border border-red-100 bg-red-50/30' : ''
-                } ${refundShakeId === order.id ? 'animate-shake' : ''}`}
-              >
-                {/* Header */}
-                <div className="flex items-center justify-between mb-2.5">
-                  <div className="flex items-center gap-2 text-gray-500">
-                    <Clock size={14} />
-                    <span className="text-xs font-medium">{dt.date}, {dt.time}</span>
-                  </div>
-                  <span className="text-xs font-medium text-gray-400 bg-gray-50 px-2 py-0.5 rounded-lg">
-                    {paymentLabels[order.payment_method] || '—'}
-                  </span>
-                </div>
+              // Day separator
+              const dateLabel = dt.date;
+              const showDaySeparator = dateLabel !== lastDateLabel;
+              lastDateLabel = dateLabel;
 
-                {/* Items */}
-                <div className="mb-2.5 space-y-0.5">
-                  {(order.items || []).slice(0, 3).map((item, i) => (
-                    <div key={i} className="flex justify-between text-sm">
-                      <span className="text-gray-700 truncate flex-1 mr-2">
-                        {item.name} <span className="text-gray-400">×{item.quantity}</span>
-                      </span>
-                      <span className="text-gray-500 shrink-0">{(item.price * item.quantity).toLocaleString('ru-RU')}</span>
+              return (
+                <React.Fragment key={order.id}>
+                  {showDaySeparator && (
+                    <div className="flex items-center gap-3 pt-3 pb-1">
+                      <div className="h-px bg-gray-200 flex-1"></div>
+                      <span className="text-xs font-semibold text-gray-400 shrink-0">{dateLabel}</span>
+                      <div className="h-px bg-gray-200 flex-1"></div>
                     </div>
-                  ))}
-                  {(order.items || []).length > 3 && (
-                    <p className="text-xs text-gray-400">ещё {order.items.length - 3} товаров...</p>
                   )}
-                </div>
+                  <div
+                    className={`rounded-2xl p-4 shadow-sm transition-all border-l-[3px] ${
+                      isRefund
+                        ? 'bg-orange-50/60 border-l-orange-400 border border-orange-100'
+                        : 'bg-white border-l-emerald-400'
+                    } ${refundShakeId === order.id ? 'animate-shake' : ''}`}
+                  >
+                    {/* Header */}
+                    <div className="flex items-center justify-between mb-2.5">
+                      <div className="flex items-center gap-2">
+                        <Clock size={14} className={isRefund ? 'text-orange-400' : 'text-gray-400'} />
+                        <span className="text-xs font-medium text-gray-500">{dt.time}</span>
+                        {isRefund && (
+                          <span className="text-[10px] font-bold text-orange-600 bg-orange-100 px-1.5 py-0.5 rounded">ВЫЧЕТ</span>
+                        )}
+                      </div>
+                      <span className={`text-xs font-medium px-2 py-0.5 rounded-lg ${
+                        isRefund ? 'text-orange-500 bg-orange-50' : 'text-gray-400 bg-gray-50'
+                      }`}>
+                        {paymentLabels[order.payment_method] || '—'}
+                      </span>
+                    </div>
 
-                {/* Footer */}
-                <div className="flex items-center justify-between pt-2.5 border-t border-gray-100">
-                  <div className="flex items-center gap-2">
-                    {order.discount > 0 && (
-                      <span className="text-xs text-green-600 bg-green-50 px-2 py-0.5 rounded-lg">
-                        {discountType === 'percentage' ? `-${order.discount}%` : `-${order.discount}`}
-                      </span>
-                    )}
-                    {!isRefund && (
-                      <button
-                        onClick={() => handleRefund(order)}
-                        disabled={refundLoading}
-                        className={`px-2.5 py-1 text-xs rounded-lg transition-all flex items-center gap-1 ${
-                          refundConfirmId === order.id
-                            ? 'bg-red-500 text-white'
-                            : 'bg-orange-50 text-orange-500'
-                        } disabled:opacity-50`}
-                      >
-                        <RotateCcw size={12} />
-                        {refundLoading && refundConfirmId === order.id ? '...' : refundConfirmId === order.id ? 'Да' : 'Вычет'}
-                      </button>
-                    )}
-                    {isRefund && (
-                      <span className="px-2.5 py-1 text-xs bg-red-100 text-red-600 rounded-lg font-medium flex items-center gap-1">
-                        <RotateCcw size={12} /> Вычет
-                      </span>
-                    )}
+                    {/* Items */}
+                    <div className="mb-2.5 space-y-0.5">
+                      {(order.items || []).slice(0, 3).map((item, i) => (
+                        <div key={i} className="flex justify-between text-sm">
+                          <span className="text-gray-700 truncate flex-1 mr-2">
+                            {item.name} <span className="text-gray-400">×{item.quantity}</span>
+                          </span>
+                          <span className="text-gray-500 shrink-0">{(item.price * item.quantity).toLocaleString('ru-RU')}</span>
+                        </div>
+                      ))}
+                      {(order.items || []).length > 3 && (
+                        <p className="text-xs text-gray-400">ещё {order.items.length - 3} товаров...</p>
+                      )}
+                    </div>
+
+                    {/* Footer */}
+                    <div className="flex items-center justify-between pt-2.5 border-t border-gray-100">
+                      <div className="flex items-center gap-2">
+                        {order.discount > 0 && (
+                          <span className="text-xs text-green-600 bg-green-50 px-2 py-0.5 rounded-lg">
+                            {discountType === 'percentage' ? `-${order.discount}%` : `-${order.discount}`}
+                          </span>
+                        )}
+                        {!isRefund && (
+                          <button
+                            onClick={() => handleRefund(order)}
+                            disabled={refundLoading}
+                            className={`px-2.5 py-1 text-xs rounded-lg transition-all flex items-center gap-1 ${
+                              refundConfirmId === order.id
+                                ? 'bg-red-500 text-white'
+                                : 'bg-orange-50 text-orange-500'
+                            } disabled:opacity-50`}
+                          >
+                            <RotateCcw size={12} />
+                            {refundLoading && refundConfirmId === order.id ? '...' : refundConfirmId === order.id ? 'Да' : 'Вычет'}
+                          </button>
+                        )}
+                        {isRefund && (
+                          <span className="px-2.5 py-1 text-xs bg-orange-100 text-orange-600 rounded-lg font-medium flex items-center gap-1">
+                            <RotateCcw size={12} /> Вычет
+                          </span>
+                        )}
+                      </div>
+                      <p className={`text-base font-bold ${isRefund ? 'text-orange-500 line-through' : 'text-gray-900'}`}>
+                        {(order.total || 0).toLocaleString('ru-RU')} ₽
+                      </p>
+                    </div>
                   </div>
-                  <p className={`text-base font-bold ${isRefund ? 'text-red-400 line-through' : 'text-gray-900'}`}>
-                    {(order.total || 0).toLocaleString('ru-RU')} ₽
-                  </p>
-                </div>
-              </div>
-            );
-          })}
+                </React.Fragment>
+              );
+            });
+          })()}
         </div>
       )}
 
