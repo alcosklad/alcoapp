@@ -1156,44 +1156,17 @@ export const refundOrder = async (orderId) => {
       }
     }
     
-    // Обновляем статус заказа на 'refund'
-    let updated;
-    try {
-      updated = await pb.collection('orders').update(orderId, { status: 'refund' });
-      console.log('refundOrder: заказ', orderId, 'помечен как вычет');
-    } catch (updateErr) {
-      console.warn('refundOrder: update не удался, пробуем пересоздание:', updateErr);
-      try {
-        const orderData = { ...order };
-        delete orderData.id;
-        delete orderData.collectionId;
-        delete orderData.collectionName;
-        delete orderData.created;
-        delete orderData.updated;
-        delete orderData.expand;
-        orderData.status = 'refund';
-        await pb.collection('orders').delete(orderId);
-        updated = await pb.collection('orders').create(orderData);
-        console.log('refundOrder: заказ пересоздан с status=refund');
-      } catch (recreateErr) {
-        console.error('refundOrder: пересоздание не удалось:', recreateErr);
-        throw new Error('Товары возвращены на склад, но не удалось обновить статус заказа. Обратитесь к администратору.');
-      }
-    }
+    // Обновляем статус заказа на 'refund' (НИКОГДА не удаляем заказ!)
+    const updated = await pb.collection('orders').update(orderId, { status: 'refund' });
+    console.log('refundOrder: заказ', orderId, 'помечен как вычет');
 
     // Верификация: перечитываем заказ и проверяем что status = 'refund'
-    try {
-      const finalId = updated?.id || orderId;
-      const verify = await pb.collection('orders').getOne(finalId);
-      if (verify.status !== 'refund') {
-        console.error('refundOrder: верификация не пройдена! status =', verify.status);
-        throw new Error('Не удалось пометить заказ как вычет. Попробуйте ещё раз.');
-      }
-      console.log('refundOrder: верификация пройдена, status =', verify.status);
-    } catch (verifyErr) {
-      if (verifyErr.message?.includes('Не удалось пометить')) throw verifyErr;
-      console.warn('refundOrder: ошибка верификации:', verifyErr);
+    const verify = await pb.collection('orders').getOne(orderId);
+    if (verify.status !== 'refund') {
+      console.error('refundOrder: верификация не пройдена! status =', verify.status);
+      throw new Error('Не удалось пометить заказ как вычет. Попробуйте ещё раз.');
     }
+    console.log('refundOrder: верификация пройдена, status =', verify.status);
 
     return updated;
   } catch (error) {
