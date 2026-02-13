@@ -42,20 +42,17 @@ export default function WorkerShift({ user }) {
 
       let salesData = [];
       try {
-        const sales = await getSales({ filter: `user = "${userId}" && created >= "${activeShift.start}"` });
-        salesData = sales;
-      } catch (_) {}
-
-      if (salesData.length === 0) {
+        salesData = await getSales({ filter: `user = "${userId}" && created >= "${activeShift.start}"` });
+      } catch (_) {
         try {
           const allOrders = await pb.collection('orders').getFullList({ filter: `user = "${userId}"` });
           const shiftStartTime = new Date(activeShift.start);
           salesData = allOrders.filter(o => new Date(o.created) >= shiftStartTime);
-        } catch (_) {}
+        } catch (_e) {}
       }
 
       const totalAmount = salesData.reduce((sum, s) => sum + (s.total || 0), 0);
-      const totalItems = salesData.reduce((sum, s) => sum + (s.items?.length || 0), 0);
+      const totalItems = salesData.reduce((sum, s) => sum + (s.items || []).reduce((q, i) => q + (i.quantity || 1), 0), 0);
 
       setClosingShift(false);
       setShiftData({ endTime: currentTime, totalAmount, totalItems, sales: salesData });
@@ -103,14 +100,16 @@ export default function WorkerShift({ user }) {
     const refundsCount = sales.filter(s => s.status === 'refund').length;
     const cashCount = sales.filter(s => s.payment_method === '0' || s.payment_method === 'cash').length;
     const transferCount = sales.filter(s => s.payment_method === '1' || s.payment_method === 'transfer').length;
+    const prepaidCount = sales.filter(s => s.payment_method === '2' || s.payment_method === 'prepaid').length;
 
     return (
       <div>
         <div className="flex items-center justify-between mb-2">
           <p className="text-sm font-semibold text-gray-700">Продажи ({sales.length})</p>
-          <div className="flex gap-2 text-[10px]">
+          <div className="flex gap-2 text-[10px] flex-wrap justify-end">
             {cashCount > 0 && <span className="bg-gray-100 text-gray-500 px-1.5 py-0.5 rounded">Нал: {cashCount}</span>}
             {transferCount > 0 && <span className="bg-blue-50 text-blue-500 px-1.5 py-0.5 rounded">Перевод: {transferCount}</span>}
+            {prepaidCount > 0 && <span className="bg-purple-50 text-purple-500 px-1.5 py-0.5 rounded">Предоплата: {prepaidCount}</span>}
             {refundsCount > 0 && <span className="bg-orange-50 text-orange-500 px-1.5 py-0.5 rounded">Вычет: {refundsCount}</span>}
           </div>
         </div>

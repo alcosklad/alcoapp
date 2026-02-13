@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { ShoppingCart, RussianRuble, TrendingUp, CreditCard, Banknote, Search, ChevronDown, ChevronUp, X, Eye, Trash2, RotateCcw } from 'lucide-react';
+import { ShoppingCart, RussianRuble, TrendingUp, CreditCard, Banknote, Search, ChevronDown, ChevronUp, X, Eye, Trash2, RotateCcw, Wallet } from 'lucide-react';
 import { getAllOrders, getUsers, deleteOrder, refundOrder, getActiveShift } from '../../lib/pocketbase';
 import pb from '../../lib/pocketbase';
 
@@ -210,9 +210,10 @@ export default function SalesDesktop() {
     const totalCount = filteredOrders.length;
     const avgCheck = totalCount > 0 ? totalSum / totalCount : 0;
     const cashSum = filteredOrders.reduce((s, o) => s + (o.payment_method === '0' ? (o.total || 0) : 0), 0);
-    const cardSum = filteredOrders.reduce((s, o) => s + (o.payment_method === '1' ? (o.total || 0) : 0), 0);
+    const transferSum = filteredOrders.reduce((s, o) => s + (o.payment_method === '1' ? (o.total || 0) : 0), 0);
+    const prepaidSum = filteredOrders.reduce((s, o) => s + (o.payment_method === '2' ? (o.total || 0) : 0), 0);
     const totalItems = filteredOrders.reduce((s, o) => s + (o.items || []).reduce((sum, i) => sum + (i.quantity || 1), 0), 0);
-    return { totalSum, totalCount, avgCheck, cashSum, cardSum, totalItems };
+    return { totalSum, totalCount, avgCheck, cashSum, transferSum, prepaidSum, totalItems };
   }, [filteredOrders]);
 
   const handleSort = (field) => {
@@ -256,7 +257,7 @@ export default function SalesDesktop() {
   return (
     <div className="space-y-4">
       {/* Summary Cards */}
-      <div className="grid grid-cols-5 gap-4">
+      <div className="grid grid-cols-6 gap-3">
         <div className="bg-white rounded-xl shadow-sm p-4">
           <div className="flex items-center gap-2 text-gray-500 mb-1">
             <RussianRuble size={18} />
@@ -289,9 +290,16 @@ export default function SalesDesktop() {
         <div className="bg-white rounded-xl shadow-sm p-4">
           <div className="flex items-center gap-2 text-gray-500 mb-1">
             <CreditCard size={18} />
-            <span className="text-sm">Безнал</span>
+            <span className="text-sm">Перевод</span>
           </div>
-          <p className="text-xl font-bold text-blue-600">{formatMoney(stats.cardSum)}</p>
+          <p className="text-xl font-bold text-blue-600">{formatMoney(stats.transferSum)}</p>
+        </div>
+        <div className="bg-white rounded-xl shadow-sm p-4">
+          <div className="flex items-center gap-2 text-gray-500 mb-1">
+            <Wallet size={18} />
+            <span className="text-sm">Предоплата</span>
+          </div>
+          <p className="text-xl font-bold text-purple-600">{formatMoney(stats.prepaidSum)}</p>
         </div>
       </div>
 
@@ -452,9 +460,13 @@ export default function SalesDesktop() {
                           <span className="inline-flex items-center gap-1 text-xs text-green-600">
                             <Banknote size={14} /> Нал
                           </span>
-                        ) : (
+                        ) : order.payment_method === '1' ? (
                           <span className="inline-flex items-center gap-1 text-xs text-blue-600">
-                            <CreditCard size={14} /> Безнал
+                            <CreditCard size={14} /> Перевод
+                          </span>
+                        ) : (
+                          <span className="inline-flex items-center gap-1 text-xs text-purple-600">
+                            <Wallet size={14} /> Предоплата
                           </span>
                         )}
                       </td>
@@ -569,7 +581,7 @@ export default function SalesDesktop() {
                 <div className="flex justify-between text-sm">
                   <span className="text-gray-500">Способ оплаты</span>
                   <span className="font-medium">
-                    {selectedOrder.payment_method === '0' ? 'Наличные' : 'Безнал'}
+                    {selectedOrder.payment_method === '0' ? 'Наличные' : selectedOrder.payment_method === '1' ? 'Перевод' : 'Предоплата'}
                   </span>
                 </div>
                 <div className="flex justify-between text-base font-semibold">

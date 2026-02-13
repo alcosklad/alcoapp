@@ -877,10 +877,10 @@ export const createSale = async (saleData) => {
   }
 };
 
-// Получение продаж
+// Получение продаж (из orders)
 export const getSales = async (filters = {}) => {
   try {
-    const records = await pb.collection('sales').getFullList({
+    const records = await pb.collection('orders').getFullList({
       sort: '-created',
       ...filters
     });
