@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Clock, RussianRuble, Package, X, CheckCircle, ChevronRight, RotateCcw } from 'lucide-react';
-import { getActiveShift, getShifts, endShift, getSales } from '../../lib/pocketbase';
+import { getActiveShift, getShifts, endShift, getOrders } from '../../lib/pocketbase';
 import pb from '../../lib/pocketbase';
 
 export default function WorkerShift({ user }) {
@@ -37,18 +37,23 @@ export default function WorkerShift({ user }) {
     try {
       setClosingShift(true);
       const userId = pb.authStore.model?.id;
-      if (!userId || !activeShift) return;
+      if (!userId || !activeShift) {
+        setClosingShift(false);
+        return;
+      }
       const currentTime = new Date().toISOString();
+      const shiftStartTime = new Date(activeShift.start);
 
+      // Используем getOrders (работает в Истории) и фильтруем по дате смены
       let salesData = [];
       try {
-        salesData = await getSales({ filter: `user = "${userId}" && created >= "${activeShift.start}"` });
+        const allOrders = await getOrders();
+        salesData = allOrders.filter(o => {
+          const orderDate = new Date(o.created || o.created_date);
+          return orderDate >= shiftStartTime;
+        });
       } catch (_) {
-        try {
-          const allOrders = await pb.collection('orders').getFullList({ filter: `user = "${userId}"` });
-          const shiftStartTime = new Date(activeShift.start);
-          salesData = allOrders.filter(o => new Date(o.created) >= shiftStartTime);
-        } catch (_e) {}
+        console.error('Failed to load orders for shift');
       }
 
       const totalAmount = salesData.reduce((sum, s) => sum + (s.total || 0), 0);
@@ -242,8 +247,8 @@ export default function WorkerShift({ user }) {
       {/* Close Shift Modal */}
       {showCloseModal && shiftData && (
         <div className="fixed inset-0 bg-black/50 z-50 flex items-end justify-center" onClick={() => { setShowCloseModal(false); setShiftData(null); }}>
-          <div className="bg-white rounded-t-3xl w-full max-h-[85vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
-            <div className="sticky top-0 bg-white px-5 pt-5 pb-3 border-b border-gray-100">
+          <div className="bg-white rounded-t-3xl w-full max-h-[85vh] flex flex-col" onClick={e => e.stopPropagation()}>
+            <div className="px-5 pt-5 pb-3 border-b border-gray-100 shrink-0">
               <div className="flex items-center justify-between">
                 <h3 className="text-lg font-bold text-gray-900">Закрытие смены</h3>
                 <button onClick={() => { setShowCloseModal(false); setShiftData(null); }} className="p-2 hover:bg-gray-100 rounded-xl">
@@ -251,7 +256,7 @@ export default function WorkerShift({ user }) {
                 </button>
               </div>
             </div>
-            <div className="px-5 py-4 space-y-4">
+            <div className="px-5 py-4 space-y-4 overflow-y-auto flex-1">
               <div className="grid grid-cols-3 gap-3">
                 <div className="bg-gray-50 rounded-xl p-3 text-center">
                   <Clock size={18} className="mx-auto text-gray-400 mb-1" />
@@ -271,8 +276,9 @@ export default function WorkerShift({ user }) {
               </div>
 
               {renderSalesList(shiftData.sales)}
-
-              <div className="flex gap-3 pt-2">
+            </div>
+            <div className="px-5 py-3 border-t border-gray-100 shrink-0" style={{ paddingBottom: 'max(12px, env(safe-area-inset-bottom))' }}>
+              <div className="flex gap-3">
                 <button
                   onClick={() => { setShowCloseModal(false); setShiftData(null); }}
                   className="flex-1 py-3 bg-gray-100 text-gray-600 rounded-xl font-semibold text-sm"
