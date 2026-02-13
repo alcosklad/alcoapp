@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { Search, ChevronUp, ChevronDown, RefreshCw, MapPin, X, Plus, Trash2, Check } from 'lucide-react';
-import { getStocksAggregated, getSuppliers, getProducts, updateProduct, createStockRecord, deleteStockRecord, updateStockRecord } from '../../lib/pocketbase';
+import { Search, ChevronUp, ChevronDown, RefreshCw, MapPin, X, Plus, Trash2, Check, Calendar, Clock } from 'lucide-react';
+import { getStocksAggregated, getSuppliers, getProducts, updateProduct, createStockRecord, deleteStockRecord, updateStockRecord, getReceptionHistoryForProduct } from '../../lib/pocketbase';
 import { detectSubcategory, ALL_SUBCATEGORIES } from '../../lib/subcategories';
 import pb from '../../lib/pocketbase';
 
@@ -24,6 +24,8 @@ export default function StockDesktop() {
   const [editCities, setEditCities] = useState([]); // [{stockId, supplierId, supplierName, quantity}]
   const [editSaving, setEditSaving] = useState(false);
   const [editError, setEditError] = useState('');
+  const [receptionHistory, setReceptionHistory] = useState([]);
+  const [historyLoading, setHistoryLoading] = useState(false);
 
   // Модалка создания остатка
   const [showCreateModal, setShowCreateModal] = useState(false);
@@ -111,7 +113,7 @@ export default function StockDesktop() {
   }, [stocks]);
 
   // === EDIT MODAL (двойной клик) ===
-  const openEditModal = (stock) => {
+  const openEditModal = async (stock) => {
     const product = getProduct(stock);
     setEditStock(stock);
     setEditProduct(product);
@@ -125,7 +127,7 @@ export default function StockDesktop() {
     // Города: если агрегировано — из _cityBreakdown, если нет — одна запись
     if (stock._cityBreakdown && stock._cityBreakdown.length > 0) {
       setEditCities(stock._cityBreakdown.map(c => ({
-        stockId: null, // мы не храним stockId в breakdown, поищем потом
+        stockId: null,
         supplierId: c.supplierId,
         supplierName: c.supplierName,
         quantity: c.quantity,
@@ -139,7 +141,20 @@ export default function StockDesktop() {
       }]);
     }
     setEditError('');
+    setReceptionHistory([]);
     setShowEditModal(true);
+    // Загружаем историю приёмок
+    if (product?.id) {
+      setHistoryLoading(true);
+      try {
+        const history = await getReceptionHistoryForProduct(product.id);
+        setReceptionHistory(history);
+      } catch (e) {
+        console.error('Error loading history:', e);
+      } finally {
+        setHistoryLoading(false);
+      }
+    }
   };
 
   const closeEditModal = () => {
@@ -770,6 +785,38 @@ export default function StockDesktop() {
                     </button>
                   </div>
                 </div>
+              </div>
+
+              {/* История приёмок */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  <Calendar size={14} className="inline mr-1" />
+                  История приёмок
+                </label>
+                {historyLoading ? (
+                  <div className="text-center py-3 text-xs text-gray-400">
+                    <RefreshCw size={14} className="inline animate-spin mr-1" /> Загрузка...
+                  </div>
+                ) : receptionHistory.length === 0 ? (
+                  <p className="text-xs text-gray-400 py-2">Нет данных о приёмках</p>
+                ) : (
+                  <div className="space-y-1.5 max-h-48 overflow-y-auto">
+                    {receptionHistory.map((h, idx) => (
+                      <div key={idx} className="flex items-center gap-2 bg-gray-50 rounded-lg px-3 py-2 text-xs">
+                        <Clock size={12} className="text-gray-400 shrink-0" />
+                        <span className="text-gray-500 w-28 shrink-0">
+                          {new Date(h.date).toLocaleDateString('ru-RU', { day: 'numeric', month: 'short', year: 'numeric' })}
+                          {', '}
+                          {new Date(h.date).toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' })}
+                        </span>
+                        <MapPin size={12} className="text-blue-400 shrink-0" />
+                        <span className="text-gray-700 flex-1 truncate">{h.city}</span>
+                        <span className="font-medium text-gray-900 shrink-0">{h.quantity} шт</span>
+                        <span className="text-gray-500 shrink-0">× {h.cost.toLocaleString('ru-RU')} ₽</span>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
             </div>
             <div className="flex items-center justify-end gap-3 px-6 py-4 border-t border-gray-200 bg-gray-50 rounded-b-xl">

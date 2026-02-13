@@ -422,6 +422,38 @@ export const getReceptions = async () => {
   }
 };
 
+// Получение истории приёмок для конкретного товара
+export const getReceptionHistoryForProduct = async (productId) => {
+  try {
+    const allReceptions = await pb.collection('receptions').getFullList({
+      expand: 'supplier',
+      sort: '-created'
+    });
+    // Фильтруем приёмки, содержащие этот товар
+    const history = [];
+    for (const rec of allReceptions) {
+      const items = rec.items || [];
+      const match = items.find(it => it.product === productId);
+      if (match) {
+        history.push({
+          receptionId: rec.id,
+          date: rec.created,
+          city: rec.expand?.supplier?.name || '—',
+          supplierId: rec.supplier,
+          stores: rec.stores || [],
+          quantity: match.quantity || 0,
+          cost: match.cost || match.purchase_price || 0,
+          name: match.name || '',
+        });
+      }
+    }
+    return history;
+  } catch (error) {
+    console.error('PocketBase: Error loading reception history:', error);
+    return [];
+  }
+};
+
 export const createDocument = async (data) => {
   try {
     return await pb.collection('documents').create(data);
