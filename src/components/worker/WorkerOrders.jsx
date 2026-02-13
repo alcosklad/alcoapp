@@ -87,6 +87,8 @@ export default function WorkerOrders({ user }) {
     setRefundConfirm(false);
     setShakeModal(false);
     document.body.style.overflow = 'hidden';
+    document.body.style.position = 'fixed';
+    document.body.style.width = '100%';
   };
 
   const closeOrderModal = () => {
@@ -94,6 +96,8 @@ export default function WorkerOrders({ user }) {
     setRefundConfirm(false);
     setShakeModal(false);
     document.body.style.overflow = '';
+    document.body.style.position = '';
+    document.body.style.width = '';
   };
 
   const handleRefund = async () => {
@@ -318,7 +322,7 @@ export default function WorkerOrders({ user }) {
                 </div>
               </div>
 
-              <div className="px-5 py-4 space-y-4">
+              <div className="px-5 py-4 space-y-4 overflow-y-auto" style={{ maxHeight: 'calc(85vh - 60px - 80px)' }}>
                 {/* Status banner */}
                 {isRefund && (
                   <div className="bg-blue-50 border border-blue-200 rounded-xl px-4 py-3 flex items-center gap-3">
@@ -380,13 +384,15 @@ export default function WorkerOrders({ user }) {
                     ))}
                   </div>
                 </div>
+              </div>
 
-                {/* Refund button — only if NOT already refunded */}
-                {!isRefund && (
+              {/* Sticky footer with refund button */}
+              {!isRefund && (
+                <div className="border-t border-gray-100 px-5 py-3" style={{ paddingBottom: 'max(12px, env(safe-area-inset-bottom))' }}>
                   <button
                     onClick={handleRefund}
                     disabled={refundLoading}
-                    className={`w-full py-3.5 rounded-xl font-semibold text-sm transition-all active:scale-[0.98] disabled:opacity-50 flex items-center justify-center gap-2 ${
+                    className={`w-full py-3 rounded-xl font-semibold text-sm transition-all active:scale-[0.98] disabled:opacity-50 flex items-center justify-center gap-2 ${
                       refundConfirm
                         ? 'bg-red-500 text-white'
                         : 'bg-orange-50 text-orange-600 border border-orange-200'
@@ -395,12 +401,11 @@ export default function WorkerOrders({ user }) {
                     <RotateCcw size={16} />
                     {refundLoading ? 'Оформление...' : refundConfirm ? 'Подтвердить вычет' : 'Сделать вычет'}
                   </button>
-                )}
-
-                {refundConfirm && !isRefund && (
-                  <p className="text-center text-xs text-red-400">Нажмите ещё раз для подтверждения. Товар вернётся в остаток.</p>
-                )}
-              </div>
+                  {refundConfirm && (
+                    <p className="text-center text-xs text-red-400 mt-1">Нажмите ещё раз для подтверждения. Товар вернётся в остаток.</p>
+                  )}
+                </div>
+              )}
             </div>
           </div>
         );
