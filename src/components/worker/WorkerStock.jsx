@@ -4,7 +4,7 @@ import { getStocksWithDetails, getSuppliers, updateStock, createOrder, getActive
 import pb from '../../lib/pocketbase';
 import WorkerCart from './WorkerCart';
 
-export default function WorkerStock({ user }) {
+export default function WorkerStock({ user, onCartOpen }) {
   const [stocks, setStocks] = useState([]);
   const [suppliers, setSuppliers] = useState([]);
   const [selectedSupplier, setSelectedSupplier] = useState('');
@@ -145,6 +145,7 @@ export default function WorkerStock({ user }) {
 
       setCart([]);
       setShowCart(false);
+      onCartOpen?.(false);
       loadStocks();
     } catch (error) {
       console.error('Order error:', error);
@@ -157,7 +158,7 @@ export default function WorkerStock({ user }) {
       <WorkerCart
         cart={cart}
         setCart={setCart}
-        onBack={() => setShowCart(false)}
+        onBack={() => { setShowCart(false); onCartOpen?.(false); }}
         onComplete={handleCompleteOrder}
       />
     );
@@ -291,7 +292,7 @@ export default function WorkerStock({ user }) {
       {cartCount > 0 && (
         <div className="fixed bottom-20 left-4 right-4 z-30" style={{ paddingBottom: 'env(safe-area-inset-bottom, 0px)' }}>
           <button
-            onClick={() => setShowCart(true)}
+            onClick={() => { setShowCart(true); onCartOpen?.(true); }}
             className="w-full bg-blue-600 text-white rounded-2xl py-4 px-6 shadow-lg shadow-blue-600/30 flex items-center justify-between active:scale-[0.98] transition-transform"
           >
             <div className="flex items-center gap-3">

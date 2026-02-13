@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { ArrowLeft, Minus, Plus, Trash2, Percent, RussianRuble, CheckCircle } from 'lucide-react';
 
 export default function WorkerCart({ cart, setCart, onBack, onComplete }) {
@@ -7,6 +7,18 @@ export default function WorkerCart({ cart, setCart, onBack, onComplete }) {
   const [paymentMethod, setPaymentMethod] = useState('cash');
   const [submitting, setSubmitting] = useState(false);
   const [success, setSuccess] = useState(false);
+
+  // Lock body scroll when cart is open
+  useEffect(() => {
+    document.body.style.overflow = 'hidden';
+    document.body.style.position = 'fixed';
+    document.body.style.width = '100%';
+    return () => {
+      document.body.style.overflow = '';
+      document.body.style.position = '';
+      document.body.style.width = '';
+    };
+  }, []);
 
   const updateQuantity = (id, delta) => {
     setCart(prev => prev.map(item => {
@@ -192,29 +204,24 @@ export default function WorkerCart({ cart, setCart, onBack, onComplete }) {
 
       {/* Footer */}
       {cart.length > 0 && (
-        <div className="bg-white border-t border-gray-100 px-5 pt-4 pb-5" style={{ paddingBottom: 'max(20px, env(safe-area-inset-bottom))' }}>
-          <div className="space-y-1.5 mb-4">
-            <div className="flex justify-between text-sm text-gray-500">
-              <span>Подитог</span>
-              <span>{subtotal.toLocaleString('ru-RU')} ₽</span>
+        <div className="bg-white border-t border-gray-100 px-5 pt-3 pb-4" style={{ paddingBottom: 'max(16px, env(safe-area-inset-bottom))' }}>
+          <div className="flex items-center justify-between mb-3">
+            <div className="flex items-center gap-3 text-xs text-gray-400">
+              <span>Подитог: {subtotal.toLocaleString('ru-RU')} ₽</span>
+              {discountAmount > 0 && (
+                <span className="text-green-500">−{discountAmount.toLocaleString('ru-RU')} ₽</span>
+              )}
             </div>
-            {discountAmount > 0 && (
-              <div className="flex justify-between text-sm text-green-600">
-                <span>Скидка</span>
-                <span>−{discountAmount.toLocaleString('ru-RU')} ₽</span>
-              </div>
-            )}
-            <div className="flex justify-between text-lg font-bold text-gray-900 pt-1.5 border-t border-gray-100">
-              <span>Итого</span>
-              <span>{total.toLocaleString('ru-RU')} ₽</span>
+            <div className="text-base font-bold text-gray-900">
+              {total.toLocaleString('ru-RU')} ₽
             </div>
           </div>
           <button
             onClick={handleSubmit}
             disabled={submitting || cart.length === 0}
-            className="w-full py-4 bg-green-600 text-white rounded-2xl font-bold text-base shadow-sm shadow-green-600/20 active:scale-[0.98] transition-all disabled:opacity-50"
+            className="w-full py-4 bg-green-600 text-white rounded-2xl font-bold text-lg tracking-wide shadow-lg shadow-green-600/30 active:scale-[0.98] transition-all disabled:opacity-50"
           >
-            {submitting ? 'Оформление...' : 'Оформить заказ'}
+            {submitting ? 'Оформление...' : 'ПРОДАТЬ'}
           </button>
         </div>
       )}
