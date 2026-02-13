@@ -230,21 +230,12 @@ export const createReception = async (data) => {
     
     const result = await pb.collection('receptions').create(receptionData);
     
-    // Обновляем остатки на складе и синхронизируем цену закупа в прайс-лист
+    // Обновляем остатки на складе (cost сохраняется в stocks per-city, НЕ в глобальном products)
     if (data.items && data.supplier) {
       const items = data.items;
       for (const item of items) {
         const purchasePrice = item.cost ?? item.purchase_price ?? null;
         await updateStock(item.product, null, item.quantity, data.supplier, purchasePrice);
-        
-        // Price Sync: обновляем cost товара в прайс-листе если указана цена закупа
-        if (purchasePrice && purchasePrice > 0 && item.product) {
-          try {
-            await pb.collection('products').update(item.product, { cost: purchasePrice });
-          } catch (e) {
-            console.warn('Price Sync: не удалось обновить cost для', item.product, e);
-          }
-        }
       }
     }
     

@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { Search, ChevronUp, ChevronDown, RefreshCw, X, Plus, Check, Trash2, Copy, Merge, Filter, SlidersHorizontal } from 'lucide-react';
-import { getProducts, updateProduct, createProduct, deleteProduct, getStocksForProduct, mergeProducts } from '../../lib/pocketbase';
+import { getProducts, updateProduct, createProduct, deleteProduct, getStocksForProduct, mergeProducts, getStocksWithDetails } from '../../lib/pocketbase';
 import { detectSubcategory, ALL_SUBCATEGORIES } from '../../lib/subcategories';
 import pb from '../../lib/pocketbase';
 
@@ -9,6 +9,7 @@ export default function PriceListDesktop() {
   const [suppliers, setSuppliers] = useState([]);
   const [selectedSupplier, setSelectedSupplier] = useState('');
   const [loading, setLoading] = useState(true);
+  const [cityStocks, setCityStocks] = useState({}); // productId -> {cost}
   const [searchQuery, setSearchQuery] = useState('');
   const [sortField, setSortField] = useState('name');
   const [sortDir, setSortDir] = useState('asc');
@@ -39,6 +40,30 @@ export default function PriceListDesktop() {
     loadSuppliers();
     loadProducts();
   }, []);
+
+  useEffect(() => {
+    loadCityStocks();
+  }, [selectedSupplier]);
+
+  const loadCityStocks = async () => {
+    if (!selectedSupplier) {
+      setCityStocks({});
+      return;
+    }
+    try {
+      const stocks = await getStocksWithDetails(selectedSupplier);
+      const map = {};
+      (stocks || []).forEach(s => {
+        if (s.product) {
+          map[s.product] = { cost: s.cost || 0 };
+        }
+      });
+      setCityStocks(map);
+    } catch (e) {
+      console.error('Error loading city stocks:', e);
+      setCityStocks({});
+    }
+  };
 
   const loadSuppliers = async () => {
     try {
@@ -548,7 +573,12 @@ export default function PriceListDesktop() {
                       <td className="px-3 py-1.5">{product.name || 'Без названия'}</td>
                       <td className="px-3 py-1.5 text-gray-600">{category || '—'}</td>
                       <td className="px-3 py-1.5 text-right">
-                        <span className="text-gray-600">{(product.cost || 0).toLocaleString('ru-RU')}</span>
+                        <span className="text-gray-600">
+                          {(selectedSupplier && cityStocks[product.id]
+                            ? cityStocks[product.id].cost
+                            : (product.cost || 0)
+                          ).toLocaleString('ru-RU')}
+                        </span>
                       </td>
                       <td className="px-4 py-2.5 text-right">
                         <span className="font-medium">{(product.price || 0).toLocaleString('ru-RU')}</span>

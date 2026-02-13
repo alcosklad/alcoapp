@@ -31,6 +31,8 @@ export default function StockDesktop() {
   const [createSearch, setCreateSearch] = useState('');
   const [createSaving, setCreateSaving] = useState(false);
   const [createError, setCreateError] = useState('');
+  const [currentPage, setCurrentPage] = useState(1);
+  const ITEMS_PER_PAGE = 50;
 
   const userRole = pb.authStore.model?.role;
   const isAdmin = userRole === 'admin';
@@ -378,11 +380,19 @@ export default function StockDesktop() {
     return sortDir === 'asc' ? <ChevronUp size={14} /> : <ChevronDown size={14} />;
   };
 
-  // Итоги
+  // Пагинация
+  const totalPages = Math.ceil(filteredStocks.length / ITEMS_PER_PAGE);
+  const paginatedStocks = filteredStocks.slice((currentPage - 1) * ITEMS_PER_PAGE, currentPage * ITEMS_PER_PAGE);
+
+  // Сбрасываем страницу при изменении фильтров
+  useEffect(() => { setCurrentPage(1); }, [searchQuery, selectedCategory, selectedSupplier]);
+
+  // Итоги (по всем, не только по текущей странице)
   const totalQuantity = filteredStocks.reduce((sum, s) => sum + (s?.quantity || 0), 0);
   const totalCostValue = filteredStocks.reduce((sum, s) => {
     const product = getProduct(s);
-    return sum + ((product.cost || 0) * (s?.quantity || 0));
+    const cost = (selectedSupplier && s.cost) ? s.cost : (product.cost || 0);
+    return sum + (cost * (s?.quantity || 0));
   }, 0);
   const totalSaleValue = filteredStocks.reduce((sum, s) => {
     const product = getProduct(s);
@@ -516,10 +526,10 @@ export default function StockDesktop() {
                   {(() => {
                     let lastCategory = null;
                     let lastSubcategory = null;
-                    return filteredStocks.map((stock) => {
+                    return paginatedStocks.map((stock) => {
                       const product = getProduct(stock);
                       const quantity = stock?.quantity || 0;
-                      const cost = product.cost || 0;
+                      const cost = (selectedSupplier && stock.cost) ? stock.cost : (product.cost || 0);
                       const price = product.price || 0;
                       const margin = price - cost;
                       const stockValue = quantity * price;
@@ -591,6 +601,48 @@ export default function StockDesktop() {
           </table>
         </div>
       </div>
+
+      {/* Пагинация */}
+      {totalPages > 1 && (
+        <div className="flex items-center justify-center gap-2 py-3">
+          <button
+            onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+            disabled={currentPage === 1}
+            className="px-3 py-1 text-xs border border-gray-300 rounded hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed"
+          >
+            ← Назад
+          </button>
+          {Array.from({ length: Math.min(totalPages, 7) }, (_, i) => {
+            let page;
+            if (totalPages <= 7) {
+              page = i + 1;
+            } else if (currentPage <= 4) {
+              page = i + 1;
+            } else if (currentPage >= totalPages - 3) {
+              page = totalPages - 6 + i;
+            } else {
+              page = currentPage - 3 + i;
+            }
+            return (
+              <button
+                key={page}
+                onClick={() => setCurrentPage(page)}
+                className={`w-8 h-8 text-xs rounded ${currentPage === page ? 'bg-blue-600 text-white' : 'border border-gray-300 hover:bg-gray-50'}`}
+              >
+                {page}
+              </button>
+            );
+          })}
+          <button
+            onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+            disabled={currentPage === totalPages}
+            className="px-3 py-1 text-xs border border-gray-300 rounded hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed"
+          >
+            Вперёд →
+          </button>
+          <span className="text-xs text-gray-400 ml-2">Стр. {currentPage} из {totalPages}</span>
+        </div>
+      )}
 
       {/* Модалка: разбивка по городам */}
       {cityModal && (
