@@ -1,8 +1,8 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { Search, Calendar, History, RussianRuble, Clock, RotateCcw, X, CreditCard, Package, ChevronRight, ArrowLeft } from 'lucide-react';
 import { getOrders, refundOrder } from '../../lib/pocketbase';
 
-export default function WorkerOrders({ user }) {
+export default function WorkerOrders({ user, closeTrigger }) {
   const [orders, setOrders] = useState([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
@@ -14,6 +14,22 @@ export default function WorkerOrders({ user }) {
   const [shakeModal, setShakeModal] = useState(false);
   const [refundLoading, setRefundLoading] = useState(false);
   const [justRefundedId, setJustRefundedId] = useState(null);
+
+  // Cleanup body scroll lock on unmount (e.g. tab switch)
+  useEffect(() => {
+    return () => {
+      document.body.style.overflow = '';
+      document.body.style.position = '';
+      document.body.style.width = '';
+    };
+  }, []);
+
+  // Close modal when tab is re-clicked
+  useEffect(() => {
+    if (closeTrigger && selectedOrder) {
+      closeOrderModal();
+    }
+  }, [closeTrigger]);
 
   const ruMonths = {'января':'01','февраля':'02','марта':'03','апреля':'04','мая':'05','июня':'06',
                     'июля':'07','августа':'08','сентября':'09','октября':'10','ноября':'11','декабря':'12'};
@@ -336,9 +352,6 @@ export default function WorkerOrders({ user }) {
         return (
           <div className={`fixed inset-0 z-[999] bg-white flex flex-col ${shakeModal ? 'animate-shake' : ''}`}>
             <div className="px-5 pt-3 pb-3 border-b border-gray-100 shrink-0 flex items-center gap-3" style={{ paddingTop: 'max(12px, env(safe-area-inset-top))' }}>
-              <button onClick={closeOrderModal} className="p-2 -ml-2 hover:bg-gray-100 rounded-xl">
-                <ArrowLeft size={22} className="text-gray-600" />
-              </button>
               <div className="flex-1">
                 <h3 className="text-lg font-bold text-gray-900">Продажа</h3>
                 <p className="text-xs text-gray-400">{dt.date}, {dt.time}</p>
@@ -409,26 +422,35 @@ export default function WorkerOrders({ user }) {
                 </div>
               </div>
 
-              {/* Refund button - sticky footer */}
-              {!isRefund && (
-                <div className="border-t border-gray-100 px-5 py-3 shrink-0" style={{ paddingBottom: 'max(12px, env(safe-area-inset-bottom))' }}>
-                  <button
-                    onClick={() => handleInlineRefund({ stopPropagation: () => {} }, order)}
-                    disabled={refundLoading}
-                    className={`w-full py-3 rounded-xl font-semibold text-sm transition-all active:scale-[0.98] disabled:opacity-50 flex items-center justify-center gap-2 ${
-                      refundConfirm === order.id
-                        ? 'bg-red-500 text-white'
-                        : 'bg-orange-50 text-orange-600 border border-orange-200'
-                    }`}
-                  >
-                    <RotateCcw size={16} />
-                    {refundLoading && refundConfirm === order.id ? 'Оформление...' : refundConfirm === order.id ? 'Подтвердить возврат' : 'Сделать возврат'}
-                  </button>
-                  {refundConfirm === order.id && (
-                    <p className="text-center text-xs text-red-400 mt-1">Нажмите ещё раз для подтверждения</p>
-                  )}
-                </div>
-              )}
+              {/* Footer: back + refund */}
+              <div className="border-t border-gray-100 px-5 py-3 shrink-0 space-y-2" style={{ paddingBottom: 'max(12px, env(safe-area-inset-bottom))' }}>
+                {!isRefund && (
+                  <>
+                    <button
+                      onClick={() => handleInlineRefund({ stopPropagation: () => {} }, order)}
+                      disabled={refundLoading}
+                      className={`w-full py-3 rounded-xl font-semibold text-sm transition-all active:scale-[0.98] disabled:opacity-50 flex items-center justify-center gap-2 ${
+                        refundConfirm === order.id
+                          ? 'bg-red-500 text-white'
+                          : 'bg-orange-50 text-orange-600 border border-orange-200'
+                      }`}
+                    >
+                      <RotateCcw size={16} />
+                      {refundLoading && refundConfirm === order.id ? 'Оформление...' : refundConfirm === order.id ? 'Подтвердить возврат' : 'Сделать возврат'}
+                    </button>
+                    {refundConfirm === order.id && (
+                      <p className="text-center text-xs text-red-400 mt-1">Нажмите ещё раз для подтверждения</p>
+                    )}
+                  </>
+                )}
+                <button
+                  onClick={closeOrderModal}
+                  className="w-full py-3 rounded-xl font-semibold text-sm text-gray-400 bg-gray-100/60 flex items-center justify-center gap-2 active:scale-[0.98] transition-all"
+                >
+                  <ArrowLeft size={16} />
+                  Назад
+                </button>
+              </div>
           </div>
         );
       })()}

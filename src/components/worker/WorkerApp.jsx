@@ -9,6 +9,18 @@ export default function WorkerApp({ user, onLogout }) {
   const [activeTab, setActiveTab] = useState('stock');
   const [cartOpen, setCartOpen] = useState(false);
   const [cart, setCart] = useState([]);
+  const [historyCloseTrigger, setHistoryCloseTrigger] = useState(0);
+
+  const handleTabClick = (tabId) => {
+    if (tabId === activeTab && tabId === 'history') {
+      setHistoryCloseTrigger(prev => prev + 1);
+    }
+    // Always reset body scroll when switching tabs
+    document.body.style.overflow = '';
+    document.body.style.position = '';
+    document.body.style.width = '';
+    setActiveTab(tabId);
+  };
 
   const tabs = [
     { id: 'stock', label: 'Остатки', icon: Package },
@@ -23,7 +35,7 @@ export default function WorkerApp({ user, onLogout }) {
       case 'shift':
         return <WorkerShift user={user} />;
       case 'history':
-        return <WorkerOrders user={user} />;
+        return <WorkerOrders user={user} closeTrigger={historyCloseTrigger} />;
       default:
         return <WorkerStock user={user} />;
     }
@@ -62,7 +74,7 @@ export default function WorkerApp({ user, onLogout }) {
             return (
               <button
                 key={tab.id}
-                onClick={() => setActiveTab(tab.id)}
+                onClick={() => handleTabClick(tab.id)}
                 className={`flex flex-col items-center gap-0.5 px-4 py-1.5 rounded-xl transition-all ${
                   isActive
                     ? 'text-blue-600'
