@@ -170,16 +170,6 @@ export default function WorkerStock({ user, onCartOpen, cart, setCart }) {
 
   return (
     <div className="px-4 pt-4 pb-4 space-y-4">
-      {/* City indicator */}
-      {currentCityName && (
-        <div className="bg-blue-50 rounded-2xl px-4 py-2.5 flex items-center justify-between">
-          <span className="text-sm font-medium text-blue-700">{currentCityName}</span>
-          {noSupplier && (
-            <span className="text-xs text-amber-600 bg-amber-50 px-2 py-0.5 rounded-lg">Город не привязан</span>
-          )}
-        </div>
-      )}
-
       {/* Stats line */}
       <div className="flex items-center gap-3 text-xs text-gray-400">
         <span className="font-medium">Всего: <span className="text-gray-700 font-bold">{totalQuantity} шт</span></span>
@@ -294,7 +284,7 @@ export default function WorkerStock({ user, onCartOpen, cart, setCart }) {
 
       {/* Shift auto-start toast */}
       {shiftToast && (
-        <div className="fixed top-6 left-4 right-4 z-50 animate-slide-down">
+        <div className="fixed bottom-24 left-4 right-4 z-[999] animate-slide-up">
           <div className="bg-blue-600 text-white rounded-2xl px-5 py-3.5 shadow-lg shadow-blue-600/30 flex items-center gap-3">
             <div className="w-8 h-8 bg-white/20 rounded-full flex items-center justify-center shrink-0">
               <Clock size={18} />
@@ -308,11 +298,11 @@ export default function WorkerStock({ user, onCartOpen, cart, setCart }) {
       )}
 
       <style>{`
-        @keyframes slideDown {
-          from { transform: translateY(-100%); opacity: 0; }
+        @keyframes slideUp {
+          from { transform: translateY(100%); opacity: 0; }
           to { transform: translateY(0); opacity: 1; }
         }
-        .animate-slide-down { animation: slideDown 0.3s ease-out; }
+        .animate-slide-up { animation: slideUp 0.35s ease-out; }
       `}</style>
     </div>
   );

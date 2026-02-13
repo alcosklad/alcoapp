@@ -80,21 +80,30 @@ export default function WorkerCart({ cart, setCart, onBack, onComplete }) {
 
   if (success) {
     return (
-      <div className="fixed inset-0 bg-gradient-to-b from-green-500 to-emerald-600 z-50 flex flex-col items-center justify-center">
+      <div className="fixed inset-0 z-[999] flex flex-col items-center justify-center sale-overlay">
         <div className="sale-success-icon w-24 h-24 bg-white/20 rounded-full flex items-center justify-center mb-6">
           <CheckCircle size={52} className="text-white" />
         </div>
         <p className="sale-success-text text-2xl font-black text-white tracking-wide">Успешно продано</p>
         <p className="sale-success-amount text-lg text-white/70 font-semibold mt-2">{total.toLocaleString('ru-RU')} ₽</p>
         <style>{`
+          .sale-overlay {
+            background: linear-gradient(to bottom, #22c55e, #059669);
+            animation: saleOverlayFade 2s ease-in-out forwards;
+          }
           .sale-success-icon {
-            animation: popIn 0.4s cubic-bezier(0.34, 1.56, 0.64, 1) both;
+            animation: popIn 0.35s cubic-bezier(0.34, 1.56, 0.64, 1) both;
           }
           .sale-success-text {
-            animation: fadeUp 0.4s ease-out 0.2s both;
+            animation: fadeUp 0.35s ease-out 0.15s both;
           }
           .sale-success-amount {
-            animation: fadeUp 0.4s ease-out 0.35s both;
+            animation: fadeUp 0.35s ease-out 0.3s both;
+          }
+          @keyframes saleOverlayFade {
+            0% { opacity: 1; }
+            70% { opacity: 1; }
+            100% { opacity: 0; }
           }
           @keyframes popIn {
             from { transform: scale(0); opacity: 0; }

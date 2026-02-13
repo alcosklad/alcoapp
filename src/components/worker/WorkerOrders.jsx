@@ -13,6 +13,7 @@ export default function WorkerOrders({ user }) {
   const [refundConfirm, setRefundConfirm] = useState(null);
   const [shakeModal, setShakeModal] = useState(false);
   const [refundLoading, setRefundLoading] = useState(false);
+  const [justRefundedId, setJustRefundedId] = useState(null);
 
   const ruMonths = {'января':'01','февраля':'02','марта':'03','апреля':'04','мая':'05','июня':'06',
                     'июля':'07','августа':'08','сентября':'09','октября':'10','ноября':'11','декабря':'12'};
@@ -120,6 +121,8 @@ export default function WorkerOrders({ user }) {
       const sorted = freshOrders.sort((a, b) => new Date(b.created || 0) - new Date(a.created || 0));
       setOrders(sorted);
       setRefundConfirm(null);
+      setJustRefundedId(order.id);
+      setTimeout(() => setJustRefundedId(null), 1500);
       if (selectedOrder?.id === order.id) {
         const updated = sorted.find(o => o.id === order.id);
         setSelectedOrder(updated || null);
@@ -246,7 +249,11 @@ export default function WorkerOrders({ user }) {
                   )}
                   <button
                     onClick={() => openOrderModal(order)}
-                    className={`w-full text-left rounded-2xl p-4 shadow-sm transition-all border-l-[3px] active:scale-[0.98] ${
+                    className={`w-full text-left rounded-2xl p-4 shadow-sm border-l-[3px] active:scale-[0.98] ${
+                      justRefundedId === order.id
+                        ? 'refund-transition'
+                        : 'transition-all'
+                    } ${
                       isRefund
                         ? 'bg-blue-50 border-l-blue-500 border border-blue-200'
                         : 'bg-white border-l-emerald-400'
@@ -327,7 +334,7 @@ export default function WorkerOrders({ user }) {
         const isRefund = order.status === 'refund';
         const discountType = getDiscountType(order.discount_type);
         return (
-          <div className={`fixed inset-0 z-50 bg-white flex flex-col ${shakeModal ? 'animate-shake' : ''}`}>
+          <div className={`fixed inset-0 z-[999] bg-white flex flex-col ${shakeModal ? 'animate-shake' : ''}`}>
             <div className="px-5 pt-3 pb-3 border-b border-gray-100 shrink-0 flex items-center gap-3" style={{ paddingTop: 'max(12px, env(safe-area-inset-top))' }}>
               <button onClick={closeOrderModal} className="p-2 -ml-2 hover:bg-gray-100 rounded-xl">
                 <ArrowLeft size={22} className="text-gray-600" />
@@ -426,7 +433,7 @@ export default function WorkerOrders({ user }) {
         );
       })()}
 
-      {/* Shake animation */}
+      {/* Animations */}
       <style>{`
         @keyframes shake {
           0%, 100% { transform: translateX(0); }
@@ -434,6 +441,14 @@ export default function WorkerOrders({ user }) {
           20%, 40%, 60%, 80% { transform: translateX(4px); }
         }
         .animate-shake { animation: shake 0.5s ease-in-out; }
+        @keyframes refundPulse {
+          0% { background-color: #ffffff; border-color: #d1d5db; }
+          30% { background-color: #eff6ff; border-color: #93c5fd; }
+          100% { background-color: #eff6ff; border-color: #bfdbfe; }
+        }
+        .refund-transition {
+          animation: refundPulse 1s ease-in-out forwards;
+        }
       `}</style>
     </div>
   );
