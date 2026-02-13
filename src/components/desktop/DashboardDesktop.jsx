@@ -114,7 +114,7 @@ export default function DashboardDesktop({ user }) {
 
   // Данные для круговой диаграммы (продажи за период по способам оплаты)
   const paymentChart = useMemo(() => {
-    let cash = 0, card = 0;
+    let cash = 0, transfer = 0, prepaid = 0;
     const now = new Date();
     const monthAgo = new Date(now);
     monthAgo.setMonth(now.getMonth() - 1);
@@ -122,16 +122,18 @@ export default function DashboardDesktop({ user }) {
       if (new Date(order.created) >= monthAgo) {
         if (order.payment_method === '0' || order.payment_method === 'cash') {
           cash += order.total || 0;
-        } else {
-          card += order.total || 0;
+        } else if (order.payment_method === '1' || order.payment_method === 'transfer') {
+          transfer += order.total || 0;
+        } else if (order.payment_method === '2' || order.payment_method === 'prepaid') {
+          prepaid += order.total || 0;
         }
       }
     });
-    if (cash === 0 && card === 0) return [];
-    return [
-      { name: 'Наличные', value: cash },
-      { name: 'Безнал', value: card },
-    ];
+    const result = [];
+    if (cash > 0) result.push({ name: 'Наличные', value: cash });
+    if (transfer > 0) result.push({ name: 'Перевод', value: transfer });
+    if (prepaid > 0) result.push({ name: 'Предоплата', value: prepaid });
+    return result;
   }, [salesData]);
 
   // Данные для графика закупок по дням (последние 14 дней)
@@ -166,7 +168,7 @@ export default function DashboardDesktop({ user }) {
     return days;
   }, [receptionsData]);
 
-  const PIE_COLORS = ['#22c55e', '#3b82f6'];
+  const PIE_COLORS = ['#22c55e', '#3b82f6', '#a855f7'];
 
   const margin = stats.totalSaleValue - stats.totalPurchaseValue;
 
@@ -254,7 +256,7 @@ export default function DashboardDesktop({ user }) {
           </div>
 
           {/* Круговая диаграмма способов оплаты */}
-          <div className="bg-white rounded-lg border border-gray-200 p-4">
+          <div className="bg-white rounded-lg border border-gray-200 p-4 overflow-hidden">
             <h3 className="text-sm font-semibold text-gray-700 mb-3">Оплата за месяц</h3>
             {paymentChart.length > 0 ? (
               <ResponsiveContainer width="100%" height={220}>
@@ -263,11 +265,13 @@ export default function DashboardDesktop({ user }) {
                     data={paymentChart}
                     cx="50%"
                     cy="50%"
-                    innerRadius={50}
-                    outerRadius={80}
+                    innerRadius={45}
+                    outerRadius={70}
                     paddingAngle={4}
                     dataKey="value"
                     label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
+                    labelLine={{ strokeWidth: 1 }}
+                    style={{ fontSize: 10 }}
                   >
                     {paymentChart.map((_, index) => (
                       <Cell key={`cell-${index}`} fill={PIE_COLORS[index % PIE_COLORS.length]} />

@@ -31,6 +31,16 @@ export default function SalesDesktop() {
   const isAdmin = pb.authStore.model?.role === 'admin';
   const isWorker = pb.authStore.model?.role === 'worker';
 
+  // Lock body scroll when modal is open
+  useEffect(() => {
+    if (selectedOrder) {
+      document.body.style.overflow = 'hidden';
+    } else {
+      document.body.style.overflow = '';
+    }
+    return () => { document.body.style.overflow = ''; };
+  }, [selectedOrder]);
+
   const handleRefundOrder = async (order) => {
     if (!refundConfirm) {
       // Первый клик — анимация тряски и запрос подтверждения
@@ -512,7 +522,7 @@ export default function SalesDesktop() {
 
       {/* Detail Modal */}
       {selectedOrder && (
-        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50" onClick={() => setSelectedOrder(null)}>
+        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50" onClick={() => { setSelectedOrder(null); setRefundConfirm(false); }}>
           <div className="bg-white rounded-xl max-w-lg w-full mx-4 max-h-[80vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
             <div className="sticky top-0 bg-white border-b px-6 py-4 flex justify-between items-center">
               <div>
