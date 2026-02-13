@@ -9,7 +9,7 @@ export default function WorkerOrders({ user }) {
   const [dateFilter, setDateFilter] = useState('');
   const [showFilters, setShowFilters] = useState(false);
   const [selectedOrder, setSelectedOrder] = useState(null);
-  const [refundConfirm, setRefundConfirm] = useState(false);
+  const [refundConfirm, setRefundConfirm] = useState(null);
   const [shakeModal, setShakeModal] = useState(false);
   const [refundLoading, setRefundLoading] = useState(false);
 
@@ -100,33 +100,28 @@ export default function WorkerOrders({ user }) {
     document.body.style.width = '';
   };
 
-  const handleRefund = async () => {
-    if (!selectedOrder) return;
-    if (selectedOrder.status === 'refund') return; // уже вычтен — блокируем
-    if (!refundConfirm) {
-      setShakeModal(true);
-      setTimeout(() => setShakeModal(false), 600);
-      setRefundConfirm(true);
+  const handleInlineRefund = async (e, order) => {
+    e.stopPropagation();
+    if (order.status === 'refund') return;
+    if (refundConfirm !== order.id) {
+      setRefundConfirm(order.id);
+      setTimeout(() => setRefundConfirm(prev => prev === order.id ? null : prev), 5000);
       return;
     }
     try {
       setRefundLoading(true);
-      await refundOrder(selectedOrder.id);
-      // Перезагружаем список и обновляем выбранный заказ
+      await refundOrder(order.id);
       const freshOrders = await getOrders();
       const sorted = freshOrders.sort((a, b) => new Date(b.created || 0) - new Date(a.created || 0));
       setOrders(sorted);
-      // Находим обновлённый заказ в списке
-      const updated = sorted.find(o => o.id === selectedOrder.id) || sorted.find(o => o.local_time === selectedOrder.local_time && o.total === selectedOrder.total);
-      if (updated) {
-        setSelectedOrder(updated); // покажем синюю модалку
-        setRefundConfirm(false);
-      } else {
-        closeOrderModal();
+      setRefundConfirm(null);
+      if (selectedOrder?.id === order.id) {
+        const updated = sorted.find(o => o.id === order.id);
+        setSelectedOrder(updated || null);
       }
     } catch (err) {
       alert('Ошибка вычета: ' + (err.message || ''));
-      setRefundConfirm(false); // сбросить, чтобы пользователь мог попробовать снова
+      setRefundConfirm(null);
     } finally {
       setRefundLoading(false);
     }
@@ -280,6 +275,19 @@ export default function WorkerOrders({ user }) {
                             <RotateCcw size={12} /> Вычет
                           </span>
                         )}
+                        {!isRefund && (
+                          <span
+                            onClick={(e) => handleInlineRefund(e, order)}
+                            className={`px-2 py-1 text-[10px] font-semibold rounded-lg flex items-center gap-1 transition-all ${
+                              refundConfirm === order.id
+                                ? 'bg-red-500 text-white'
+                                : 'bg-orange-50 text-orange-500 border border-orange-200'
+                            } ${refundLoading && refundConfirm === order.id ? 'opacity-50' : ''}`}
+                          >
+                            <RotateCcw size={10} />
+                            {refundLoading && refundConfirm === order.id ? '...' : refundConfirm === order.id ? 'Подтвердить' : 'Вычет'}
+                          </span>
+                        )}
                         {order.discount > 0 && !isRefund && (
                           <span className="text-xs text-green-600 bg-green-50 px-2 py-0.5 rounded-lg">
                             {getDiscountType(order.discount_type) === 'percentage' ? `-${order.discount}%` : `-${order.discount}`}
@@ -386,26 +394,6 @@ export default function WorkerOrders({ user }) {
                 </div>
               </div>
 
-              {/* Sticky footer with refund button */}
-              {!isRefund && (
-                <div className="border-t border-gray-100 px-5 py-3" style={{ paddingBottom: 'max(12px, env(safe-area-inset-bottom))' }}>
-                  <button
-                    onClick={handleRefund}
-                    disabled={refundLoading}
-                    className={`w-full py-3 rounded-xl font-semibold text-sm transition-all active:scale-[0.98] disabled:opacity-50 flex items-center justify-center gap-2 ${
-                      refundConfirm
-                        ? 'bg-red-500 text-white'
-                        : 'bg-orange-50 text-orange-600 border border-orange-200'
-                    }`}
-                  >
-                    <RotateCcw size={16} />
-                    {refundLoading ? 'Оформление...' : refundConfirm ? 'Подтвердить вычет' : 'Сделать вычет'}
-                  </button>
-                  {refundConfirm && (
-                    <p className="text-center text-xs text-red-400 mt-1">Нажмите ещё раз для подтверждения. Товар вернётся в остаток.</p>
-                  )}
-                </div>
-              )}
             </div>
           </div>
         );
