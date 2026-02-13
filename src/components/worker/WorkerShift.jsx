@@ -244,56 +244,52 @@ export default function WorkerShift({ user }) {
         )}
       </div>
 
-      {/* Close Shift Modal */}
+      {/* Close Shift Modal — fullscreen fixed */}
       {showCloseModal && shiftData && (
-        <div className="fixed inset-0 bg-black/50 z-50 flex items-end justify-center" onClick={() => { setShowCloseModal(false); setShiftData(null); }}>
-          <div className="bg-white rounded-t-3xl w-full max-h-[85vh] flex flex-col" onClick={e => e.stopPropagation()}>
-            <div className="px-5 pt-5 pb-3 border-b border-gray-100 shrink-0">
-              <div className="flex items-center justify-between">
-                <h3 className="text-lg font-bold text-gray-900">Закрытие смены</h3>
-                <button onClick={() => { setShowCloseModal(false); setShiftData(null); }} className="p-2 hover:bg-gray-100 rounded-xl">
-                  <X size={20} className="text-gray-400" />
-                </button>
-              </div>
-            </div>
-            <div className="px-5 py-4 space-y-4 overflow-y-auto flex-1">
-              <div className="grid grid-cols-3 gap-3">
-                <div className="bg-gray-50 rounded-xl p-3 text-center">
-                  <Clock size={18} className="mx-auto text-gray-400 mb-1" />
-                  <p className="text-xs text-gray-400">Время</p>
-                  <p className="text-sm font-bold text-gray-900">{formatDuration(activeShift.start, shiftData.endTime)}</p>
-                </div>
-                <div className="bg-gray-50 rounded-xl p-3 text-center">
-                  <Package size={18} className="mx-auto text-gray-400 mb-1" />
-                  <p className="text-xs text-gray-400">Товары</p>
-                  <p className="text-sm font-bold text-gray-900">{shiftData.totalItems} шт</p>
-                </div>
-                <div className="bg-gray-50 rounded-xl p-3 text-center">
-                  <RussianRuble size={18} className="mx-auto text-green-500 mb-1" />
-                  <p className="text-xs text-gray-400">Сумма</p>
-                  <p className="text-sm font-bold text-green-600">{shiftData.totalAmount.toLocaleString('ru-RU')}</p>
-                </div>
-              </div>
+        <div className="fixed inset-0 z-50 bg-white flex flex-col" style={{ touchAction: 'none' }}>
+          <div className="px-5 pt-3 pb-3 border-b border-gray-100 shrink-0 flex items-center justify-between" style={{ paddingTop: 'max(12px, env(safe-area-inset-top))' }}>
+            <h3 className="text-lg font-bold text-gray-900">Закрытие смены</h3>
+            <button onClick={() => { setShowCloseModal(false); setShiftData(null); }} className="p-2 hover:bg-gray-100 rounded-xl">
+              <X size={20} className="text-gray-400" />
+            </button>
+          </div>
 
-              {renderSalesList(shiftData.sales)}
-            </div>
-            <div className="px-5 py-3 border-t border-gray-100 shrink-0" style={{ paddingBottom: 'max(12px, env(safe-area-inset-bottom))' }}>
-              <div className="flex gap-3">
-                <button
-                  onClick={() => { setShowCloseModal(false); setShiftData(null); }}
-                  className="flex-1 py-3 bg-gray-100 text-gray-600 rounded-xl font-semibold text-sm"
-                >
-                  Отмена
-                </button>
-                <button
-                  onClick={confirmCloseShift}
-                  disabled={closingShift}
-                  className="flex-1 py-3 bg-red-500 text-white rounded-xl font-semibold text-sm disabled:opacity-50 active:scale-[0.98] transition-all"
-                >
-                  {closingShift ? 'Закрытие...' : 'Закрыть смену'}
-                </button>
+          <div className="flex gap-3 px-5 py-3 border-b border-gray-100 shrink-0">
+            <button
+              onClick={() => { setShowCloseModal(false); setShiftData(null); }}
+              className="flex-1 py-3 bg-gray-100 text-gray-600 rounded-xl font-semibold text-sm"
+            >
+              Отмена
+            </button>
+            <button
+              onClick={confirmCloseShift}
+              disabled={closingShift}
+              className="flex-1 py-3 bg-red-500 text-white rounded-xl font-semibold text-sm disabled:opacity-50 active:scale-[0.98] transition-all"
+            >
+              {closingShift ? 'Закрытие...' : 'Закрыть смену'}
+            </button>
+          </div>
+
+          <div className="px-5 py-4 space-y-4 overflow-y-auto flex-1" style={{ WebkitOverflowScrolling: 'touch' }}>
+            <div className="grid grid-cols-3 gap-3">
+              <div className="bg-gray-50 rounded-xl p-3 text-center">
+                <Clock size={18} className="mx-auto text-gray-400 mb-1" />
+                <p className="text-xs text-gray-400">Время</p>
+                <p className="text-sm font-bold text-gray-900">{formatDuration(activeShift.start, shiftData.endTime)}</p>
+              </div>
+              <div className="bg-gray-50 rounded-xl p-3 text-center">
+                <Package size={18} className="mx-auto text-gray-400 mb-1" />
+                <p className="text-xs text-gray-400">Товары</p>
+                <p className="text-sm font-bold text-gray-900">{shiftData.totalItems} шт</p>
+              </div>
+              <div className="bg-gray-50 rounded-xl p-3 text-center">
+                <RussianRuble size={18} className="mx-auto text-green-500 mb-1" />
+                <p className="text-xs text-gray-400">Сумма</p>
+                <p className="text-sm font-bold text-green-600">{shiftData.totalAmount.toLocaleString('ru-RU')}</p>
               </div>
             </div>
+
+            {renderSalesList(shiftData.sales)}
           </div>
         </div>
       )}
