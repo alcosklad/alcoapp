@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Search, ChevronUp, ChevronDown, RefreshCw, Plus, Eye, X, Trash2, Minus } from 'lucide-react';
+import { Search, ChevronUp, ChevronDown, ChevronRight, RefreshCw, Plus, Eye, X, Trash2, Minus } from 'lucide-react';
 import { getReceptions, getSuppliers, getProducts, createReception, updateReception, deleteReception } from '../../lib/pocketbase';
 import { format } from 'date-fns';
 import { ru } from 'date-fns/locale';
@@ -19,6 +19,7 @@ export default function ReceptionDesktop() {
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [editedItems, setEditedItems] = useState([]);
   const [hasChanges, setHasChanges] = useState(false);
+  const [expandedStores, setExpandedStores] = useState({});
   
   const userRole = pb.authStore.model?.role;
   const isAdmin = userRole === 'admin';
@@ -352,15 +353,32 @@ export default function ReceptionDesktop() {
                       </td>
                       <td className="px-3 py-1.5 text-gray-600">
                         {reception.stores && reception.stores.length > 0 ? (
-                          <div className="flex flex-wrap gap-1">
-                            {reception.stores.map(storeId => {
-                              const store = storesList.find(s => s.id === storeId);
+                          <div className="flex items-center gap-1 flex-wrap">
+                            {(() => {
+                              const isExpanded = expandedStores[reception.id];
+                              const storesToShow = isExpanded ? reception.stores : [reception.stores[0]];
                               return (
-                                <span key={storeId} className="px-1.5 py-0.5 bg-blue-50 text-blue-700 rounded text-[10px]">
-                                  {store?.name || storeId}
-                                </span>
+                                <>
+                                  {storesToShow.map(storeId => {
+                                    const store = storesList.find(s => s.id === storeId);
+                                    return (
+                                      <span key={storeId} className="px-1.5 py-0.5 bg-blue-50 text-blue-700 rounded text-[10px]">
+                                        {store?.name || storeId}
+                                      </span>
+                                    );
+                                  })}
+                                  {reception.stores.length > 1 && (
+                                    <button
+                                      onClick={(e) => { e.stopPropagation(); setExpandedStores(prev => ({...prev, [reception.id]: !prev[reception.id]})); }}
+                                      className="p-0.5 text-blue-400 hover:text-blue-600 hover:bg-blue-50 rounded transition-transform"
+                                      title={isExpanded ? 'Свернуть' : `Ещё ${reception.stores.length - 1}`}
+                                    >
+                                      <ChevronRight size={12} className={`transition-transform ${isExpanded ? 'rotate-90' : ''}`} />
+                                    </button>
+                                  )}
+                                </>
                               );
-                            })}
+                            })()}
                           </div>
                         ) : '—'}
                       </td>

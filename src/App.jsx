@@ -77,7 +77,7 @@ function App() {
         case 'shifts':
           return <ShiftsDesktop />;
         case 'settings':
-          return <SettingsDesktop />;
+          return <SettingsDesktop onLogout={handleLogout} />;
         default:
           return <DashboardDesktop user={user} />;
       }

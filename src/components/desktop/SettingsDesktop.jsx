@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from 'react';
-import { Users, Plus, Edit2, Trash2, X, Check, Eye, EyeOff, RefreshCw, Shield, UserCircle, Truck } from 'lucide-react';
+import React, { useState, useEffect, useMemo } from 'react';
+import { Users, Plus, Edit2, Trash2, X, Check, Eye, EyeOff, RefreshCw, Shield, UserCircle, Truck, ChevronUp, ChevronDown } from 'lucide-react';
 import { getUsers, createUser, updateUser, deleteUser, getSuppliers } from '../../lib/pocketbase';
 import pb from '../../lib/pocketbase';
 
@@ -9,7 +9,7 @@ const ROLES = [
   { value: 'worker', label: 'Курьер', icon: Truck, color: 'text-green-600 bg-green-50' },
 ];
 
-export default function SettingsDesktop() {
+export default function SettingsDesktop({ onLogout }) {
   const [users, setUsers] = useState([]);
   const [suppliers, setSuppliers] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -17,13 +17,15 @@ export default function SettingsDesktop() {
   const [editingUser, setEditingUser] = useState(null);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
+  const [sortField, setSortField] = useState('name');
+  const [sortDir, setSortDir] = useState('asc');
 
   const [form, setForm] = useState({
     username: '',
     name: '',
     password: '',
     role: 'worker',
-    city: '',
+    supplier: '',
   });
 
   const [showPassword, setShowPassword] = useState(false);
@@ -48,9 +50,60 @@ export default function SettingsDesktop() {
     }
   };
 
+  const getSupplierName = (supplierId) => {
+    if (!supplierId) return '—';
+    const s = suppliers.find(x => x.id === supplierId);
+    return s?.name || '—';
+  };
+
+  const handleSort = (field) => {
+    if (sortField === field) {
+      setSortDir(d => d === 'asc' ? 'desc' : 'asc');
+    } else {
+      setSortField(field);
+      setSortDir('asc');
+    }
+  };
+
+  const sortedUsers = useMemo(() => {
+    return [...users].sort((a, b) => {
+      let aVal, bVal;
+      switch (sortField) {
+        case 'name':
+          aVal = (a.name || '').toLowerCase();
+          bVal = (b.name || '').toLowerCase();
+          break;
+        case 'role':
+          aVal = a.role || '';
+          bVal = b.role || '';
+          break;
+        case 'city':
+          aVal = getSupplierName(a.supplier).toLowerCase();
+          bVal = getSupplierName(b.supplier).toLowerCase();
+          break;
+        case 'created':
+          aVal = new Date(a.created || 0);
+          bVal = new Date(b.created || 0);
+          return sortDir === 'asc' ? aVal - bVal : bVal - aVal;
+        default:
+          aVal = '';
+          bVal = '';
+      }
+      if (typeof aVal === 'string') {
+        return sortDir === 'asc' ? aVal.localeCompare(bVal) : bVal.localeCompare(aVal);
+      }
+      return sortDir === 'asc' ? (aVal > bVal ? 1 : -1) : (bVal > aVal ? 1 : -1);
+    });
+  }, [users, sortField, sortDir, suppliers]);
+
+  const SortIcon = ({ field }) => {
+    if (sortField !== field) return null;
+    return sortDir === 'asc' ? <ChevronUp size={14} /> : <ChevronDown size={14} />;
+  };
+
   const openCreateModal = () => {
     setEditingUser(null);
-    setForm({ username: '', name: '', password: '', role: 'worker', city: '' });
+    setForm({ username: '', name: '', password: '', role: 'worker', supplier: '' });
     setError('');
     setShowPassword(false);
     setShowModal(true);
@@ -63,7 +116,7 @@ export default function SettingsDesktop() {
       name: user.name || '',
       password: '',
       role: user.role || 'worker',
-      city: user.city || '',
+      supplier: user.supplier || '',
     });
     setError('');
     setShowPassword(false);
@@ -73,7 +126,7 @@ export default function SettingsDesktop() {
   const closeModal = () => {
     setShowModal(false);
     setEditingUser(null);
-    setForm({ username: '', name: '', password: '', role: 'worker', city: '' });
+    setForm({ username: '', name: '', password: '', role: 'worker', supplier: '' });
     setError('');
   };
 
@@ -93,6 +146,14 @@ export default function SettingsDesktop() {
       return;
     }
 
+    const isSelf = editingUser && editingUser.id === pb.authStore.model?.id;
+    const dataChanged = editingUser && (
+      form.password ||
+      form.username !== editingUser.username ||
+      form.name !== editingUser.name ||
+      form.role !== editingUser.role
+    );
+
     try {
       setSaving(true);
       if (editingUser) {
@@ -102,6 +163,13 @@ export default function SettingsDesktop() {
       }
       closeModal();
       await loadData();
+
+      if (isSelf && dataChanged) {
+        alert('Данные вашего аккаунта изменены. Пожалуйста, выйдите и войдите заново для применения изменений.');
+        if (form.password && onLogout) {
+          onLogout();
+        }
+      }
     } catch (err) {
       console.error('Error saving user:', err);
       const msg = err?.data?.data;
@@ -187,23 +255,31 @@ export default function SettingsDesktop() {
         <table className="w-full text-sm">
           <thead>
             <tr className="bg-gray-50 border-b border-gray-200">
-              <th className="text-left px-4 py-3 font-medium text-gray-600">Имя</th>
+              <th className="text-left px-4 py-3 font-medium text-gray-600 cursor-pointer hover:bg-gray-100 select-none" onClick={() => handleSort('name')}>
+                <div className="flex items-center gap-1">Имя <SortIcon field="name" /></div>
+              </th>
               <th className="text-left px-4 py-3 font-medium text-gray-600">Логин</th>
-              <th className="text-left px-4 py-3 font-medium text-gray-600">Роль</th>
-              <th className="text-left px-4 py-3 font-medium text-gray-600">Город</th>
-              <th className="text-left px-4 py-3 font-medium text-gray-600">Создан</th>
+              <th className="text-left px-4 py-3 font-medium text-gray-600 cursor-pointer hover:bg-gray-100 select-none" onClick={() => handleSort('role')}>
+                <div className="flex items-center gap-1">Роль <SortIcon field="role" /></div>
+              </th>
+              <th className="text-left px-4 py-3 font-medium text-gray-600 cursor-pointer hover:bg-gray-100 select-none" onClick={() => handleSort('city')}>
+                <div className="flex items-center gap-1">Город <SortIcon field="city" /></div>
+              </th>
+              <th className="text-left px-4 py-3 font-medium text-gray-600 cursor-pointer hover:bg-gray-100 select-none" onClick={() => handleSort('created')}>
+                <div className="flex items-center gap-1">Создан <SortIcon field="created" /></div>
+              </th>
               <th className="w-24 px-4 py-3"></th>
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-100">
-            {users.length === 0 ? (
+            {sortedUsers.length === 0 ? (
               <tr>
                 <td colSpan={6} className="px-4 py-8 text-center text-gray-400">
                   Нет пользователей
                 </td>
               </tr>
             ) : (
-              users.map(user => (
+              sortedUsers.map(user => (
                 <tr key={user.id} className="hover:bg-gray-50 transition-colors">
                   <td className="px-4 py-3">
                     <div className="font-medium text-gray-900">{user.name || '—'}</div>
@@ -215,7 +291,7 @@ export default function SettingsDesktop() {
                     {getRoleBadge(user.role)}
                   </td>
                   <td className="px-4 py-3 text-gray-600">
-                    {user.city || '—'}
+                    {getSupplierName(user.supplier)}
                   </td>
                   <td className="px-4 py-3 text-gray-500 text-xs">
                     {user.created ? new Date(user.created).toLocaleDateString('ru-RU') : '—'}
@@ -279,15 +355,15 @@ export default function SettingsDesktop() {
                 />
               </div>
 
-              {/* Имя */}
+              {/* Имя (отображаемое имя / никнейм) */}
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Имя</label>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Имя (отображаемое)</label>
                 <input
                   type="text"
                   value={form.name}
                   onChange={e => setForm({...form, name: e.target.value})}
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  placeholder="Имя сотрудника"
+                  placeholder="Имя в интерфейсе и сайдбаре"
                 />
               </div>
 
@@ -328,20 +404,27 @@ export default function SettingsDesktop() {
                 </select>
               </div>
 
-              {/* Город */}
+              {/* Город (supplier — relation) */}
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Город</label>
                 <select
-                  value={form.city}
-                  onChange={e => setForm({...form, city: e.target.value})}
+                  value={form.supplier}
+                  onChange={e => setForm({...form, supplier: e.target.value})}
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
                 >
                   <option value="">Не указан</option>
                   {suppliers.map(s => (
-                    <option key={s.id} value={s.name}>{s.name}</option>
+                    <option key={s.id} value={s.id}>{s.name}</option>
                   ))}
                 </select>
               </div>
+
+              {/* Пометка для текущего пользователя */}
+              {editingUser && editingUser.id === pb.authStore.model?.id && (
+                <div className="bg-amber-50 text-amber-700 p-3 rounded-lg text-xs">
+                  ⚠️ Вы редактируете свой аккаунт. При смене пароля или логина потребуется перелогин.
+                </div>
+              )}
             </div>
 
             {/* Footer */}

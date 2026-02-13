@@ -83,9 +83,12 @@ export default function DesktopLayout({ children, activeTab, onTabChange, user, 
         <div className="border-t border-gray-200 p-3">
           {!collapsed && (
             <div className="mb-2 px-1">
-              <p className="text-sm font-medium text-gray-800 truncate">{user?.name || 'Пользователь'}</p>
+              <p className="text-sm font-medium text-gray-800 truncate">{user?.name || user?.username || 'Пользователь'}</p>
               <p className="text-xs text-gray-500">
                 {userRole === 'admin' ? 'Администратор' : 'Оператор'}
+                {user?.username && user?.name !== user?.username && (
+                  <span className="text-gray-400"> · {user.username}</span>
+                )}
               </p>
             </div>
           )}

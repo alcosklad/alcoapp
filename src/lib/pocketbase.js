@@ -1004,16 +1004,18 @@ export const updateUserTimezone = async (userId, timezone) => {
 
 export const createUser = async (data) => {
   try {
-    const record = await pb.collection('users').create({
+    const createData = {
       username: data.username,
       password: data.password,
       passwordConfirm: data.password,
       name: data.name || data.username,
       role: data.role || 'worker',
-      city: data.city || '',
       email: data.email || `${data.username}@nashsklad.local`,
       emailVisibility: false,
-    });
+    };
+    // supplier — relation ID к коллекции suppliers (город)
+    if (data.supplier) createData.supplier = data.supplier;
+    const record = await pb.collection('users').create(createData);
     return record;
   } catch (error) {
     console.error('PocketBase: Error creating user:', error);
@@ -1026,7 +1028,7 @@ export const updateUser = async (userId, data) => {
     const updateData = {};
     if (data.name !== undefined) updateData.name = data.name;
     if (data.role !== undefined) updateData.role = data.role;
-    if (data.city !== undefined) updateData.city = data.city;
+    if (data.supplier !== undefined) updateData.supplier = data.supplier || '';
     if (data.username !== undefined) updateData.username = data.username;
     if (data.password) {
       updateData.password = data.password;

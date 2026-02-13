@@ -354,7 +354,7 @@ export default function DashboardDesktop({ user }) {
       {/* Модалка разбивки по складам */}
       {showStockBreakdown && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50" onClick={() => setShowStockBreakdown(false)}>
-          <div className="bg-white rounded-2xl max-w-4xl w-full mx-6 shadow-2xl" onClick={(e) => e.stopPropagation()}>
+          <div className="bg-white rounded-2xl max-w-6xl w-full mx-6 shadow-2xl" onClick={(e) => e.stopPropagation()}>
             <div className="flex items-center justify-between px-8 py-5 border-b border-gray-100">
               <div>
                 <h3 className="text-xl font-bold text-gray-900">Товары по складам</h3>
@@ -364,36 +364,28 @@ export default function DashboardDesktop({ user }) {
                 <X size={20} className="text-gray-400" />
               </button>
             </div>
-            <div className="px-8 py-6">
+            <div className="px-8 py-6 max-h-[70vh] overflow-y-auto">
               {(stats.stockBreakdown || []).length === 0 ? (
                 <p className="text-gray-500 text-sm text-center py-8">Нет данных</p>
               ) : (
-                <div className="grid grid-cols-1 gap-3">
+                <div className="grid grid-cols-2 lg:grid-cols-3 gap-3">
                   {(stats.stockBreakdown || []).map((item, idx) => (
-                    <div key={idx} className="flex items-center justify-between p-4 bg-gray-50 rounded-xl hover:bg-gray-100 transition-colors">
-                      <div className="flex items-center gap-4">
-                        <div className="w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center">
-                          <Package size={20} className="text-blue-600" />
+                    <div key={idx} className="flex items-center justify-between p-3 bg-gray-50 rounded-xl hover:bg-gray-100 transition-colors">
+                      <div className="flex items-center gap-3 min-w-0 flex-1">
+                        <div className="w-8 h-8 bg-blue-100 rounded-lg flex items-center justify-center shrink-0">
+                          <Package size={16} className="text-blue-600" />
                         </div>
-                        <span className="text-base font-semibold text-gray-900">{item.name}</span>
-                      </div>
-                      <div className="flex items-center gap-8">
-                        <div className="text-right">
-                          <p className="text-lg font-bold text-gray-900">{item.count.toLocaleString('ru-RU')} <span className="text-sm font-normal text-gray-500">шт</span></p>
+                        <div className="min-w-0 flex-1">
+                          <p className="text-sm font-medium text-gray-900 truncate">{item.name}</p>
+                          <p className="text-xs text-gray-500">{item.count.toLocaleString('ru-RU')} шт</p>
                         </div>
-                        {isAdmin && (
-                          <>
-                            <div className="text-right min-w-[120px]">
-                              <p className="text-xs text-gray-400 mb-0.5">Продажа</p>
-                              <p className="text-sm font-semibold text-green-600">{item.saleValue.toLocaleString('ru-RU')}</p>
-                            </div>
-                            <div className="text-right min-w-[120px]">
-                              <p className="text-xs text-gray-400 mb-0.5">Закуп</p>
-                              <p className="text-sm font-semibold text-purple-600">{item.purchaseValue.toLocaleString('ru-RU')}</p>
-                            </div>
-                          </>
-                        )}
                       </div>
+                      {isAdmin && (
+                        <div className="text-right shrink-0 ml-2">
+                          <p className="text-xs font-semibold text-green-600">{item.saleValue.toLocaleString('ru-RU')}</p>
+                          <p className="text-xs text-purple-500">{item.purchaseValue.toLocaleString('ru-RU')}</p>
+                        </div>
+                      )}
                     </div>
                   ))}
                 </div>
@@ -402,15 +394,10 @@ export default function DashboardDesktop({ user }) {
             {isAdmin && (stats.stockBreakdown || []).length > 0 && (
               <div className="px-8 py-4 border-t border-gray-100 bg-gray-50 rounded-b-2xl">
                 <div className="flex items-center justify-between">
-                  <span className="text-base font-bold text-gray-900">Итого</span>
-                  <div className="flex items-center gap-8">
-                    <span className="text-lg font-bold text-gray-900">{stats.totalProducts.toLocaleString('ru-RU')} шт</span>
-                    <div className="text-right min-w-[120px]">
-                      <p className="text-sm font-bold text-green-600">{stats.totalSaleValue.toLocaleString('ru-RU')}</p>
-                    </div>
-                    <div className="text-right min-w-[120px]">
-                      <p className="text-sm font-bold text-purple-600">{stats.totalPurchaseValue.toLocaleString('ru-RU')}</p>
-                    </div>
+                  <span className="text-sm font-bold text-gray-900">Итого: {stats.totalProducts.toLocaleString('ru-RU')} шт</span>
+                  <div className="flex items-center gap-6">
+                    <span className="text-sm font-bold text-green-600">Продажа: {stats.totalSaleValue.toLocaleString('ru-RU')}</span>
+                    <span className="text-sm font-bold text-purple-600">Закуп: {stats.totalPurchaseValue.toLocaleString('ru-RU')}</span>
                   </div>
                 </div>
               </div>
