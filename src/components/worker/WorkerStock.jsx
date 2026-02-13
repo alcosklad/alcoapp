@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
-import { Search, Package, AlertTriangle, ShoppingCart, Plus, Check } from 'lucide-react';
+import { Search, Package, AlertTriangle, ShoppingCart, Plus, Check, Clock } from 'lucide-react';
 import { getStocksWithDetails, getSuppliers, updateStock, createOrder, getActiveShift, startShift } from '../../lib/pocketbase';
 import pb from '../../lib/pocketbase';
 import WorkerCart from './WorkerCart';
@@ -12,6 +12,7 @@ export default function WorkerStock({ user, onCartOpen, cart, setCart }) {
   const [searchQuery, setSearchQuery] = useState('');
   const [showCart, setShowCart] = useState(false);
   const [addedId, setAddedId] = useState(null); // for animation
+  const [shiftToast, setShiftToast] = useState(false);
 
   const userSupplier = user?.supplier;
   const [noSupplier, setNoSupplier] = useState(false);
@@ -129,6 +130,8 @@ export default function WorkerStock({ user, onCartOpen, cart, setCart }) {
       const activeShift = await getActiveShift(userId);
       if (!activeShift) {
         await startShift(userId, new Date().toISOString());
+        setShiftToast(true);
+        setTimeout(() => setShiftToast(false), 3000);
       }
 
       await createOrder(orderData);
@@ -181,7 +184,7 @@ export default function WorkerStock({ user, onCartOpen, cart, setCart }) {
       <div className="flex items-center gap-3 text-xs text-gray-400">
         <span className="font-medium">Всего: <span className="text-gray-700 font-bold">{totalQuantity} шт</span></span>
         <span>·</span>
-        <span className="font-medium">Товаров: <span className="text-gray-700 font-bold">{filteredStocks.length}</span></span>
+        <span className="font-medium">Наименований: <span className="text-gray-700 font-bold">{filteredStocks.length}</span></span>
       </div>
 
       {/* Search */}
@@ -217,11 +220,14 @@ export default function WorkerStock({ user, onCartOpen, cart, setCart }) {
             const isAdded = addedId === stock.id;
             const inCart = cart.find(c => c.id === stock.id);
 
+            const remaining = inCart ? qty - inCart.quantity : qty;
+
             return (
               <div
                 key={stock.id}
+                onClick={() => !isOut && addToCart(stock)}
                 className={`bg-white rounded-2xl p-4 shadow-sm transition-all ${
-                  isOut ? 'opacity-40' : 'active:scale-[0.98]'
+                  isOut ? 'opacity-40' : 'active:scale-[0.98] cursor-pointer'
                 }`}
               >
                 <div className="flex items-center justify-between gap-3">
@@ -234,31 +240,26 @@ export default function WorkerStock({ user, onCartOpen, cart, setCart }) {
                         {price.toLocaleString('ru-RU')} ₽
                       </span>
                       <span className={`text-xs font-semibold px-2 py-0.5 rounded-lg ${
-                        isOut
+                        isOut || remaining <= 0
                           ? 'bg-gray-100 text-gray-400'
-                          : isLow
+                          : remaining <= 3
                           ? 'bg-red-50 text-red-500'
                           : 'bg-green-50 text-green-600'
                       }`}>
-                        {qty} шт
+                        {remaining} шт
                       </span>
-                      {inCart && (
-                        <span className="text-xs font-medium text-blue-500 bg-blue-50 px-2 py-0.5 rounded-lg">
-                          в корзине: {inCart.quantity}
-                        </span>
-                      )}
                     </div>
                   </div>
                   {!isOut && (
                     <button
-                      onClick={() => addToCart(stock)}
-                      className={`w-11 h-11 rounded-xl flex items-center justify-center transition-all shrink-0 ${
-                        isAdded
-                          ? 'bg-green-500 text-white scale-110'
+                      onClick={(e) => { e.stopPropagation(); addToCart(stock); }}
+                      className={`w-11 h-11 rounded-xl flex items-center justify-center transition-all shrink-0 font-bold text-sm ${
+                        inCart
+                          ? 'bg-blue-600 text-white'
                           : 'bg-blue-50 text-blue-600 active:bg-blue-100 active:scale-95'
                       }`}
                     >
-                      {isAdded ? <Check size={20} strokeWidth={3} /> : <Plus size={20} />}
+                      {inCart ? inCart.quantity : <Plus size={20} />}
                     </button>
                   )}
                 </div>
@@ -290,6 +291,29 @@ export default function WorkerStock({ user, onCartOpen, cart, setCart }) {
           </button>
         </div>
       )}
+
+      {/* Shift auto-start toast */}
+      {shiftToast && (
+        <div className="fixed top-6 left-4 right-4 z-50 animate-slide-down">
+          <div className="bg-blue-600 text-white rounded-2xl px-5 py-3.5 shadow-lg shadow-blue-600/30 flex items-center gap-3">
+            <div className="w-8 h-8 bg-white/20 rounded-full flex items-center justify-center shrink-0">
+              <Clock size={18} />
+            </div>
+            <div>
+              <p className="text-sm font-bold">Смена открыта</p>
+              <p className="text-xs text-blue-100">Автоматически при первой продаже</p>
+            </div>
+          </div>
+        </div>
+      )}
+
+      <style>{`
+        @keyframes slideDown {
+          from { transform: translateY(-100%); opacity: 0; }
+          to { transform: translateY(0); opacity: 1; }
+        }
+        .animate-slide-down { animation: slideDown 0.3s ease-out; }
+      `}</style>
     </div>
   );
 }

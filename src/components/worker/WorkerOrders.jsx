@@ -1,12 +1,13 @@
 import React, { useState, useEffect } from 'react';
-import { Search, Calendar, History, RussianRuble, Clock, RotateCcw, X, CreditCard, Package, ChevronRight } from 'lucide-react';
+import { Search, Calendar, History, RussianRuble, Clock, RotateCcw, X, CreditCard, Package, ChevronRight, ArrowLeft } from 'lucide-react';
 import { getOrders, refundOrder } from '../../lib/pocketbase';
 
 export default function WorkerOrders({ user }) {
   const [orders, setOrders] = useState([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
-  const [dateFilter, setDateFilter] = useState('');
+  const [dateFrom, setDateFrom] = useState('');
+  const [dateTo, setDateTo] = useState('');
   const [showFilters, setShowFilters] = useState(false);
   const [selectedOrder, setSelectedOrder] = useState(null);
   const [refundConfirm, setRefundConfirm] = useState(null);
@@ -53,14 +54,18 @@ export default function WorkerOrders({ user }) {
       item.name?.toLowerCase().includes(searchTerm.toLowerCase())
     );
     let matchesDate = true;
-    if (dateFilter) {
-      if (order.local_time) {
-        const parts = order.local_time.split(', ');
-        const orderDate = parts[0] || '';
-        const filterDate = new Date(dateFilter).toLocaleDateString('ru-RU', { day: 'numeric', month: 'long', year: 'numeric' });
-        matchesDate = orderDate === filterDate;
-      } else {
-        matchesDate = new Date(order.created_date).toDateString() === new Date(dateFilter).toDateString();
+    if (dateFrom || dateTo) {
+      const orderDate = new Date(order.created || order.created_date || 0);
+      orderDate.setHours(0, 0, 0, 0);
+      if (dateFrom) {
+        const from = new Date(dateFrom);
+        from.setHours(0, 0, 0, 0);
+        if (orderDate < from) matchesDate = false;
+      }
+      if (dateTo) {
+        const to = new Date(dateTo);
+        to.setHours(23, 59, 59, 999);
+        if (orderDate > to) matchesDate = false;
       }
     }
     return matchesSearch && matchesDate;
@@ -178,18 +183,32 @@ export default function WorkerOrders({ user }) {
       </div>
 
       {showFilters && (
-        <div className="bg-white rounded-2xl p-4 shadow-sm flex items-center gap-2">
-          <input
-            type="date"
-            value={dateFilter}
-            onChange={(e) => setDateFilter(e.target.value)}
-            className="flex-1 px-3 py-2.5 bg-gray-50 border border-gray-100 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-          />
-          {dateFilter && (
-            <button onClick={() => setDateFilter('')} className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-xl">
-              <X size={16} />
-            </button>
-          )}
+        <div className="bg-white rounded-2xl p-4 shadow-sm space-y-2">
+          <div className="flex items-center gap-2">
+            <div className="flex-1">
+              <label className="text-[10px] text-gray-400 mb-0.5 block">От</label>
+              <input
+                type="date"
+                value={dateFrom}
+                onChange={(e) => setDateFrom(e.target.value)}
+                className="w-full px-3 py-2.5 bg-gray-50 border border-gray-100 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+            </div>
+            <div className="flex-1">
+              <label className="text-[10px] text-gray-400 mb-0.5 block">До</label>
+              <input
+                type="date"
+                value={dateTo}
+                onChange={(e) => setDateTo(e.target.value)}
+                className="w-full px-3 py-2.5 bg-gray-50 border border-gray-100 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+            </div>
+            {(dateFrom || dateTo) && (
+              <button onClick={() => { setDateFrom(''); setDateTo(''); }} className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-xl mt-4">
+                <X size={16} />
+              </button>
+            )}
+          </div>
         </div>
       )}
 
@@ -270,11 +289,6 @@ export default function WorkerOrders({ user }) {
                     {/* Footer */}
                     <div className={`flex items-center justify-between pt-2.5 border-t ${isRefund ? 'border-blue-200' : 'border-gray-100'}`}>
                       <div className="flex items-center gap-2">
-                        {isRefund && (
-                          <span className="px-2.5 py-1 text-xs bg-blue-500 text-white rounded-lg font-bold flex items-center gap-1">
-                            <RotateCcw size={12} /> Возврат
-                          </span>
-                        )}
                         {!isRefund && (
                           <span
                             onClick={(e) => handleInlineRefund(e, order)}
@@ -314,14 +328,14 @@ export default function WorkerOrders({ user }) {
         const discountType = getDiscountType(order.discount_type);
         return (
           <div className={`fixed inset-0 z-50 bg-white flex flex-col ${shakeModal ? 'animate-shake' : ''}`}>
-            <div className="px-5 pt-3 pb-3 border-b border-gray-100 shrink-0 flex items-center justify-between" style={{ paddingTop: 'max(12px, env(safe-area-inset-top))' }}>
-              <div>
+            <div className="px-5 pt-3 pb-3 border-b border-gray-100 shrink-0 flex items-center gap-3" style={{ paddingTop: 'max(12px, env(safe-area-inset-top))' }}>
+              <button onClick={closeOrderModal} className="p-2 -ml-2 hover:bg-gray-100 rounded-xl">
+                <ArrowLeft size={22} className="text-gray-600" />
+              </button>
+              <div className="flex-1">
                 <h3 className="text-lg font-bold text-gray-900">Продажа</h3>
                 <p className="text-xs text-gray-400">{dt.date}, {dt.time}</p>
               </div>
-              <button onClick={closeOrderModal} className="p-2 hover:bg-gray-100 rounded-xl">
-                <X size={20} className="text-gray-400" />
-              </button>
             </div>
 
               <div className="px-5 py-4 space-y-4 overflow-y-auto flex-1" style={{ WebkitOverflowScrolling: 'touch' }}>
@@ -387,6 +401,27 @@ export default function WorkerOrders({ user }) {
                   </div>
                 </div>
               </div>
+
+              {/* Refund button - sticky footer */}
+              {!isRefund && (
+                <div className="border-t border-gray-100 px-5 py-3 shrink-0" style={{ paddingBottom: 'max(12px, env(safe-area-inset-bottom))' }}>
+                  <button
+                    onClick={() => handleInlineRefund({ stopPropagation: () => {} }, order)}
+                    disabled={refundLoading}
+                    className={`w-full py-3 rounded-xl font-semibold text-sm transition-all active:scale-[0.98] disabled:opacity-50 flex items-center justify-center gap-2 ${
+                      refundConfirm === order.id
+                        ? 'bg-red-500 text-white'
+                        : 'bg-orange-50 text-orange-600 border border-orange-200'
+                    }`}
+                  >
+                    <RotateCcw size={16} />
+                    {refundLoading && refundConfirm === order.id ? 'Оформление...' : refundConfirm === order.id ? 'Подтвердить возврат' : 'Сделать возврат'}
+                  </button>
+                  {refundConfirm === order.id && (
+                    <p className="text-center text-xs text-red-400 mt-1">Нажмите ещё раз для подтверждения</p>
+                  )}
+                </div>
+              )}
           </div>
         );
       })()}

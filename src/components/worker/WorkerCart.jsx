@@ -80,12 +80,31 @@ export default function WorkerCart({ cart, setCart, onBack, onComplete }) {
 
   if (success) {
     return (
-      <div className="fixed inset-0 bg-white z-50 flex flex-col items-center justify-center">
-        <div className="w-20 h-20 bg-green-100 rounded-full flex items-center justify-center mb-4 animate-bounce">
-          <CheckCircle size={40} className="text-green-500" />
+      <div className="fixed inset-0 bg-gradient-to-b from-green-500 to-emerald-600 z-50 flex flex-col items-center justify-center">
+        <div className="sale-success-icon w-24 h-24 bg-white/20 rounded-full flex items-center justify-center mb-6">
+          <CheckCircle size={52} className="text-white" />
         </div>
-        <p className="text-xl font-bold text-gray-900">Заказ оформлен!</p>
-        <p className="text-sm text-gray-400 mt-1">{total.toLocaleString('ru-RU')} ₽</p>
+        <p className="sale-success-text text-2xl font-black text-white tracking-wide">Успешно продано</p>
+        <p className="sale-success-amount text-lg text-white/70 font-semibold mt-2">{total.toLocaleString('ru-RU')} ₽</p>
+        <style>{`
+          .sale-success-icon {
+            animation: popIn 0.4s cubic-bezier(0.34, 1.56, 0.64, 1) both;
+          }
+          .sale-success-text {
+            animation: fadeUp 0.4s ease-out 0.2s both;
+          }
+          .sale-success-amount {
+            animation: fadeUp 0.4s ease-out 0.35s both;
+          }
+          @keyframes popIn {
+            from { transform: scale(0); opacity: 0; }
+            to { transform: scale(1); opacity: 1; }
+          }
+          @keyframes fadeUp {
+            from { transform: translateY(16px); opacity: 0; }
+            to { transform: translateY(0); opacity: 1; }
+          }
+        `}</style>
       </div>
     );
   }
