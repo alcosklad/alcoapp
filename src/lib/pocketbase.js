@@ -524,7 +524,7 @@ export const getStocks = async (warehouseId = null) => {
   }
 };
 
-// Получение статистики продаж за период
+// Получение статистики продаж за период (из orders)
 export const getSalesStats = async (period = 'day', filterId = null) => {
   try {
     const now = new Date();
@@ -549,17 +549,17 @@ export const getSalesStats = async (period = 'day', filterId = null) => {
     
     let filter = `created >= "${startDate.toISOString()}"`;
     if (filterId) {
-      filter += ` && supplier = "${filterId}"`;
+      filter += ` && user.supplier = "${filterId}"`;
     }
     
-    const sales = await pb.collection('sales').getFullList({
+    const orders = await pb.collection('orders').getFullList({
       filter,
       sort: '-created'
     }).catch(() => []);
     
     return {
-      count: sales.length,
-      totalAmount: sales.reduce((sum, sale) => sum + (sale.total_price || 0), 0)
+      count: orders.length,
+      totalAmount: orders.reduce((sum, order) => sum + (order.total || 0), 0)
     };
   } catch (error) {
     console.error('PocketBase: Error loading sales stats:', error);
@@ -625,17 +625,19 @@ export const getDashboardStats = async (filterId = null) => {
     const thirtyDaysAgo = new Date();
     thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
     
-    const sales = await pb.collection('sales').getFullList({
+    const recentOrders = await pb.collection('orders').getFullList({
+      filter: `created >= "${thirtyDaysAgo.toISOString()}"`,
       sort: '-created'
     }).catch(() => []);
     
     // Находим товары, которые не продавались больше 30 дней
     const soldProductIds = new Set();
-    sales.forEach(sale => {
-      const saleDate = new Date(sale.created);
-      if (saleDate > thirtyDaysAgo) {
-        soldProductIds.add(sale.product);
-      }
+    recentOrders.forEach(order => {
+      const items = Array.isArray(order.items) ? order.items : [];
+      items.forEach(item => {
+        if (item.productId) soldProductIds.add(item.productId);
+        if (item.product) soldProductIds.add(item.product);
+      });
     });
     
     // Группируем неликвид по product_id с разбивкой по городам
@@ -831,6 +833,16 @@ export const createOrder = async (orderData) => {
       ? parseFloat(orderData.discountValue) || 0
       : orderData.discount;
     
+    // Получаем город пользователя из supplier
+    let cityName = '';
+    try {
+      const userModel = pb.authStore.model;
+      if (userModel?.supplier) {
+        const supplier = await pb.collection('suppliers').getOne(userModel.supplier).catch(() => null);
+        if (supplier) cityName = supplier.name || '';
+      }
+    } catch (_) {}
+    
     // Формируем данные для сохранения
     const data = {
       user: pb.authStore.model?.id,
@@ -842,7 +854,8 @@ export const createOrder = async (orderData) => {
       total: orderData.total,
       payment_method: paymentMethodValue,
       local_time: orderData.localTime,
-      created_date: new Date().toISOString()
+      created_date: new Date().toISOString(),
+      city: cityName
     };
     
     const result = await pb.collection('orders').create(data);
