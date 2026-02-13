@@ -239,7 +239,7 @@ export default function WorkerOrders({ user }) {
                         {isRefund ? <RotateCcw size={14} className="text-blue-500" /> : <Clock size={14} className="text-gray-400" />}
                         <span className={`text-xs font-medium ${isRefund ? 'text-blue-400' : 'text-gray-500'}`}>{dt.time}</span>
                         {isRefund && (
-                          <span className="text-[10px] font-bold text-white bg-blue-500 px-1.5 py-0.5 rounded">ВЫЧЕТ</span>
+                          <span className="text-[10px] font-bold text-white bg-blue-500 px-1.5 py-0.5 rounded">ВОЗВРАТ</span>
                         )}
                       </div>
                       <div className="flex items-center gap-1.5">
@@ -272,7 +272,7 @@ export default function WorkerOrders({ user }) {
                       <div className="flex items-center gap-2">
                         {isRefund && (
                           <span className="px-2.5 py-1 text-xs bg-blue-500 text-white rounded-lg font-bold flex items-center gap-1">
-                            <RotateCcw size={12} /> Вычет
+                            <RotateCcw size={12} /> Возврат
                           </span>
                         )}
                         {!isRefund && (
@@ -285,7 +285,7 @@ export default function WorkerOrders({ user }) {
                             } ${refundLoading && refundConfirm === order.id ? 'opacity-50' : ''}`}
                           >
                             <RotateCcw size={10} />
-                            {refundLoading && refundConfirm === order.id ? '...' : refundConfirm === order.id ? 'Подтвердить' : 'Вычет'}
+                            {refundLoading && refundConfirm === order.id ? '...' : refundConfirm === order.id ? 'Подтвердить' : 'Возврат'}
                           </span>
                         )}
                         {order.discount > 0 && !isRefund && (
@@ -313,30 +313,24 @@ export default function WorkerOrders({ user }) {
         const isRefund = order.status === 'refund';
         const discountType = getDiscountType(order.discount_type);
         return (
-          <div className="fixed inset-0 bg-black/50 z-50 flex items-end justify-center" onClick={closeOrderModal}>
-            <div
-              className={`bg-white rounded-t-3xl w-full max-h-[85vh] overflow-y-auto ${shakeModal ? 'animate-shake' : ''}`}
-              onClick={e => e.stopPropagation()}
-            >
-              <div className="sticky top-0 bg-white px-5 pt-5 pb-3 border-b border-gray-100 z-10">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <h3 className="text-lg font-bold text-gray-900">Продажа</h3>
-                    <p className="text-xs text-gray-400">{dt.date}, {dt.time}</p>
-                  </div>
-                  <button onClick={closeOrderModal} className="p-2 hover:bg-gray-100 rounded-xl">
-                    <X size={20} className="text-gray-400" />
-                  </button>
-                </div>
+          <div className={`fixed inset-0 z-50 bg-white flex flex-col ${shakeModal ? 'animate-shake' : ''}`}>
+            <div className="px-5 pt-3 pb-3 border-b border-gray-100 shrink-0 flex items-center justify-between" style={{ paddingTop: 'max(12px, env(safe-area-inset-top))' }}>
+              <div>
+                <h3 className="text-lg font-bold text-gray-900">Продажа</h3>
+                <p className="text-xs text-gray-400">{dt.date}, {dt.time}</p>
               </div>
+              <button onClick={closeOrderModal} className="p-2 hover:bg-gray-100 rounded-xl">
+                <X size={20} className="text-gray-400" />
+              </button>
+            </div>
 
-              <div className="px-5 py-4 space-y-4 overflow-y-auto" style={{ maxHeight: 'calc(85vh - 60px - 80px)' }}>
+              <div className="px-5 py-4 space-y-4 overflow-y-auto flex-1" style={{ WebkitOverflowScrolling: 'touch' }}>
                 {/* Status banner */}
                 {isRefund && (
                   <div className="bg-blue-50 border border-blue-200 rounded-xl px-4 py-3 flex items-center gap-3">
                     <RotateCcw size={20} className="text-blue-500 shrink-0" />
                     <div>
-                      <p className="text-sm font-bold text-blue-700">Вычет оформлен</p>
+                      <p className="text-sm font-bold text-blue-700">Возврат оформлен</p>
                       <p className="text-xs text-blue-400">Товары возвращены в остаток</p>
                     </div>
                   </div>
@@ -393,8 +387,6 @@ export default function WorkerOrders({ user }) {
                   </div>
                 </div>
               </div>
-
-            </div>
           </div>
         );
       })()}

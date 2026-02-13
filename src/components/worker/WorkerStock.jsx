@@ -4,13 +4,12 @@ import { getStocksWithDetails, getSuppliers, updateStock, createOrder, getActive
 import pb from '../../lib/pocketbase';
 import WorkerCart from './WorkerCart';
 
-export default function WorkerStock({ user, onCartOpen }) {
+export default function WorkerStock({ user, onCartOpen, cart, setCart }) {
   const [stocks, setStocks] = useState([]);
   const [suppliers, setSuppliers] = useState([]);
   const [selectedSupplier, setSelectedSupplier] = useState('');
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
-  const [cart, setCart] = useState([]);
   const [showCart, setShowCart] = useState(false);
   const [addedId, setAddedId] = useState(null); // for animation
 
@@ -178,30 +177,11 @@ export default function WorkerStock({ user, onCartOpen }) {
         </div>
       )}
 
-      {/* Stats */}
-      <div className="grid grid-cols-2 gap-3">
-        <div className="bg-white rounded-2xl p-4 shadow-sm">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-2xl font-bold text-blue-600">{totalQuantity}</p>
-              <p className="text-xs text-gray-400 mt-0.5">Штук всего</p>
-            </div>
-            <div className="w-10 h-10 bg-blue-50 rounded-xl flex items-center justify-center">
-              <Package size={20} className="text-blue-500" />
-            </div>
-          </div>
-        </div>
-        <div className="bg-white rounded-2xl p-4 shadow-sm">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-2xl font-bold text-red-500">{lowStockCount}</p>
-              <p className="text-xs text-gray-400 mt-0.5">Мало остаток</p>
-            </div>
-            <div className="w-10 h-10 bg-red-50 rounded-xl flex items-center justify-center">
-              <AlertTriangle size={20} className="text-red-400" />
-            </div>
-          </div>
-        </div>
+      {/* Stats line */}
+      <div className="flex items-center gap-3 text-xs text-gray-400">
+        <span className="font-medium">Всего: <span className="text-gray-700 font-bold">{totalQuantity} шт</span></span>
+        <span>·</span>
+        <span className="font-medium">Товаров: <span className="text-gray-700 font-bold">{filteredStocks.length}</span></span>
       </div>
 
       {/* Search */}

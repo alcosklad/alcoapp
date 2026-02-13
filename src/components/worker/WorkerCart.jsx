@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { ArrowLeft, Minus, Plus, Trash2, Percent, RussianRuble, CheckCircle } from 'lucide-react';
 
 export default function WorkerCart({ cart, setCart, onBack, onComplete }) {
-  const [discountType, setDiscountType] = useState('percentage');
+  const [discountType, setDiscountType] = useState('fixed');
   const [discountValue, setDiscountValue] = useState('');
   const [paymentMethod, setPaymentMethod] = useState('cash');
   const [submitting, setSubmitting] = useState(false);
@@ -166,15 +166,14 @@ export default function WorkerCart({ cart, setCart, onBack, onComplete }) {
                   className="flex-1 px-4 py-3 bg-gray-50 border border-gray-100 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
                 />
                 <button
-                  onClick={() => setDiscountType(discountType === 'percentage' ? 'fixed' : 'percentage')}
-                  className={`px-4 py-3 rounded-xl flex items-center gap-1.5 text-sm font-medium transition-colors ${
-                    discountType === 'percentage'
+                  onClick={() => setDiscountType(discountType === 'fixed' ? 'percentage' : 'fixed')}
+                  className={`px-4 py-3 rounded-xl flex items-center justify-center text-sm font-bold transition-colors ${
+                    discountType === 'fixed'
                       ? 'bg-blue-600 text-white'
-                      : 'bg-gray-100 text-gray-600'
+                      : 'bg-blue-600 text-white'
                   }`}
                 >
-                  {discountType === 'percentage' ? <Percent size={16} /> : <RussianRuble size={16} />}
-                  {discountType === 'percentage' ? '%' : '₽'}
+                  {discountType === 'fixed' ? '₽' : '%'}
                 </button>
               </div>
             </div>
@@ -205,15 +204,16 @@ export default function WorkerCart({ cart, setCart, onBack, onComplete }) {
       {/* Footer */}
       {cart.length > 0 && (
         <div className="bg-white border-t border-gray-100 px-5 pt-3 pb-4" style={{ paddingBottom: 'max(16px, env(safe-area-inset-bottom))' }}>
-          <div className="flex items-center justify-between mb-3">
-            <div className="flex items-center gap-3 text-xs text-gray-400">
+          <div className="mb-3">
+            <div className="flex items-center gap-3 text-xs text-gray-400 mb-1">
               <span>Подитог: {subtotal.toLocaleString('ru-RU')} ₽</span>
               {discountAmount > 0 && (
                 <span className="text-green-500">−{discountAmount.toLocaleString('ru-RU')} ₽</span>
               )}
             </div>
-            <div className="text-base font-bold text-gray-900">
-              {total.toLocaleString('ru-RU')} ₽
+            <div className="flex items-center justify-between">
+              <span className="text-lg font-bold text-gray-900">Итого:</span>
+              <span className="text-2xl font-black text-gray-900">{total.toLocaleString('ru-RU')} ₽</span>
             </div>
           </div>
           <button

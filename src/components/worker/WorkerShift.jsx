@@ -115,7 +115,7 @@ export default function WorkerShift({ user }) {
             {cashCount > 0 && <span className="bg-gray-100 text-gray-500 px-1.5 py-0.5 rounded">Нал: {cashCount}</span>}
             {transferCount > 0 && <span className="bg-blue-50 text-blue-500 px-1.5 py-0.5 rounded">Перевод: {transferCount}</span>}
             {prepaidCount > 0 && <span className="bg-purple-50 text-purple-500 px-1.5 py-0.5 rounded">Предоплата: {prepaidCount}</span>}
-            {refundsCount > 0 && <span className="bg-orange-50 text-orange-500 px-1.5 py-0.5 rounded">Вычет: {refundsCount}</span>}
+            {refundsCount > 0 && <span className="bg-orange-50 text-orange-500 px-1.5 py-0.5 rounded">Возврат: {refundsCount}</span>}
           </div>
         </div>
         <div className="space-y-2 max-h-[45vh] overflow-y-auto">
@@ -133,7 +133,7 @@ export default function WorkerShift({ user }) {
                     <span className={`text-[10px] px-1.5 py-0.5 rounded ${
                       isRefund ? 'bg-orange-100 text-orange-600 font-bold' : 'bg-gray-100 text-gray-500'
                     }`}>
-                      {isRefund ? 'ВЫЧЕТ' : getPaymentLabel(sale.payment_method)}
+                      {isRefund ? 'ВОЗВРАТ' : getPaymentLabel(sale.payment_method)}
                     </span>
                   </div>
                   <p className={`text-sm font-bold ${isRefund ? 'text-orange-500 line-through' : 'text-gray-900'}`}>

@@ -60,7 +60,7 @@ export default function SalesDesktop() {
       await loadData();
     } catch (err) {
       console.error('Error refunding order:', err);
-      alert('Ошибка вычета: ' + (err.message || ''));
+      alert('Ошибка возврата: ' + (err.message || ''));
     } finally {
       setRefundLoading(false);
     }
@@ -462,7 +462,7 @@ export default function SalesDesktop() {
                       <td className="px-4 py-3 text-right font-medium text-gray-900">
                         {formatMoney(order.total)}
                         {order.status === 'refund' && (
-                          <span className="ml-2 inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium bg-red-100 text-red-700">Вычет</span>
+                          <span className="ml-2 inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium bg-red-100 text-red-700">Возврат</span>
                         )}
                       </td>
                       <td className="px-4 py-3 text-center">
@@ -543,11 +543,11 @@ export default function SalesDesktop() {
                     } ${refundShaking ? 'animate-shake' : ''} disabled:opacity-50`}
                   >
                     <RotateCcw size={14} />
-                    {refundLoading ? 'Вычет...' : refundConfirm ? 'Подтвердить вычет' : 'Вычет'}
+                    {refundLoading ? 'Возврат...' : refundConfirm ? 'Подтвердить возврат' : 'Возврат'}
                   </button>
                 )}
                 {selectedOrder.status === 'refund' && (
-                  <span className="px-3 py-1.5 text-xs bg-red-100 text-red-700 rounded-lg font-medium">Вычет</span>
+                  <span className="px-3 py-1.5 text-xs bg-red-100 text-red-700 rounded-lg font-medium">Возврат</span>
                 )}
                 {isAdmin && (
                   <button

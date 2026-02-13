@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { getDashboardStats, getSuppliers, getAllOrders, getReceptions } from '../../lib/pocketbase';
 import { Package, TrendingUp, ShoppingCart, AlertTriangle, FileText, Calendar, Clock, BarChart3, X } from 'lucide-react';
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, LineChart, Line, Legend } from 'recharts';
 import pb from '../../lib/pocketbase';
 
 export default function DashboardDesktop({ user }) {
@@ -136,8 +136,8 @@ export default function DashboardDesktop({ user }) {
     return result;
   }, [salesData]);
 
-  // Данные для графика закупок по дням (последние 14 дней)
-  const dailyPurchaseChart = useMemo(() => {
+  // Данные для линейного графика закупок по городам (последние 14 дней)
+  const { cityPurchaseChart, cityNames } = useMemo(() => {
     const days = [];
     for (let i = 13; i >= 0; i--) {
       const d = new Date();
@@ -146,27 +146,37 @@ export default function DashboardDesktop({ user }) {
       days.push({
         date: d,
         label: d.toLocaleDateString('ru-RU', { day: '2-digit', month: '2-digit' }),
-        amount: 0,
-        count: 0,
       });
     }
+    const citySet = new Set();
+    receptionsData.forEach(rec => {
+      const cityName = rec.expand?.supplier?.name || '';
+      if (cityName) citySet.add(cityName);
+    });
+    const names = Array.from(citySet).sort();
+    // Init each day with 0 for each city
+    days.forEach(day => {
+      names.forEach(name => { day[name] = 0; });
+    });
     receptionsData.forEach(rec => {
       const recDate = new Date(rec.date || rec.created);
       recDate.setHours(0, 0, 0, 0);
       const day = days.find(d => d.date.getTime() === recDate.getTime());
-      if (day && rec.items) {
+      const cityName = rec.expand?.supplier?.name || '';
+      if (day && cityName && rec.items) {
         const items = Array.isArray(rec.items) ? rec.items : [];
         const sum = items.reduce((s, item) => {
           const cost = item.cost ?? item.purchase_price ?? 0;
           const qty = item.quantity || 0;
           return s + (cost * qty);
         }, 0);
-        day.amount += sum;
-        day.count += 1;
+        day[cityName] += sum;
       }
     });
-    return days;
+    return { cityPurchaseChart: days, cityNames: names };
   }, [receptionsData]);
+
+  const CITY_COLORS = ['#3b82f6', '#22c55e', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899', '#14b8a6', '#f97316'];
 
   const PIE_COLORS = ['#22c55e', '#3b82f6', '#a855f7'];
 
@@ -289,43 +299,38 @@ export default function DashboardDesktop({ user }) {
         </div>
       )}
 
-      {/* График продаж по дням (горизонтальный) */}
-      {isAdmin && showSalesChart && (
-        <div className="bg-white rounded-lg border border-gray-200 p-4">
-          <h3 className="text-sm font-semibold text-gray-700 mb-3">Сумма продаж за 14 дней</h3>
-          <ResponsiveContainer width="100%" height={280}>
-            <BarChart data={dailySalesChart} layout="vertical" margin={{ top: 5, right: 20, left: 60, bottom: 5 }}>
-              <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
-              <XAxis type="number" tick={{ fontSize: 11, fill: '#9ca3af' }} />
-              <YAxis type="category" dataKey="label" tick={{ fontSize: 11, fill: '#9ca3af' }} width={50} />
-              <Tooltip
-                formatter={(value) => [value.toLocaleString('ru-RU'), 'Выручка']}
-                labelFormatter={(label) => `Дата: ${label}`}
-                contentStyle={{ fontSize: 12, borderRadius: 8 }}
-              />
-              <Bar dataKey="revenue" fill="#22c55e" radius={[0, 4, 4, 0]} name="Выручка" />
-            </BarChart>
-          </ResponsiveContainer>
-        </div>
-      )}
-
-      {/* График закупок по дням */}
+      {/* Линейный график закупок по городам */}
       {isAdmin && showPurchaseChart && (
         <div className="bg-white rounded-lg border border-gray-200 p-4">
-          <h3 className="text-sm font-semibold text-gray-700 mb-3">Закупки за 14 дней</h3>
-          <ResponsiveContainer width="100%" height={220}>
-            <BarChart data={dailyPurchaseChart} margin={{ top: 5, right: 10, left: 0, bottom: 5 }}>
-              <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
-              <XAxis dataKey="label" tick={{ fontSize: 11, fill: '#9ca3af' }} />
-              <YAxis tick={{ fontSize: 11, fill: '#9ca3af' }} width={60} />
-              <Tooltip
-                formatter={(value) => [value.toLocaleString('ru-RU'), 'Сумма закупа']}
-                labelFormatter={(label) => `Дата: ${label}`}
-                contentStyle={{ fontSize: 12, borderRadius: 8 }}
-              />
-              <Bar dataKey="amount" fill="#8b5cf6" radius={[4, 4, 0, 0]} name="Закупка" />
-            </BarChart>
-          </ResponsiveContainer>
+          <h3 className="text-sm font-semibold text-gray-700 mb-3">Закупки по городам за 14 дней</h3>
+          {cityNames.length > 0 ? (
+            <ResponsiveContainer width="100%" height={280}>
+              <LineChart data={cityPurchaseChart} margin={{ top: 5, right: 20, left: 10, bottom: 5 }}>
+                <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
+                <XAxis dataKey="label" tick={{ fontSize: 11, fill: '#9ca3af' }} />
+                <YAxis tick={{ fontSize: 11, fill: '#9ca3af' }} width={60} />
+                <Tooltip
+                  formatter={(value, name) => [value.toLocaleString('ru-RU'), name]}
+                  labelFormatter={(label) => `Дата: ${label}`}
+                  contentStyle={{ fontSize: 12, borderRadius: 8 }}
+                />
+                <Legend wrapperStyle={{ fontSize: 12 }} />
+                {cityNames.map((name, i) => (
+                  <Line
+                    key={name}
+                    type="monotone"
+                    dataKey={name}
+                    stroke={CITY_COLORS[i % CITY_COLORS.length]}
+                    strokeWidth={2}
+                    dot={{ r: 3 }}
+                    activeDot={{ r: 5 }}
+                  />
+                ))}
+              </LineChart>
+            </ResponsiveContainer>
+          ) : (
+            <div className="flex items-center justify-center h-[220px] text-gray-400 text-sm">Нет данных</div>
+          )}
         </div>
       )}
 

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useCallback } from 'react';
 import { Package, Clock, History, LogOut } from 'lucide-react';
 import pb from '../../lib/pocketbase';
 import WorkerStock from './WorkerStock';
@@ -8,6 +8,7 @@ import WorkerOrders from './WorkerOrders';
 export default function WorkerApp({ user, onLogout }) {
   const [activeTab, setActiveTab] = useState('stock');
   const [cartOpen, setCartOpen] = useState(false);
+  const [cart, setCart] = useState([]);
 
   const tabs = [
     { id: 'stock', label: 'Остатки', icon: Package },
@@ -18,7 +19,7 @@ export default function WorkerApp({ user, onLogout }) {
   const renderContent = () => {
     switch (activeTab) {
       case 'stock':
-        return <WorkerStock user={user} onCartOpen={setCartOpen} />;
+        return <WorkerStock user={user} onCartOpen={setCartOpen} cart={cart} setCart={setCart} />;
       case 'shift':
         return <WorkerShift user={user} />;
       case 'history':
