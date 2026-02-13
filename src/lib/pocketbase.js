@@ -914,13 +914,24 @@ export const startShift = async (userId, startTime) => {
       startTime = new Date().toISOString();
     }
     
+    // Get city from user's supplier
+    let cityName = '';
+    try {
+      const userModel = pb.authStore.model;
+      if (userModel?.supplier) {
+        const supplier = await pb.collection('suppliers').getOne(userModel.supplier).catch(() => null);
+        if (supplier) cityName = supplier.name || '';
+      }
+    } catch (_) {}
+    
     const shiftData = {
       user: userId,
       start: startTime,
       status: 'active',
       totalAmount: 0,
       totalItems: 0,
-      sales: []
+      sales: [],
+      city: cityName
     };
     
     const record = await pb.collection('shifts').create(shiftData);

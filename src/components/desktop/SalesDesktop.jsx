@@ -11,7 +11,7 @@ export default function SalesDesktop() {
 
   // Filters
   const [filterCourier, setFilterCourier] = useState('');
-  const [filterCity, setFilterCity] = useState('');
+  const [filterCity, setFilterCity] = useState([]);
   const [filterDateFrom, setFilterDateFrom] = useState('');
   const [filterDateTo, setFilterDateTo] = useState('');
   const [filterPeriod, setFilterPeriod] = useState('month');
@@ -164,21 +164,21 @@ export default function SalesDesktop() {
       result = result.filter(o => o.user === filterCourier);
     }
 
-    // City filter
-    if (filterCity) {
-      result = result.filter(o => o.city === filterCity);
+    // City filter (multi-select)
+    if (filterCity.length > 0) {
+      result = result.filter(o => filterCity.includes(o.city));
     }
 
     // Date filter
     if (filterDateFrom) {
       const from = new Date(filterDateFrom);
       from.setHours(0, 0, 0, 0);
-      result = result.filter(o => new Date(o.local_time || o.created) >= from);
+      result = result.filter(o => new Date(o.created_date || o.created) >= from);
     }
     if (filterDateTo) {
       const to = new Date(filterDateTo);
       to.setHours(23, 59, 59, 999);
-      result = result.filter(o => new Date(o.local_time || o.created) <= to);
+      result = result.filter(o => new Date(o.created_date || o.created) <= to);
     }
 
     // Sort
@@ -186,8 +186,8 @@ export default function SalesDesktop() {
       let aVal, bVal;
       switch (sortField) {
         case 'local_time':
-          aVal = new Date(a.local_time || a.created).getTime();
-          bVal = new Date(b.local_time || b.created).getTime();
+          aVal = new Date(a.created_date || a.created).getTime();
+          bVal = new Date(b.created_date || b.created).getTime();
           break;
         case 'total':
           aVal = a.total || 0;
@@ -370,17 +370,27 @@ export default function SalesDesktop() {
             ))}
           </select>
 
-          {/* City filter */}
-          <select
-            value={filterCity}
-            onChange={e => setFilterCity(e.target.value)}
-            className="border rounded-lg px-3 py-1.5 text-sm bg-white"
-          >
-            <option value="">Все города</option>
-            {cities.map(c => (
-              <option key={c} value={c}>{c}</option>
-            ))}
-          </select>
+          {/* City filter - multi-select chips */}
+          <div className="flex items-center gap-1.5 flex-wrap">
+            {cities.map(c => {
+              const isSelected = filterCity.includes(c);
+              return (
+                <button
+                  key={c}
+                  onClick={() => setFilterCity(prev =>
+                    isSelected ? prev.filter(x => x !== c) : [...prev, c]
+                  )}
+                  className={`px-3 py-1.5 text-sm rounded-lg border transition-colors ${
+                    isSelected
+                      ? 'bg-blue-50 border-blue-300 text-blue-700 font-medium'
+                      : 'bg-white border-gray-200 text-gray-600 hover:border-gray-300'
+                  }`}
+                >
+                  {c}
+                </button>
+              );
+            })}
+          </div>
 
           {/* Search */}
           <div className="relative flex-1 min-w-[200px]">
@@ -394,9 +404,9 @@ export default function SalesDesktop() {
             />
           </div>
 
-          {(filterCourier || filterCity || search) && (
+          {(filterCourier || filterCity.length > 0 || search) && (
             <button
-              onClick={() => { setFilterCourier(''); setFilterCity(''); setSearch(''); }}
+              onClick={() => { setFilterCourier(''); setFilterCity([]); setSearch(''); }}
               className="text-gray-400 hover:text-gray-600 p-1"
               title="Сбросить фильтры"
             >

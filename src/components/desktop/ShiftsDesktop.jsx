@@ -11,7 +11,7 @@ export default function ShiftsDesktop() {
 
   // Filters
   const [filterCourier, setFilterCourier] = useState('');
-  const [filterCity, setFilterCity] = useState('');
+  const [filterCity, setFilterCity] = useState([]);
   const [filterDateFrom, setFilterDateFrom] = useState('');
   const [filterDateTo, setFilterDateTo] = useState('');
   const [filterPeriod, setFilterPeriod] = useState('month');
@@ -114,8 +114,8 @@ export default function ShiftsDesktop() {
       result = result.filter(s => s.user === filterCourier);
     }
 
-    if (filterCity) {
-      result = result.filter(s => s.city === filterCity);
+    if (filterCity.length > 0) {
+      result = result.filter(s => filterCity.includes(s.city));
     }
 
     if (filterDateFrom) {
@@ -314,16 +314,27 @@ export default function ShiftsDesktop() {
             ))}
           </select>
 
-          <select
-            value={filterCity}
-            onChange={e => setFilterCity(e.target.value)}
-            className="border rounded-lg px-3 py-1.5 text-sm bg-white"
-          >
-            <option value="">Все города</option>
-            {cities.map(c => (
-              <option key={c} value={c}>{c}</option>
-            ))}
-          </select>
+          {/* City filter - multi-select chips */}
+          <div className="flex items-center gap-1.5 flex-wrap">
+            {cities.map(c => {
+              const isSelected = filterCity.includes(c);
+              return (
+                <button
+                  key={c}
+                  onClick={() => setFilterCity(prev =>
+                    isSelected ? prev.filter(x => x !== c) : [...prev, c]
+                  )}
+                  className={`px-3 py-1.5 text-sm rounded-lg border transition-colors ${
+                    isSelected
+                      ? 'bg-blue-50 border-blue-300 text-blue-700 font-medium'
+                      : 'bg-white border-gray-200 text-gray-600 hover:border-gray-300'
+                  }`}
+                >
+                  {c}
+                </button>
+              );
+            })}
+          </div>
 
           <div className="relative flex-1 min-w-[200px]">
             <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
@@ -336,9 +347,9 @@ export default function ShiftsDesktop() {
             />
           </div>
 
-          {(filterCourier || filterCity || search) && (
+          {(filterCourier || filterCity.length > 0 || search) && (
             <button
-              onClick={() => { setFilterCourier(''); setFilterCity(''); setSearch(''); }}
+              onClick={() => { setFilterCourier(''); setFilterCity([]); setSearch(''); }}
               className="text-gray-400 hover:text-gray-600 p-1"
             >
               <X size={18} />
