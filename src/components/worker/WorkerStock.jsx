@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
-import { Search, Package, AlertTriangle, ShoppingCart, Plus, Check, Clock } from 'lucide-react';
+import { Search, Package, AlertTriangle, ShoppingCart, Plus, Check, Clock, RefreshCw } from 'lucide-react';
 import { getStocksWithDetails, getSuppliers, updateStock, createOrder, getActiveShift, startShift } from '../../lib/pocketbase';
 import pb from '../../lib/pocketbase';
 import WorkerCart from './WorkerCart';
@@ -171,10 +171,20 @@ export default function WorkerStock({ user, onCartOpen, cart, setCart }) {
   return (
     <div className="px-4 pt-4 pb-4 space-y-4">
       {/* Stats line */}
-      <div className="flex items-center gap-3 text-xs text-gray-400">
-        <span className="font-medium">Всего: <span className="text-gray-700 font-bold">{totalQuantity} шт</span></span>
-        <span>·</span>
-        <span className="font-medium">Наименований: <span className="text-gray-700 font-bold">{filteredStocks.length}</span></span>
+      <div className="flex items-center justify-between text-xs text-gray-400">
+        <div className="flex items-center gap-3">
+          <span className="font-medium">Всего: <span className="text-gray-700 font-bold">{totalQuantity} шт</span></span>
+          <span>·</span>
+          <span className="font-medium">Наименований: <span className="text-gray-700 font-bold">{filteredStocks.length}</span></span>
+        </div>
+        <button
+          onClick={() => loadStocks()}
+          disabled={loading}
+          className="flex items-center gap-1 px-2.5 py-1.5 bg-gray-100 rounded-xl text-gray-500 active:bg-blue-50 active:text-blue-600 transition-colors disabled:opacity-50"
+        >
+          <RefreshCw size={12} className={loading ? 'animate-spin' : ''} />
+          <span className="text-[11px] font-medium">Обновить</span>
+        </button>
       </div>
 
       {/* Search */}
@@ -241,16 +251,34 @@ export default function WorkerStock({ user, onCartOpen, cart, setCart }) {
                     </div>
                   </div>
                   {!isOut && (
-                    <button
-                      onClick={(e) => { e.stopPropagation(); addToCart(stock); }}
-                      className={`w-11 h-11 rounded-xl flex items-center justify-center transition-all shrink-0 font-bold text-sm ${
-                        inCart
-                          ? 'bg-blue-600 text-white'
-                          : 'bg-blue-50 text-blue-600 active:bg-blue-100 active:scale-95'
-                      }`}
-                    >
-                      {inCart ? inCart.quantity : <Plus size={20} />}
-                    </button>
+                    <div className="flex flex-col items-center gap-1 shrink-0">
+                      <button
+                        onClick={(e) => { e.stopPropagation(); addToCart(stock); }}
+                        className={`w-11 h-11 rounded-xl flex items-center justify-center transition-all font-bold text-sm ${
+                          inCart
+                            ? 'bg-blue-600 text-white'
+                            : 'bg-blue-50 text-blue-600 active:bg-blue-100 active:scale-95'
+                        }`}
+                      >
+                        {inCart ? inCart.quantity : <Plus size={20} />}
+                      </button>
+                      {inCart && (
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setCart(prev => {
+                              const existing = prev.find(c => c.id === stock.id);
+                              if (!existing) return prev;
+                              if (existing.quantity <= 1) return prev.filter(c => c.id !== stock.id);
+                              return prev.map(c => c.id === stock.id ? { ...c, quantity: c.quantity - 1 } : c);
+                            });
+                          }}
+                          className="w-7 h-5 rounded-md bg-gray-100 text-gray-500 flex items-center justify-center active:bg-red-50 active:text-red-500 transition-colors text-xs font-bold"
+                        >
+                          −
+                        </button>
+                      )}
+                    </div>
                   )}
                 </div>
               </div>

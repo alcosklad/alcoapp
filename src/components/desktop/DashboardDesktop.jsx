@@ -26,8 +26,6 @@ export default function DashboardDesktop({ user }) {
   const [showStockBreakdown, setShowStockBreakdown] = useState(false);
   const [salesData, setSalesData] = useState([]);
   const [receptionsData, setReceptionsData] = useState([]);
-  const [showPurchaseChart, setShowPurchaseChart] = useState(false);
-  const [showSalesChart, setShowSalesChart] = useState(false);
   
   const userRole = pb.authStore.model?.role;
   const isAdmin = userRole === 'admin';
@@ -85,56 +83,6 @@ export default function DashboardDesktop({ user }) {
       setLoading(false);
     }
   };
-
-  // Данные для графика продаж по дням (последние 14 дней)
-  const dailySalesChart = useMemo(() => {
-    const days = [];
-    for (let i = 13; i >= 0; i--) {
-      const d = new Date();
-      d.setDate(d.getDate() - i);
-      d.setHours(0, 0, 0, 0);
-      days.push({
-        date: d,
-        label: d.toLocaleDateString('ru-RU', { day: '2-digit', month: '2-digit' }),
-        revenue: 0,
-        count: 0,
-      });
-    }
-    salesData.forEach(order => {
-      const orderDate = new Date(order.created);
-      orderDate.setHours(0, 0, 0, 0);
-      const day = days.find(d => d.date.getTime() === orderDate.getTime());
-      if (day) {
-        day.revenue += order.total || 0;
-        day.count += 1;
-      }
-    });
-    return days;
-  }, [salesData]);
-
-  // Данные для круговой диаграммы (продажи за период по способам оплаты)
-  const paymentChart = useMemo(() => {
-    let cash = 0, transfer = 0, prepaid = 0;
-    const now = new Date();
-    const monthAgo = new Date(now);
-    monthAgo.setMonth(now.getMonth() - 1);
-    salesData.forEach(order => {
-      if (new Date(order.created) >= monthAgo) {
-        if (order.payment_method === '0' || order.payment_method === 'cash') {
-          cash += order.total || 0;
-        } else if (order.payment_method === '1' || order.payment_method === 'transfer') {
-          transfer += order.total || 0;
-        } else if (order.payment_method === '2' || order.payment_method === 'prepaid') {
-          prepaid += order.total || 0;
-        }
-      }
-    });
-    const result = [];
-    if (cash > 0) result.push({ name: 'Наличные', value: cash });
-    if (transfer > 0) result.push({ name: 'Перевод', value: transfer });
-    if (prepaid > 0) result.push({ name: 'Предоплата', value: prepaid });
-    return result;
-  }, [salesData]);
 
   // Данные для линейного графика закупок по городам (последние 14 дней)
   const { cityPurchaseChart, cityNames } = useMemo(() => {
@@ -222,8 +170,8 @@ export default function DashboardDesktop({ user }) {
       {isAdmin ? (
         <div className="grid grid-cols-2 lg:grid-cols-6 gap-3">
           <StatCard icon={Package} label="Товаров на складе" value={`${stats.totalProducts.toLocaleString('ru-RU')} шт`} color="blue" clickable onClick={() => setShowStockBreakdown(true)} />
-          <StatCard icon={ShoppingCart} label="Сумма продажи" value={stats.totalSaleValue.toLocaleString('ru-RU')} color="green" clickable onClick={() => setShowSalesChart(v => !v)} />
-          <StatCard icon={TrendingUp} label="Сумма закупа" value={stats.totalPurchaseValue.toLocaleString('ru-RU')} color="purple" clickable onClick={() => setShowPurchaseChart(v => !v)} />
+          <StatCard icon={ShoppingCart} label="Сумма продажи" value={stats.totalSaleValue.toLocaleString('ru-RU')} color="green" />
+          <StatCard icon={TrendingUp} label="Сумма закупа" value={stats.totalPurchaseValue.toLocaleString('ru-RU')} color="purple" />
           <StatCard icon={BarChart3} label="Маржа склада" value={margin.toLocaleString('ru-RU')} color={margin > 0 ? 'green' : 'orange'} />
           <StatCard icon={FileText} label="Приёмок за месяц" value={stats.receptionsCount} color="indigo" />
           <StatCard
@@ -244,65 +192,10 @@ export default function DashboardDesktop({ user }) {
         </div>
       )}
 
-      {/* Графики — только для админа */}
+      {/* Линейный график закупок по городам — главный график */}
       {isAdmin && (
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-          {/* График продаж по дням */}
-          <div className="lg:col-span-2 bg-white rounded-lg border border-gray-200 p-4">
-            <h3 className="text-sm font-semibold text-gray-700 mb-3">Продажи за 14 дней</h3>
-            <ResponsiveContainer width="100%" height={220}>
-              <BarChart data={dailySalesChart} margin={{ top: 5, right: 10, left: 0, bottom: 5 }}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
-                <XAxis dataKey="label" tick={{ fontSize: 11, fill: '#9ca3af' }} />
-                <YAxis tick={{ fontSize: 11, fill: '#9ca3af' }} width={50} />
-                <Tooltip
-                  formatter={(value, name) => [value.toLocaleString('ru-RU'), name === 'revenue' ? 'Выручка' : 'Продаж']}
-                  labelFormatter={(label) => `Дата: ${label}`}
-                  contentStyle={{ fontSize: 12, borderRadius: 8 }}
-                />
-                <Bar dataKey="revenue" fill="#3b82f6" radius={[4, 4, 0, 0]} name="Выручка" />
-              </BarChart>
-            </ResponsiveContainer>
-          </div>
-
-          {/* Круговая диаграмма способов оплаты */}
-          <div className="bg-white rounded-lg border border-gray-200 p-4 overflow-hidden">
-            <h3 className="text-sm font-semibold text-gray-700 mb-3">Оплата за месяц</h3>
-            {paymentChart.length > 0 ? (
-              <ResponsiveContainer width="100%" height={220}>
-                <PieChart>
-                  <Pie
-                    data={paymentChart}
-                    cx="50%"
-                    cy="50%"
-                    innerRadius={45}
-                    outerRadius={70}
-                    paddingAngle={4}
-                    dataKey="value"
-                    label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
-                    labelLine={{ strokeWidth: 1 }}
-                    style={{ fontSize: 10 }}
-                  >
-                    {paymentChart.map((_, index) => (
-                      <Cell key={`cell-${index}`} fill={PIE_COLORS[index % PIE_COLORS.length]} />
-                    ))}
-                  </Pie>
-                  <Tooltip formatter={(value) => value.toLocaleString('ru-RU')} contentStyle={{ fontSize: 12, borderRadius: 8 }} />
-                </PieChart>
-              </ResponsiveContainer>
-            ) : (
-              <div className="flex items-center justify-center h-[220px] text-gray-400 text-sm">
-                Нет данных
-              </div>
-            )}
-          </div>
-        </div>
-      )}
-
-      {/* Линейный график закупок по городам */}
-      {isAdmin && showPurchaseChart && (
         <div className="bg-white rounded-lg border border-gray-200 p-4">
-          <h3 className="text-sm font-semibold text-gray-700 mb-3">Закупки по городам за 14 дней</h3>
+          <h3 className="text-sm font-semibold text-gray-700 mb-3">Сумма закупа по городам за 14 дней</h3>
           {cityNames.length > 0 ? (
             <ResponsiveContainer width="100%" height={280}>
               <LineChart data={cityPurchaseChart} margin={{ top: 5, right: 20, left: 10, bottom: 5 }}>
@@ -334,31 +227,6 @@ export default function DashboardDesktop({ user }) {
         </div>
       )}
 
-      {/* Продажи за периоды — для админа */}
-      {isAdmin && (
-        <div className="grid grid-cols-4 gap-3">
-          <div className="bg-white rounded-lg border border-gray-200 p-3">
-            <p className="text-xs text-gray-500 mb-1">За сегодня</p>
-            <p className="text-lg font-bold text-gray-900">{stats.salesDay.count} <span className="text-xs font-normal text-gray-400">продаж</span></p>
-            <p className="text-sm text-green-600">{(stats.salesDay.totalAmount || 0).toLocaleString('ru-RU')}</p>
-          </div>
-          <div className="bg-white rounded-lg border border-gray-200 p-3">
-            <p className="text-xs text-gray-500 mb-1">За неделю</p>
-            <p className="text-lg font-bold text-gray-900">{stats.salesWeek.count} <span className="text-xs font-normal text-gray-400">продаж</span></p>
-            <p className="text-sm text-green-600">{(stats.salesWeek.totalAmount || 0).toLocaleString('ru-RU')}</p>
-          </div>
-          <div className="bg-white rounded-lg border border-gray-200 p-3">
-            <p className="text-xs text-gray-500 mb-1">За месяц</p>
-            <p className="text-lg font-bold text-gray-900">{stats.salesMonth.count} <span className="text-xs font-normal text-gray-400">продаж</span></p>
-            <p className="text-sm text-green-600">{(stats.salesMonth.totalAmount || 0).toLocaleString('ru-RU')}</p>
-          </div>
-          <div className="bg-white rounded-lg border border-gray-200 p-3">
-            <p className="text-xs text-gray-500 mb-1">За полгода</p>
-            <p className="text-lg font-bold text-gray-900">{stats.salesHalfYear.count} <span className="text-xs font-normal text-gray-400">продаж</span></p>
-            <p className="text-sm text-green-600">{(stats.salesHalfYear.totalAmount || 0).toLocaleString('ru-RU')}</p>
-          </div>
-        </div>
-      )}
 
       {/* Модалка разбивки по складам */}
       {showStockBreakdown && (

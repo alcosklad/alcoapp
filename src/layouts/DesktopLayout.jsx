@@ -29,9 +29,8 @@ export default function DesktopLayout({ children, activeTab, onTabChange, user, 
     { id: 'settings', label: 'Настройки', icon: Settings },
   ];
 
-  // Меню для оператора (без приёмок)
+  // Меню для оператора (только Остатки и Прайс)
   const operatorMenu = [
-    { id: 'dashboard', label: 'Главная', icon: LayoutDashboard },
     { id: 'stock', label: 'Остатки', icon: Warehouse },
     { id: 'pricelist', label: 'Прайс-лист', icon: FileText },
   ];

@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { Search, Calendar, History, RussianRuble, Clock, RotateCcw, X, CreditCard, Package, ChevronRight, ArrowLeft } from 'lucide-react';
-import { getOrders, refundOrder } from '../../lib/pocketbase';
+import { Search, Calendar, History, RussianRuble, Clock, RotateCcw, X, CreditCard, Package, ChevronRight, ArrowLeft, RefreshCw } from 'lucide-react';
+import { getOrders, refundOrder, getActiveShift } from '../../lib/pocketbase';
+import pb from '../../lib/pocketbase';
 
 export default function WorkerOrders({ user, closeTrigger }) {
   const [orders, setOrders] = useState([]);
@@ -14,6 +15,7 @@ export default function WorkerOrders({ user, closeTrigger }) {
   const [shakeModal, setShakeModal] = useState(false);
   const [refundLoading, setRefundLoading] = useState(false);
   const [justRefundedId, setJustRefundedId] = useState(null);
+  const [shiftOrderIds, setShiftOrderIds] = useState(new Set());
 
   // Cleanup body scroll lock on unmount (e.g. tab switch)
   useEffect(() => {
@@ -59,6 +61,22 @@ export default function WorkerOrders({ user, closeTrigger }) {
         return dateB - dateA;
       });
       setOrders(sorted);
+
+      // Load active shift to determine which orders allow refund
+      try {
+        const userId = pb.authStore.model?.id;
+        if (userId) {
+          const shift = await getActiveShift(userId);
+          if (shift && shift.sales) {
+            const ids = new Set(shift.sales.map(s => s.id || s).filter(Boolean));
+            setShiftOrderIds(ids);
+          } else {
+            setShiftOrderIds(new Set());
+          }
+        }
+      } catch (_) {
+        setShiftOrderIds(new Set());
+      }
     } catch (e) {
       console.error('Error loading orders:', e);
     } finally {
@@ -156,8 +174,8 @@ export default function WorkerOrders({ user, closeTrigger }) {
   return (
     <div className="px-4 pt-4 pb-4 space-y-4">
       {/* Stats */}
-      <div className="grid grid-cols-2 gap-3">
-        <div className="bg-white rounded-2xl p-4 shadow-sm">
+      <div className="flex gap-3">
+        <div className="bg-white rounded-2xl p-4 shadow-sm flex-1">
           <div className="flex items-center justify-between">
             <div>
               <p className="text-2xl font-bold text-blue-600">{filteredOrders.length}</p>
@@ -168,17 +186,14 @@ export default function WorkerOrders({ user, closeTrigger }) {
             </div>
           </div>
         </div>
-        <div className="bg-white rounded-2xl p-4 shadow-sm">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-2xl font-bold text-green-600">{totalRevenue.toLocaleString('ru-RU')}</p>
-              <p className="text-xs text-gray-400 mt-0.5">Выручка</p>
-            </div>
-            <div className="w-10 h-10 bg-green-50 rounded-xl flex items-center justify-center">
-              <RussianRuble size={20} className="text-green-500" />
-            </div>
-          </div>
-        </div>
+        <button
+          onClick={() => loadOrders()}
+          disabled={loading}
+          className="bg-white rounded-2xl px-4 shadow-sm flex items-center gap-2 text-gray-500 active:bg-blue-50 active:text-blue-600 transition-colors disabled:opacity-50"
+        >
+          <RefreshCw size={16} className={loading ? 'animate-spin' : ''} />
+          <span className="text-xs font-medium">Обновить</span>
+        </button>
       </div>
 
       {/* Search + Filters */}
@@ -312,7 +327,7 @@ export default function WorkerOrders({ user, closeTrigger }) {
                     {/* Footer */}
                     <div className={`flex items-center justify-between pt-2.5 border-t ${isRefund ? 'border-blue-200' : 'border-gray-100'}`}>
                       <div className="flex items-center gap-2">
-                        {!isRefund && (
+                        {!isRefund && shiftOrderIds.has(order.id) && (
                           <span
                             onClick={(e) => handleInlineRefund(e, order)}
                             className={`px-2 py-1 text-[10px] font-semibold rounded-lg flex items-center gap-1 transition-all ${
@@ -424,7 +439,7 @@ export default function WorkerOrders({ user, closeTrigger }) {
 
               {/* Footer: back + refund */}
               <div className="border-t border-gray-100 px-5 py-3 shrink-0 space-y-2" style={{ paddingBottom: 'max(12px, env(safe-area-inset-bottom))' }}>
-                {!isRefund && (
+                {!isRefund && shiftOrderIds.has(order.id) && (
                   <>
                     <button
                       onClick={() => handleInlineRefund({ stopPropagation: () => {} }, order)}

@@ -31,7 +31,7 @@ function App() {
     if (pb.authStore.isValid) {
       setUser(pb.authStore.model);
       // Если воркер, показываем остатки по умолчанию
-      if (pb.authStore.model?.role === 'worker') {
+      if (pb.authStore.model?.role === 'worker' || pb.authStore.model?.role === 'operator') {
         setActiveTab('stock');
       }
     }
@@ -40,8 +40,8 @@ function App() {
 
   const handleAuth = (userData) => {
     setUser(userData);
-    // Если воркер, показываем остатки
-    if (userData?.role === 'worker') {
+    // Если воркер или оператор, показываем остатки
+    if (userData?.role === 'worker' || userData?.role === 'operator') {
       setActiveTab('stock');
     }
   };

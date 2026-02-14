@@ -17,12 +17,12 @@ export default function AuthScreen({ onAuth }) {
   const checkAuth = async () => {
     try {
       if (pb.authStore.isValid) {
-        // Проверяем токен
-        await pb.collection('users').getOne(pb.authStore.model.id);
+        // Перепроверяем токен на сервере — если пароль менялся, authRefresh вернёт 401
+        await pb.collection('users').authRefresh();
         onAuth(pb.authStore.model);
       }
     } catch (err) {
-      // Токен невалидный, выходим
+      // Токен невалидный или пароль изменён — очищаем сессию
       pb.authStore.clear();
     } finally {
       setLoading(false);
