@@ -11,7 +11,7 @@ const MOYSKLAD_API = 'https://api.moysklad.ru/api/remap/1.2';
 
 const POCKETBASE_URL = 'http://146.103.121.96:8090';
 const PB_ADMIN_EMAIL = 'admin@sklad.ru';
-const PB_ADMIN_PASSWORD = '326052sssS';
+const PB_ADMIN_PASSWORD = '323282sssS';
 
 const DRY_RUN = process.argv.includes('--dry-run');
 const YEAR_FILTER = '2026-01-01 00:00:00';
@@ -163,31 +163,23 @@ async function main() {
   msProductsData.forEach(p => { msProducts[p.id] = { name: p.name, article: p.article }; });
   console.log(`✅ Товаров МС: ${Object.keys(msProducts).length}`);
 
-  // 7. Clear old data in PocketBase
-  if (!DRY_RUN) {
-    console.log('\n🗑️  Очистка старых данных...');
-
-    // Clear orders
-    try {
-      const oldOrders = await pb.collection('orders').getFullList();
-      for (const o of oldOrders) {
-        await pb.collection('orders').delete(o.id);
-      }
-      console.log(`  Удалено orders: ${oldOrders.length}`);
-    } catch (e) {
-      console.log('  orders: коллекция пуста или не существует');
-    }
-
-    // Clear shifts
-    try {
-      const oldShifts = await pb.collection('shifts').getFullList();
-      for (const s of oldShifts) {
-        await pb.collection('shifts').delete(s.id);
-      }
-      console.log(`  Удалено shifts: ${oldShifts.length}`);
-    } catch (e) {
-      console.log('  shifts: коллекция пуста или не существует');
-    }
+  // 7. Load existing ms_ids to skip duplicates (incremental mode)
+  console.log('\n� Загрузка существующих ms_id из PocketBase...');
+  const existingOrderMsIds = new Set();
+  const existingShiftMsIds = new Set();
+  try {
+    const existingOrders = await pb.collection('orders').getFullList({ fields: 'ms_id' });
+    existingOrders.forEach(o => { if (o.ms_id) existingOrderMsIds.add(o.ms_id); });
+    console.log(`  Существующих orders с ms_id: ${existingOrderMsIds.size}`);
+  } catch (e) {
+    console.log('  orders: коллекция пуста или не существует');
+  }
+  try {
+    const existingShifts = await pb.collection('shifts').getFullList({ fields: 'ms_id' });
+    existingShifts.forEach(s => { if (s.ms_id) existingShiftMsIds.add(s.ms_id); });
+    console.log(`  Существующих shifts с ms_id: ${existingShiftMsIds.size}`);
+  } catch (e) {
+    console.log('  shifts: коллекция пуста или не существует');
   }
 
   // 8. Process shifts
@@ -203,6 +195,17 @@ async function main() {
     const employeeName = msEmployees[ownerId] || 'Unknown';
     const storeName = msStores[storeId] || 'Unknown';
     const cityName = STORE_TO_CITY[storeName] || storeName;
+
+    // Skip if already exists in PB
+    if (existingShiftMsIds.has(shift.id)) {
+      shiftsSkipped++;
+      // Still need to map shift id for demand processing
+      try {
+        const existingShift = await pb.collection('shifts').getFirstListItem(`ms_id = "${shift.id}"`);
+        shiftMap[shift.id] = existingShift.id;
+      } catch (_) {}
+      continue;
+    }
 
     // Map to PB user
     const pbUserName = EMPLOYEE_TO_PB_USER[employeeName];
@@ -270,6 +273,12 @@ async function main() {
 
     if (i % 50 === 0 && i > 0) {
       console.log(`  Обработано ${i} / ${msDemands.length}...`);
+    }
+
+    // Skip if already exists in PB
+    if (existingOrderMsIds.has(demand.id)) {
+      salesSkipped++;
+      continue;
     }
 
     const ownerId = extractId(demand.owner);

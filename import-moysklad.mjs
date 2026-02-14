@@ -11,7 +11,7 @@ const MOYSKLAD_API = 'https://api.moysklad.ru/api/remap/1.2';
 
 const POCKETBASE_URL = 'http://146.103.121.96:8090';
 const PB_ADMIN_EMAIL = 'admin@sklad.ru';
-const PB_ADMIN_PASSWORD = '326052sssS';
+const PB_ADMIN_PASSWORD = '323282sssS';
 
 const DRY_RUN = process.argv.includes('--dry-run');
 

@@ -16,7 +16,8 @@ export default function WorkerLogin({ onAuth }) {
   const checkAuth = async () => {
     try {
       if (pb.authStore.isValid) {
-        await pb.collection('users').getOne(pb.authStore.model.id);
+        // authRefresh validates token on server — if password changed, returns 401
+        await pb.collection('users').authRefresh();
         onAuth(pb.authStore.model);
       }
     } catch (_) {
