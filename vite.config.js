@@ -8,7 +8,7 @@ export default defineConfig({
     react(),
     VitePWA({
       registerType: 'autoUpdate',
-      includeAssets: ['pwa-192x192.svg'],
+      includeAssets: ['icon-192x192.png', 'icon-512x512.png'],
       manifest: {
         name: 'Наш Склад',
         short_name: 'Склад',
@@ -21,19 +21,19 @@ export default defineConfig({
         scope: '/',
         icons: [
           {
-            src: '/pwa-192x192.svg',
+            src: '/icon-192x192.png',
             sizes: '192x192',
-            type: 'image/svg+xml'
+            type: 'image/png'
           },
           {
-            src: '/pwa-192x192.svg',
+            src: '/icon-512x512.png',
             sizes: '512x512',
-            type: 'image/svg+xml'
+            type: 'image/png'
           },
           {
-            src: '/pwa-192x192.svg',
+            src: '/icon-512x512.png',
             sizes: '512x512',
-            type: 'image/svg+xml',
+            type: 'image/png',
             purpose: 'any maskable'
           }
         ]
