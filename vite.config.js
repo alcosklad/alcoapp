@@ -8,7 +8,7 @@ export default defineConfig({
     react(),
     VitePWA({
       registerType: 'autoUpdate',
-      includeAssets: ['icon-192x192.png', 'icon-512x512.png'],
+      includeAssets: ['icon-192x192.png', 'icon-512x512.png', 'apple-touch-icon-180x180.png'],
       manifest: {
         name: 'Наш Склад',
         short_name: 'Склад',
