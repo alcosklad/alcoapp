@@ -55,8 +55,11 @@ function App() {
     setActiveTab('dashboard');
   };
 
+  // While checking auth, return null — the HTML splash screen is still visible
+  if (loading) return null;
+
   // Показываем экран авторизации если пользователь не вошел
-  if (!loading && !user) {
+  if (!user) {
     return <WorkerLogin onAuth={handleAuth} />;
   }
 
