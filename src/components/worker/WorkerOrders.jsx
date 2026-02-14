@@ -67,8 +67,17 @@ export default function WorkerOrders({ user, closeTrigger }) {
         const userId = pb.authStore.model?.id;
         if (userId) {
           const shift = await getActiveShift(userId);
-          if (shift && shift.sales) {
-            const ids = new Set(shift.sales.map(s => s.id || s).filter(Boolean));
+          if (shift) {
+            const shiftStart = new Date(shift.start);
+            // Match orders created after shift start (active shift has no sales array yet)
+            const ids = new Set(
+              sorted
+                .filter(o => {
+                  const orderDate = new Date(o.created || o.created_date);
+                  return orderDate >= shiftStart && o.status !== 'refund';
+                })
+                .map(o => o.id)
+            );
             setShiftOrderIds(ids);
           } else {
             setShiftOrderIds(new Set());

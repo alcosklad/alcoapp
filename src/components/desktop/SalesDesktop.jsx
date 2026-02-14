@@ -41,6 +41,7 @@ export default function SalesDesktop() {
   useEffect(() => {
     const now = new Date();
     let from = new Date();
+    const toLocal = (d) => `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
     switch (filterPeriod) {
       case 'today': from.setHours(0,0,0,0); break;
       case 'week': from.setDate(now.getDate() - 7); break;
@@ -49,8 +50,8 @@ export default function SalesDesktop() {
       case 'custom': return;
       default: from.setMonth(now.getMonth() - 1);
     }
-    setFilterDateFrom(from.toISOString().split('T')[0]);
-    setFilterDateTo(now.toISOString().split('T')[0]);
+    setFilterDateFrom(toLocal(from));
+    setFilterDateTo(toLocal(now));
   }, [filterPeriod]);
 
   const loadData = async () => {
@@ -101,25 +102,45 @@ export default function SalesDesktop() {
   const startEdit = (order) => {
     setEditingOrder(order.id);
     setEditForm({
-      total: order.total || 0,
+      items: (order.items || []).map(item => ({ ...item })),
       payment_method: order.payment_method || '0',
       discount: order.discount || 0,
+      discount_type: order.discount_type || 'percentage',
     });
   };
+
+  const editSubtotal = (editForm.items || []).reduce((s, item) => s + (Number(item.price) || 0) * (Number(item.quantity) || 1), 0);
+  const editTotal = (() => {
+    let t = editSubtotal;
+    if (editForm.discount > 0) {
+      if (editForm.discount_type === 'percentage') {
+        t = t * (1 - editForm.discount / 100);
+      } else {
+        t = t - editForm.discount;
+      }
+    }
+    return Math.max(0, Math.round(t * 100) / 100);
+  })();
 
   const saveEdit = async () => {
     try {
       setSaving(true);
-      await updateOrder(editingOrder, {
-        ...editForm,
+      const saveData = {
+        items: editForm.items,
+        payment_method: editForm.payment_method,
+        discount: editForm.discount,
+        discount_type: editForm.discount_type,
+        subtotal: editSubtotal,
+        total: editTotal,
         edited_at: new Date().toISOString(),
         edited_by: pb.authStore.model?.name || 'Admin'
-      });
+      };
+      await updateOrder(editingOrder, saveData);
       setEditingOrder(null);
-      const updated = orders.map(o => o.id === editingOrder ? { ...o, ...editForm, edited_at: new Date().toISOString(), edited_by: pb.authStore.model?.name } : o);
+      const updated = orders.map(o => o.id === editingOrder ? { ...o, ...saveData } : o);
       setOrders(updated);
       if (selectedOrder?.id === editingOrder) {
-        setSelectedOrder(prev => ({ ...prev, ...editForm, edited_at: new Date().toISOString() }));
+        setSelectedOrder(prev => ({ ...prev, ...saveData }));
       }
     } catch (err) {
       alert('Ошибка сохранения: ' + (err.message || ''));
@@ -269,10 +290,6 @@ export default function SalesDesktop() {
               <input type="date" value={filterDateTo} onChange={e => setFilterDateTo(e.target.value)} className="border rounded-lg px-3 py-1.5 text-sm" />
             </>
           )}
-          <select value={filterCourier} onChange={e => setFilterCourier(e.target.value)} className="border rounded-lg px-3 py-1.5 text-sm bg-white">
-            <option value="">Все курьеры</option>
-            {couriers.map(([id, name]) => <option key={id} value={id}>{name}</option>)}
-          </select>
           <div className="flex items-center gap-1.5 flex-wrap">
             {cities.map(c => (
               <button key={c} onClick={() => setFilterCity(p => p.includes(c) ? p.filter(x=>x!==c) : [...p,c])}
@@ -392,14 +409,49 @@ export default function SalesDesktop() {
               {editingOrder === selectedOrder.id ? (
                 <div className="bg-blue-50 rounded-xl p-4 space-y-3">
                   <p className="text-sm font-semibold text-blue-700">Редактирование</p>
-                  <div className="grid grid-cols-3 gap-3">
-                    <div>
-                      <label className="text-xs text-gray-500">Сумма</label>
-                      <input type="number" value={editForm.total} onChange={e => setEditForm(p => ({...p, total: Number(e.target.value)}))} className="w-full mt-1 border rounded-lg px-3 py-2 text-sm" />
-                    </div>
+                  {/* Items */}
+                  <div className="space-y-2">
+                    <p className="text-xs text-gray-500 font-medium">Товары</p>
+                    {(editForm.items || []).map((item, idx) => (
+                      <div key={idx} className="grid grid-cols-[1fr_80px_80px_60px] gap-2 items-end">
+                        <div>
+                          {idx === 0 && <label className="text-[10px] text-gray-400">Название</label>}
+                          <p className="text-sm text-gray-800 truncate mt-1">{item.name || 'Товар'}</p>
+                        </div>
+                        <div>
+                          {idx === 0 && <label className="text-[10px] text-gray-400">Цена</label>}
+                          <input type="number" value={item.price || ''} onChange={e => {
+                            const items = [...editForm.items];
+                            items[idx] = { ...items[idx], price: Number(e.target.value) || 0 };
+                            setEditForm(p => ({ ...p, items }));
+                          }} className="w-full border rounded-lg px-2 py-1.5 text-sm" />
+                        </div>
+                        <div>
+                          {idx === 0 && <label className="text-[10px] text-gray-400">Кол-во</label>}
+                          <input type="number" min="1" value={item.quantity || 1} onChange={e => {
+                            const items = [...editForm.items];
+                            items[idx] = { ...items[idx], quantity: Math.max(1, Number(e.target.value) || 1) };
+                            setEditForm(p => ({ ...p, items }));
+                          }} className="w-full border rounded-lg px-2 py-1.5 text-sm" />
+                        </div>
+                        <div className="text-right">
+                          {idx === 0 && <label className="text-[10px] text-gray-400 block">Сумма</label>}
+                          <p className="text-sm font-medium text-gray-700 py-1.5">{fmtMoney((item.price||0)*(item.quantity||1))}</p>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                  {/* Discount + Payment */}
+                  <div className="grid grid-cols-3 gap-3 pt-2 border-t border-blue-100">
                     <div>
                       <label className="text-xs text-gray-500">Скидка</label>
-                      <input type="number" value={editForm.discount} onChange={e => setEditForm(p => ({...p, discount: Number(e.target.value)}))} className="w-full mt-1 border rounded-lg px-3 py-2 text-sm" />
+                      <div className="flex gap-1 mt-1">
+                        <input type="number" value={editForm.discount} onChange={e => setEditForm(p => ({...p, discount: Number(e.target.value) || 0}))} className="w-full border rounded-lg px-2 py-2 text-sm" />
+                        <select value={editForm.discount_type} onChange={e => setEditForm(p => ({...p, discount_type: e.target.value}))} className="border rounded-lg px-1 py-2 text-sm bg-white shrink-0">
+                          <option value="percentage">%</option>
+                          <option value="fixed">₽</option>
+                        </select>
+                      </div>
                     </div>
                     <div>
                       <label className="text-xs text-gray-500">Оплата</label>
@@ -408,6 +460,10 @@ export default function SalesDesktop() {
                         <option value="1">Перевод</option>
                         <option value="2">Предоплата</option>
                       </select>
+                    </div>
+                    <div>
+                      <label className="text-xs text-gray-500">Итого</label>
+                      <p className="text-lg font-bold text-green-600 mt-1">{fmtMoney(editTotal)} ₽</p>
                     </div>
                   </div>
                   <div className="flex gap-2">

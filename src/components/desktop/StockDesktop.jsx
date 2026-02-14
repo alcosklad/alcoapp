@@ -117,11 +117,13 @@ export default function StockDesktop() {
     const product = getProduct(stock);
     setEditStock(stock);
     setEditProduct(product);
+    // Use stock-level cost if available (updated by receptions), fallback to product cost
+    const stockCost = stock.cost || product.cost || 0;
     setEditForm({
       name: product.name || '',
       category: (Array.isArray(product.category) ? product.category[0] : product.category) || '',
       subcategory: product.subcategory || '',
-      cost: product.cost || 0,
+      cost: stockCost,
       price: product.price || 0,
     });
     // Города: если агрегировано — из _cityBreakdown, если нет — одна запись

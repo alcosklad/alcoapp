@@ -42,6 +42,7 @@ export default function ShiftsDesktop() {
   useEffect(() => {
     const now = new Date();
     let from = new Date();
+    const toLocal = (d) => `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
     switch (filterPeriod) {
       case 'today': from.setHours(0,0,0,0); break;
       case 'week': from.setDate(now.getDate() - 7); break;
@@ -50,8 +51,8 @@ export default function ShiftsDesktop() {
       case 'custom': return;
       default: from.setMonth(now.getMonth() - 1);
     }
-    setFilterDateFrom(from.toISOString().split('T')[0]);
-    setFilterDateTo(now.toISOString().split('T')[0]);
+    setFilterDateFrom(toLocal(from));
+    setFilterDateTo(toLocal(now));
   }, [filterPeriod]);
 
   const loadData = async () => {

@@ -313,13 +313,13 @@ export default function WorkerStock({ user, onCartOpen, cart, setCart }) {
       {/* Shift auto-start toast */}
       {shiftToast && (
         <div className="fixed bottom-24 left-4 right-4 z-[999] animate-slide-up">
-          <div className="bg-blue-600 text-white rounded-2xl px-5 py-3.5 shadow-lg shadow-blue-600/30 flex items-center gap-3">
-            <div className="w-8 h-8 bg-white/20 rounded-full flex items-center justify-center shrink-0">
-              <Clock size={18} />
+          <div className="bg-green-500/80 backdrop-blur-sm text-white rounded-2xl px-4 py-2.5 shadow-md flex items-center gap-2.5">
+            <div className="w-7 h-7 bg-white/20 rounded-full flex items-center justify-center shrink-0">
+              <Check size={16} />
             </div>
             <div>
-              <p className="text-sm font-bold">Смена открыта</p>
-              <p className="text-xs text-blue-100">Автоматически при первой продаже</p>
+              <p className="text-sm font-semibold">Смена открыта</p>
+              <p className="text-[11px] text-green-100">Автоматически при первой продаже</p>
             </div>
           </div>
         </div>
