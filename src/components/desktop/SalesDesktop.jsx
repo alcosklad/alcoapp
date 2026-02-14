@@ -2,6 +2,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { ShoppingCart, RussianRuble, TrendingUp, CreditCard, Banknote, Search, ChevronDown, ChevronUp, X, Eye, Trash2, RotateCcw, Wallet, Pencil, Check, Package } from 'lucide-react';
 import { getAllOrders, getUsers, deleteOrder, refundOrder, updateOrder } from '../../lib/pocketbase';
 import pb from '../../lib/pocketbase';
+import { getOrFetch, invalidate } from '../../lib/cache';
 
 export default function SalesDesktop() {
   const [orders, setOrders] = useState([]);
@@ -57,7 +58,10 @@ export default function SalesDesktop() {
   const loadData = async () => {
     try {
       setLoading(true);
-      const [ordersData, usersData] = await Promise.all([getAllOrders(), getUsers()]);
+      const [ordersData, usersData] = await Promise.all([
+        getOrFetch('orders:all', () => getAllOrders(), 60000, (fresh) => setOrders(fresh)),
+        getOrFetch('users:all', () => getUsers(), 300000)
+      ]);
       setOrders(ordersData);
       setUsers(usersData);
     } catch (error) {
@@ -78,6 +82,9 @@ export default function SalesDesktop() {
     try {
       setRefundLoading(true);
       await refundOrder(order.id);
+      invalidate('orders');
+      invalidate('stocks');
+      invalidate('dashboard');
       setSelectedOrder(null);
       setRefundConfirm(false);
       await loadData();
@@ -92,6 +99,8 @@ export default function SalesDesktop() {
     if (!window.confirm(`Удалить продажу #${order.id?.slice(-6)} на сумму ${fmtMoney(order.total)}?`)) return;
     try {
       await deleteOrder(order.id);
+      invalidate('orders');
+      invalidate('dashboard');
       setSelectedOrder(null);
       await loadData();
     } catch (err) {

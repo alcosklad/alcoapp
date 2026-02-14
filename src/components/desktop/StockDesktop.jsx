@@ -3,6 +3,7 @@ import { Search, ChevronUp, ChevronDown, RefreshCw, MapPin, X, Plus, Trash2, Che
 import { getStocksAggregated, getSuppliers, getProducts, updateProduct, createStockRecord, deleteStockRecord, updateStockRecord, getReceptionHistoryForProduct } from '../../lib/pocketbase';
 import { detectSubcategory, ALL_SUBCATEGORIES } from '../../lib/subcategories';
 import pb from '../../lib/pocketbase';
+import { getOrFetch, invalidate } from '../../lib/cache';
 
 export default function StockDesktop() {
   const [stocks, setStocks] = useState([]);
@@ -51,7 +52,7 @@ export default function StockDesktop() {
 
   const loadSuppliers = async () => {
     try {
-      const data = await getSuppliers().catch(() => []);
+      const data = await getOrFetch('suppliers', () => getSuppliers().catch(() => []), 300000);
       setSuppliers(data || []);
     } catch (error) {
       console.error('Error loading suppliers:', error);
@@ -61,7 +62,8 @@ export default function StockDesktop() {
   const loadStocks = async () => {
     try {
       setLoading(true);
-      const data = await getStocksAggregated(selectedSupplier || null).catch(() => []);
+      const cacheKey = 'stocks:agg:' + (selectedSupplier || 'all');
+      const data = await getOrFetch(cacheKey, () => getStocksAggregated(selectedSupplier || null).catch(() => []), 60000, (fresh) => { setStocks(fresh || []); setLoading(false); });
       setStocks(data || []);
     } catch (error) {
       console.error('Error loading stocks:', error);
@@ -72,7 +74,7 @@ export default function StockDesktop() {
 
   const loadAllProducts = async () => {
     try {
-      const data = await getProducts().catch(() => []);
+      const data = await getOrFetch('products:all', () => getProducts().catch(() => []), 120000);
       setAllProducts(data || []);
     } catch (error) {
       console.error('Error loading products:', error);

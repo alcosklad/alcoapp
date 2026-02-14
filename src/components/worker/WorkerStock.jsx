@@ -2,6 +2,7 @@ import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { Search, Package, AlertTriangle, ShoppingCart, Plus, Check, Clock, RefreshCw } from 'lucide-react';
 import { getStocksWithDetails, getSuppliers, updateStock, createOrder, getActiveShift, startShift } from '../../lib/pocketbase';
 import pb from '../../lib/pocketbase';
+import { getOrFetch, invalidate } from '../../lib/cache';
 import WorkerCart from './WorkerCart';
 
 export default function WorkerStock({ user, onCartOpen, cart, setCart }) {
@@ -29,7 +30,7 @@ export default function WorkerStock({ user, onCartOpen, cart, setCart }) {
 
   const loadSuppliers = async () => {
     try {
-      const data = await getSuppliers().catch(() => []);
+      const data = await getOrFetch('suppliers', () => getSuppliers().catch(() => []), 300000);
       setSuppliers(data || []);
       if (userSupplier) {
         setSelectedSupplier(userSupplier);
@@ -63,11 +64,17 @@ export default function WorkerStock({ user, onCartOpen, cart, setCart }) {
     }
   };
 
-  const loadStocks = async () => {
+  const loadStocks = async (forceRefresh = false) => {
     if (!selectedSupplier) return;
     try {
-      setLoading(true);
-      const data = await getStocksWithDetails(selectedSupplier).catch(() => []);
+      if (forceRefresh) invalidate('stocks');
+      const cacheKey = 'stocks:' + selectedSupplier;
+      const data = await getOrFetch(
+        cacheKey,
+        () => getStocksWithDetails(selectedSupplier).catch(() => []),
+        60000,
+        (freshData) => { setStocks(freshData || []); setLoading(false); }
+      );
       setStocks(data || []);
     } catch (e) {
       console.error('Error loading stocks:', e);
@@ -146,6 +153,11 @@ export default function WorkerStock({ user, onCartOpen, cart, setCart }) {
       }
 
       setCart([]);
+      try { localStorage.removeItem('ns_worker_cart'); } catch {}
+      invalidate('stocks');
+      invalidate('orders');
+      invalidate('shifts');
+      invalidate('dashboard');
       setShowCart(false);
       onCartOpen?.(false);
       loadStocks();
@@ -178,7 +190,7 @@ export default function WorkerStock({ user, onCartOpen, cart, setCart }) {
           <span className="font-medium">Наименований: <span className="text-gray-700 font-bold">{filteredStocks.length}</span></span>
         </div>
         <button
-          onClick={() => loadStocks()}
+          onClick={() => loadStocks(true)}
           disabled={loading}
           className="flex items-center gap-1 px-2.5 py-1.5 bg-gray-100 rounded-xl text-gray-500 active:bg-blue-50 active:text-blue-600 transition-colors disabled:opacity-50"
         >

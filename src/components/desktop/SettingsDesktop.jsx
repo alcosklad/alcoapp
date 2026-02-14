@@ -2,6 +2,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { Users, Plus, Edit2, Trash2, X, Check, Eye, EyeOff, RefreshCw, Shield, UserCircle, Truck, ChevronUp, ChevronDown } from 'lucide-react';
 import { getUsers, createUser, updateUser, deleteUser, getSuppliers } from '../../lib/pocketbase';
 import pb from '../../lib/pocketbase';
+import { getOrFetch, invalidate } from '../../lib/cache';
 
 const ROLES = [
   { value: 'admin', label: 'Администратор', icon: Shield, color: 'text-red-600 bg-red-50' },
@@ -38,8 +39,8 @@ export default function SettingsDesktop({ onLogout }) {
     try {
       setLoading(true);
       const [usersData, suppliersData] = await Promise.all([
-        getUsers(),
-        getSuppliers()
+        getOrFetch('users:all', () => getUsers(), 60000, (fresh) => setUsers(fresh || [])),
+        getOrFetch('suppliers', () => getSuppliers(), 300000)
       ]);
       setUsers(usersData || []);
       setSuppliers(suppliersData || []);
@@ -161,6 +162,7 @@ export default function SettingsDesktop({ onLogout }) {
       } else {
         await createUser(form);
       }
+      invalidate('users');
       closeModal();
       await loadData();
 
@@ -196,6 +198,7 @@ export default function SettingsDesktop({ onLogout }) {
     try {
       setLoading(true);
       await deleteUser(user.id);
+      invalidate('users');
       await loadData();
     } catch (err) {
       console.error('Error deleting user:', err);

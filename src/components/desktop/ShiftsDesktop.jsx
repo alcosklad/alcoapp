@@ -2,6 +2,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { Clock, RussianRuble, TrendingUp, Users, Search, ChevronDown, ChevronUp, X, Eye, Trash2, Play, Square, Pencil, Check, ChevronRight, RotateCcw, Package } from 'lucide-react';
 import { getAllShifts, getUsers, deleteShift, updateShift } from '../../lib/pocketbase';
 import pb from '../../lib/pocketbase';
+import { getOrFetch, invalidate } from '../../lib/cache';
 
 export default function ShiftsDesktop() {
   const [shifts, setShifts] = useState([]);
@@ -58,7 +59,10 @@ export default function ShiftsDesktop() {
   const loadData = async () => {
     try {
       setLoading(true);
-      const [shiftsData, usersData] = await Promise.all([getAllShifts(), getUsers()]);
+      const [shiftsData, usersData] = await Promise.all([
+        getOrFetch('shifts:all', () => getAllShifts(), 60000, (fresh) => setShifts(fresh)),
+        getOrFetch('users:all', () => getUsers(), 300000)
+      ]);
       setShifts(shiftsData);
       setUsers(usersData);
     } catch (error) {
@@ -72,6 +76,8 @@ export default function ShiftsDesktop() {
     if (!window.confirm(`Удалить смену ${shift.expand?.user?.name || ''} от ${fmtDate(shift.start)}?`)) return;
     try {
       await deleteShift(shift.id);
+      invalidate('shifts');
+      invalidate('dashboard');
       setSelectedShift(null);
       await loadData();
     } catch (err) {
@@ -88,6 +94,8 @@ export default function ShiftsDesktop() {
         edited_at: new Date().toISOString(),
         edited_by: pb.authStore.model?.name || 'Admin'
       });
+      invalidate('shifts');
+      invalidate('dashboard');
       setSelectedShift(null);
       await loadData();
     } catch (err) {

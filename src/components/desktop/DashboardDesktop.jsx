@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { getDashboardStats, getSuppliers, getAllOrders, getReceptions } from '../../lib/pocketbase';
+import { getOrFetch } from '../../lib/cache';
 import { Package, TrendingUp, ShoppingCart, AlertTriangle, FileText, Calendar, Clock, BarChart3, X } from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, LineChart, Line, Legend } from 'recharts';
 import pb from '../../lib/pocketbase';
@@ -44,7 +45,7 @@ export default function DashboardDesktop({ user }) {
 
   const loadSuppliers = async () => {
     try {
-      const data = await getSuppliers().catch(() => []);
+      const data = await getOrFetch('suppliers', () => getSuppliers().catch(() => []), 300000);
       setSuppliers(data || []);
     } catch (error) {
       console.error('Error loading suppliers:', error);
@@ -53,7 +54,7 @@ export default function DashboardDesktop({ user }) {
 
   const loadSalesForChart = async () => {
     try {
-      const orders = await getAllOrders().catch(() => []);
+      const orders = await getOrFetch('orders:all', () => getAllOrders().catch(() => []), 120000, (fresh) => setSalesData(fresh || []));
       setSalesData(orders || []);
     } catch (e) {
       console.error('Error loading sales for chart:', e);
@@ -62,7 +63,7 @@ export default function DashboardDesktop({ user }) {
 
   const loadReceptionsForChart = async () => {
     try {
-      const data = await getReceptions().catch(() => []);
+      const data = await getOrFetch('receptions:all', () => getReceptions().catch(() => []), 120000, (fresh) => setReceptionsData(fresh || []));
       setReceptionsData(data || []);
     } catch (e) {
       console.error('Error loading receptions for chart:', e);
@@ -74,7 +75,8 @@ export default function DashboardDesktop({ user }) {
       setLoading(true);
       setError(null);
       
-      const statsData = await getDashboardStats(selectedSupplier || null);
+      const cacheKey = 'dashboard:stats:' + (selectedSupplier || 'all');
+      const statsData = await getOrFetch(cacheKey, () => getDashboardStats(selectedSupplier || null), 60000, (fresh) => { setStats(fresh); setLoading(false); });
       setStats(statsData);
     } catch (error) {
       console.error('Error loading dashboard:', error);

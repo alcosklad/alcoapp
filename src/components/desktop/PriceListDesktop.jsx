@@ -3,6 +3,7 @@ import { Search, ChevronUp, ChevronDown, RefreshCw, X, Plus, Check, Trash2, Copy
 import { getProducts, updateProduct, createProduct, deleteProduct, getStocksForProduct, mergeProducts, getStocksWithDetails } from '../../lib/pocketbase';
 import { detectSubcategory, ALL_SUBCATEGORIES } from '../../lib/subcategories';
 import pb from '../../lib/pocketbase';
+import { getOrFetch, invalidate } from '../../lib/cache';
 
 export default function PriceListDesktop() {
   const [products, setProducts] = useState([]);
@@ -68,7 +69,7 @@ export default function PriceListDesktop() {
   const loadSuppliers = async () => {
     try {
       const { getSuppliers } = await import('../../lib/pocketbase');
-      const data = await getSuppliers().catch(() => []);
+      const data = await getOrFetch('suppliers', () => getSuppliers().catch(() => []), 300000);
       setSuppliers(data || []);
     } catch (error) {
       console.error('Error loading suppliers:', error);
@@ -78,7 +79,7 @@ export default function PriceListDesktop() {
   const loadProducts = async () => {
     try {
       setLoading(true);
-      const data = await getProducts().catch(() => []);
+      const data = await getOrFetch('products:all', () => getProducts().catch(() => []), 120000, (fresh) => { setProducts(fresh || []); setLoading(false); });
       setProducts(data || []);
     } catch (error) {
       console.error('Error loading products:', error);
@@ -193,6 +194,8 @@ export default function PriceListDesktop() {
     try {
       setMerging(true);
       await mergeProducts(modalProduct.id, duplicateProduct.id);
+      invalidate('products');
+      invalidate('stocks');
       setDuplicates(prev => prev.filter(d => d.id !== duplicateProduct.id));
       loadProducts();
       alert('Товары объединены!');
@@ -232,6 +235,7 @@ export default function PriceListDesktop() {
       } else {
         await createProduct(data);
       }
+      invalidate('products');
       closeModal();
       loadProducts();
     } catch (err) {
@@ -265,6 +269,8 @@ export default function PriceListDesktop() {
       }
 
       await deleteProduct(modalProduct.id);
+      invalidate('products');
+      invalidate('stocks');
       closeModal();
       loadProducts();
     } catch (err) {

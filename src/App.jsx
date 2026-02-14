@@ -19,6 +19,7 @@ import SalesDesktop from './components/desktop/SalesDesktop';
 import ShiftsDesktop from './components/desktop/ShiftsDesktop';
 import SettingsDesktop from './components/desktop/SettingsDesktop';
 import pb from './lib/pocketbase';
+import { clearAll as clearCache } from './lib/cache';
 import ErrorBoundary from './components/ErrorBoundary';
 
 function App() {
@@ -48,6 +49,8 @@ function App() {
 
   const handleLogout = () => {
     pb.authStore.clear();
+    clearCache();
+    try { localStorage.removeItem('ns_worker_cart'); } catch {}
     setUser(null);
     setActiveTab('dashboard');
   };
@@ -62,27 +65,6 @@ function App() {
 
   // Desktop версия для админа и оператора
   if (isDesktopUser) {
-    const renderDesktopContent = () => {
-      switch (activeTab) {
-        case 'dashboard':
-          return <DashboardDesktop user={user} />;
-        case 'reception':
-          return <ReceptionDesktop />;
-        case 'stock':
-          return <StockDesktop />;
-        case 'pricelist':
-          return <PriceListDesktop />;
-        case 'sales':
-          return <SalesDesktop />;
-        case 'shifts':
-          return <ShiftsDesktop />;
-        case 'settings':
-          return <SettingsDesktop onLogout={handleLogout} />;
-        default:
-          return <DashboardDesktop user={user} />;
-      }
-    };
-
     return (
       <DesktopLayout
         activeTab={activeTab}
@@ -90,7 +72,27 @@ function App() {
         user={user}
         onLogout={handleLogout}
       >
-        {renderDesktopContent()}
+        <div style={{ display: activeTab === 'dashboard' ? 'block' : 'none' }}>
+          <DashboardDesktop user={user} />
+        </div>
+        <div style={{ display: activeTab === 'reception' ? 'block' : 'none' }}>
+          <ReceptionDesktop />
+        </div>
+        <div style={{ display: activeTab === 'stock' ? 'block' : 'none' }}>
+          <StockDesktop />
+        </div>
+        <div style={{ display: activeTab === 'pricelist' ? 'block' : 'none' }}>
+          <PriceListDesktop />
+        </div>
+        <div style={{ display: activeTab === 'sales' ? 'block' : 'none' }}>
+          <SalesDesktop />
+        </div>
+        <div style={{ display: activeTab === 'shifts' ? 'block' : 'none' }}>
+          <ShiftsDesktop />
+        </div>
+        <div style={{ display: activeTab === 'settings' ? 'block' : 'none' }}>
+          <SettingsDesktop onLogout={handleLogout} />
+        </div>
       </DesktopLayout>
     );
   }

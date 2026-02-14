@@ -4,6 +4,7 @@ import { getReceptions, getSuppliers, getProducts, createReception, updateRecept
 import { format } from 'date-fns';
 import { ru } from 'date-fns/locale';
 import pb from '../../lib/pocketbase';
+import { getOrFetch, invalidate } from '../../lib/cache';
 import CreateReceptionModal from './CreateReceptionModal';
 
 export default function ReceptionDesktop() {
@@ -49,7 +50,7 @@ export default function ReceptionDesktop() {
 
   const loadSuppliers = async () => {
     try {
-      const data = await getSuppliers().catch(() => []);
+      const data = await getOrFetch('suppliers', () => getSuppliers().catch(() => []), 300000);
       setSuppliers(data || []);
     } catch (error) {
       console.error('Error loading suppliers:', error);
@@ -58,7 +59,7 @@ export default function ReceptionDesktop() {
 
   const loadProducts = async () => {
     try {
-      const data = await getProducts().catch(() => []);
+      const data = await getOrFetch('products:all', () => getProducts().catch(() => []), 120000);
       setProducts(data || []);
     } catch (error) {
       console.error('Error loading products:', error);
@@ -68,7 +69,11 @@ export default function ReceptionDesktop() {
   const loadReceptions = async () => {
     try {
       setLoading(true);
-      const data = await getReceptions().catch(() => []);
+      const data = await getOrFetch('receptions:all', () => getReceptions().catch(() => []), 60000, (fresh) => {
+        const filtered = selectedSupplier ? fresh.filter(r => r.supplier === selectedSupplier) : fresh;
+        setReceptions(filtered || []);
+        setLoading(false);
+      });
       
       // Фильтруем по выбранному городу
       const filtered = selectedSupplier 
@@ -96,6 +101,9 @@ export default function ReceptionDesktop() {
     try {
       setLoading(true);
       await createReception(receptionData);
+      invalidate('receptions');
+      invalidate('stocks');
+      invalidate('dashboard');
       setShowCreateModal(false);
       await loadReceptions();
       alert('Приёмка успешно создана! Остатки обновлены.');
@@ -118,6 +126,9 @@ export default function ReceptionDesktop() {
     try {
       setLoading(true);
       await deleteReception(receptionId);
+      invalidate('receptions');
+      invalidate('stocks');
+      invalidate('dashboard');
       setSelectedReception(null);
       await loadReceptions();
       alert('Приёмка удалена');
@@ -170,6 +181,9 @@ export default function ReceptionDesktop() {
         total_amount: totalAmount
       });
 
+      invalidate('receptions');
+      invalidate('stocks');
+      invalidate('dashboard');
       setSelectedReception(null);
       setEditedItems([]);
       setHasChanges(false);

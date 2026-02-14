@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Clock, RussianRuble, Package, X, CheckCircle, ChevronRight, RotateCcw } from 'lucide-react';
 import { getActiveShift, getShifts, endShift, getOrders } from '../../lib/pocketbase';
 import pb from '../../lib/pocketbase';
+import { getOrFetch, invalidate } from '../../lib/cache';
 
 export default function WorkerShift({ user }) {
   const [activeShift, setActiveShift] = useState(null);
@@ -22,10 +23,20 @@ export default function WorkerShift({ user }) {
       setLoading(true);
       const userId = pb.authStore.model?.id;
       if (!userId) return;
-      const active = await getActiveShift(userId);
+      const active = await getOrFetch(
+        'shifts:active:' + userId,
+        () => getActiveShift(userId),
+        30000,
+        (fresh) => setActiveShift(fresh)
+      );
       setActiveShift(active);
-      const history = await getShifts(userId);
-      setShifts(history.filter(s => s.status === 'closed'));
+      const history = await getOrFetch(
+        'shifts:history:' + userId,
+        () => getShifts(userId),
+        60000,
+        (fresh) => setShifts((fresh || []).filter(s => s.status === 'closed'))
+      );
+      setShifts((history || []).filter(s => s.status === 'closed'));
     } catch (e) {
       console.error('Error loading shifts:', e);
     } finally {
@@ -76,6 +87,8 @@ export default function WorkerShift({ user }) {
       setShowCloseModal(false);
       setActiveShift(null);
       setShiftData(null);
+      invalidate('shifts');
+      invalidate('dashboard');
       loadData();
     } catch (e) {
       console.error('Error closing shift:', e);

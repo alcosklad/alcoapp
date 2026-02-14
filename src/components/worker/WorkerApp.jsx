@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { Package, Clock, History, LogOut } from 'lucide-react';
 import pb from '../../lib/pocketbase';
 import WorkerStock from './WorkerStock';
@@ -8,7 +8,19 @@ import WorkerOrders from './WorkerOrders';
 export default function WorkerApp({ user, onLogout }) {
   const [activeTab, setActiveTab] = useState('stock');
   const [cartOpen, setCartOpen] = useState(false);
-  const [cart, setCart] = useState([]);
+  const [cart, setCart] = useState(() => {
+    try {
+      const saved = localStorage.getItem('ns_worker_cart');
+      return saved ? JSON.parse(saved) : [];
+    } catch { return []; }
+  });
+
+  // Persist cart to localStorage on every change
+  useEffect(() => {
+    try {
+      localStorage.setItem('ns_worker_cart', JSON.stringify(cart));
+    } catch {}
+  }, [cart]);
   const [historyCloseTrigger, setHistoryCloseTrigger] = useState(0);
 
   const handleTabClick = (tabId) => {
@@ -28,18 +40,6 @@ export default function WorkerApp({ user, onLogout }) {
     { id: 'history', label: 'История', icon: History },
   ];
 
-  const renderContent = () => {
-    switch (activeTab) {
-      case 'stock':
-        return <WorkerStock user={user} onCartOpen={setCartOpen} cart={cart} setCart={setCart} />;
-      case 'shift':
-        return <WorkerShift user={user} />;
-      case 'history':
-        return <WorkerOrders user={user} closeTrigger={historyCloseTrigger} />;
-      default:
-        return <WorkerStock user={user} />;
-    }
-  };
 
   return (
     <div className="min-h-screen bg-[#F7F8FA] flex flex-col">
@@ -60,9 +60,17 @@ export default function WorkerApp({ user, onLogout }) {
         </button>
       </header>}
 
-      {/* Content */}
+      {/* Content — all tabs stay mounted, hidden via CSS to avoid remounts */}
       <main className="flex-1 overflow-y-auto pb-24">
-        {renderContent()}
+        <div style={{ display: activeTab === 'stock' ? 'block' : 'none' }}>
+          <WorkerStock user={user} onCartOpen={setCartOpen} cart={cart} setCart={setCart} />
+        </div>
+        <div style={{ display: activeTab === 'shift' ? 'block' : 'none' }}>
+          <WorkerShift user={user} />
+        </div>
+        <div style={{ display: activeTab === 'history' ? 'block' : 'none' }}>
+          <WorkerOrders user={user} closeTrigger={historyCloseTrigger} />
+        </div>
       </main>
 
       {/* Bottom Tab Bar */}

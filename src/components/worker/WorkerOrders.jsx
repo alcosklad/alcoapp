@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { Search, Calendar, History, RussianRuble, Clock, RotateCcw, X, CreditCard, Package, ChevronRight, ArrowLeft, RefreshCw } from 'lucide-react';
 import { getOrders, refundOrder, getActiveShift } from '../../lib/pocketbase';
 import pb from '../../lib/pocketbase';
+import { getOrFetch, invalidate } from '../../lib/cache';
 
 export default function WorkerOrders({ user, closeTrigger }) {
   const [orders, setOrders] = useState([]);
@@ -53,7 +54,15 @@ export default function WorkerOrders({ user, closeTrigger }) {
   const loadOrders = async () => {
     try {
       setLoading(true);
-      const data = await getOrders();
+      const data = await getOrFetch(
+        'orders:worker:' + (pb.authStore.model?.id || ''),
+        () => getOrders(),
+        60000,
+        (fresh) => {
+          const sorted = fresh.sort((a, b) => new Date(b.created || b.created_date || 0) - new Date(a.created || a.created_date || 0));
+          setOrders(sorted);
+        }
+      );
       // Сортируем по created (PocketBase timestamp) — надёжнее чем текстовое local_time
       const sorted = data.sort((a, b) => {
         const dateA = new Date(a.created || a.created_date || 0);
@@ -160,6 +169,9 @@ export default function WorkerOrders({ user, closeTrigger }) {
     try {
       setRefundLoading(true);
       await refundOrder(order.id);
+      invalidate('orders');
+      invalidate('stocks');
+      invalidate('dashboard');
       const freshOrders = await getOrders();
       const sorted = freshOrders.sort((a, b) => new Date(b.created || 0) - new Date(a.created || 0));
       setOrders(sorted);
