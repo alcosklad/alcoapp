@@ -69,15 +69,21 @@ export async function getOrFetch(key, fetchFn, ttlMs = 60000, onUpdate = null) {
   if (entry) {
     // Background refresh
     fetchFn().then(freshData => {
-      writeCache(key, freshData, ttlMs);
-      if (onUpdate) onUpdate(freshData);
+      // Only update cache if we got valid data
+      if (freshData && (!Array.isArray(freshData) || freshData.length > 0)) {
+        writeCache(key, freshData, ttlMs);
+        if (onUpdate) onUpdate(freshData);
+      }
     }).catch(() => {});
     return entry.data;
   }
 
   // No cache at all — must fetch
   const data = await fetchFn();
-  writeCache(key, data, ttlMs);
+  // Only cache non-empty results to avoid caching errors
+  if (data && (!Array.isArray(data) || data.length > 0)) {
+    writeCache(key, data, ttlMs);
+  }
   return data;
 }
 
@@ -120,6 +126,38 @@ export function setCache(key, data, ttlMs = 60000) {
 export function getCached(key) {
   const entry = getEntry(key);
   return entry ? entry.data : null;
+}
+
+/**
+ * Clean up invalid cache entries (empty arrays, null values).
+ * Call this on app init to fix corrupted cache.
+ */
+export function cleanInvalidCache() {
+  try {
+    const keysToRemove = [];
+    for (let i = 0; i < localStorage.length; i++) {
+      const k = localStorage.key(i);
+      if (k && k.startsWith(STORAGE_PREFIX)) {
+        try {
+          const raw = localStorage.getItem(k);
+          const entry = JSON.parse(raw);
+          const data = entry?.data;
+          // Remove if data is null, undefined, or empty array
+          if (!data || (Array.isArray(data) && data.length === 0)) {
+            keysToRemove.push(k);
+          }
+        } catch {
+          keysToRemove.push(k); // Remove corrupted entries
+        }
+      }
+    }
+    keysToRemove.forEach(k => localStorage.removeItem(k));
+    if (keysToRemove.length > 0) {
+      console.log(`[Cache] Cleaned ${keysToRemove.length} invalid entries`);
+    }
+  } catch {
+    // ignore
+  }
 }
 
 /**

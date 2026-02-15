@@ -19,7 +19,7 @@ import SalesDesktop from './components/desktop/SalesDesktop';
 import ShiftsDesktop from './components/desktop/ShiftsDesktop';
 import SettingsDesktop from './components/desktop/SettingsDesktop';
 import pb from './lib/pocketbase';
-import { clearAll as clearCache } from './lib/cache';
+import { clearAll as clearCache, cleanInvalidCache } from './lib/cache';
 import ErrorBoundary from './components/ErrorBoundary';
 
 function App() {
@@ -28,6 +28,9 @@ function App() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    // Clean up invalid cache entries on app init
+    cleanInvalidCache();
+    
     // Проверяем авторизацию при загрузке
     if (pb.authStore.isValid) {
       setUser(pb.authStore.model);
