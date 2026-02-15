@@ -222,9 +222,11 @@ export default function PriceListDesktop() {
         cost: Number(modalForm.cost) || 0,
         price: Number(modalForm.price) || 0,
       };
-      // Авто-генерация артикула для нового товара
-      if (!modalProduct) {
+      // Авто-генерация артикула для нового товара или если артикул пустой
+      if (!modalProduct || !modalProduct.article || modalProduct.article.trim() === '' || modalProduct.article === '-') {
+        // Находим максимальный числовой артикул среди всех товаров
         const maxArt = products.reduce((max, p) => {
+          if (!p.article || p.article === '-') return max;
           const num = parseInt(p.article, 10);
           return !isNaN(num) && num > max ? num : max;
         }, 0);
