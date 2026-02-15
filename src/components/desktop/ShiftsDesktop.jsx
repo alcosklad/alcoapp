@@ -255,11 +255,43 @@ export default function ShiftsDesktop() {
           </div>
           <p className="text-xl font-bold text-green-600">{activeShifts.length}</p>
           {activeHover && activeShifts.length > 0 && (
-            <div className="absolute top-full left-0 mt-1 bg-white rounded-xl shadow-xl border p-3 z-50 min-w-[200px]">
-              {Object.entries(activeCities).map(([city, names]) => (
-                <div key={city} className="mb-2 last:mb-0">
-                  <p className="text-xs font-semibold text-gray-700">{city}</p>
-                  {names.map((n, i) => <p key={i} className="text-xs text-gray-500 pl-2">• {n}</p>)}
+            <div className="absolute top-full left-0 mt-1 bg-white rounded-xl shadow-xl border p-2 z-50 min-w-[280px] max-h-[400px] overflow-y-auto">
+              {activeShifts.map((shift) => (
+                <div key={shift.id} className="flex items-center justify-between gap-2 p-2 hover:bg-gray-50 rounded-lg mb-1 last:mb-0">
+                  <div className="flex-1 min-w-0">
+                    <p className="text-xs font-semibold text-gray-900 truncate">
+                      {shift.expand?.user?.name || '—'}
+                    </p>
+                    <p className="text-[10px] text-gray-500">
+                      {shift.city || 'Не указан'} • {fmtTime(shift.start)}
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-1">
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setSelectedShift(shift);
+                        setActiveHover(false);
+                      }}
+                      className="p-1 text-blue-600 hover:bg-blue-50 rounded"
+                      title="Детали"
+                    >
+                      <Eye size={14} />
+                    </button>
+                    {isAdmin && (
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setActiveHover(false);
+                          handleForceClose(shift);
+                        }}
+                        className="p-1 text-red-600 hover:bg-red-50 rounded"
+                        title="Завершить смену"
+                      >
+                        <Square size={14} />
+                      </button>
+                    )}
+                  </div>
                 </div>
               ))}
             </div>
