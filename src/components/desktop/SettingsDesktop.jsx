@@ -3,6 +3,7 @@ import { Users, Plus, Edit2, Trash2, X, Check, Eye, EyeOff, RefreshCw, Shield, U
 import { getUsers, createUser, updateUser, deleteUser, getSuppliers } from '../../lib/pocketbase';
 import pb from '../../lib/pocketbase';
 import { getOrFetch, invalidate } from '../../lib/cache';
+import { formatLocalDateOnly } from '../../lib/dateUtils';
 
 const ROLES = [
   { value: 'admin', label: 'Администратор', icon: Shield, color: 'text-red-600 bg-red-50' },
@@ -297,7 +298,7 @@ export default function SettingsDesktop({ onLogout }) {
                     {getSupplierName(user.supplier)}
                   </td>
                   <td className="px-4 py-3 text-gray-500 text-xs">
-                    {user.created ? new Date(user.created).toLocaleDateString('ru-RU') : '—'}
+                    {formatLocalDateOnly(user.created)}
                   </td>
                   <td className="px-4 py-3">
                     <div className="flex items-center justify-end gap-1">

@@ -256,6 +256,10 @@ export default function PriceListDesktop() {
 
   const handleDelete = async () => {
     if (!modalProduct) return;
+    
+    setModalSaving(true);
+    setModalError('');
+    
     try {
       // Проверяем есть ли остатки
       const stockRecords = await getStocksForProduct(modalProduct.id);
@@ -267,23 +271,39 @@ export default function PriceListDesktop() {
         confirmMsg = `⚠️ Товар "${modalProduct.name}" есть на складе (${totalQty} шт).\n\nВсе остатки будут удалены! Продолжить?`;
       }
 
-      if (!window.confirm(confirmMsg)) return;
+      if (!window.confirm(confirmMsg)) {
+        setModalSaving(false);
+        return;
+      }
 
       // Удаляем stock записи если есть
       if (hasStocks) {
         for (const sr of stockRecords) {
-          try { await pb.collection('stocks').delete(sr.id); } catch (e) { console.warn('Error deleting stock:', e); }
+          try { 
+            await pb.collection('stocks').delete(sr.id); 
+          } catch (e) { 
+            console.warn('Error deleting stock:', e); 
+          }
         }
       }
 
+      // Удаляем товар
       await deleteProduct(modalProduct.id);
+      
+      // Инвалидируем кеш
       invalidate('products');
       invalidate('stocks');
+      
+      // Закрываем модалку и обновляем список
       closeModal();
-      loadProducts();
+      await loadProducts();
+      
+      alert('Товар удалён');
     } catch (err) {
       console.error('Error deleting product:', err);
       setModalError('Ошибка удаления: ' + (err?.message || ''));
+    } finally {
+      setModalSaving(false);
     }
   };
 

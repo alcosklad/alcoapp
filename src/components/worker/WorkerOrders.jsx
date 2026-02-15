@@ -3,6 +3,7 @@ import { Search, Calendar, History, RussianRuble, Clock, RotateCcw, X, CreditCar
 import { getOrders, refundOrder, getActiveShift } from '../../lib/pocketbase';
 import pb from '../../lib/pocketbase';
 import { getOrFetch, invalidate } from '../../lib/cache';
+import { formatLocalDate, formatLocalTime } from '../../lib/dateUtils';
 
 export default function WorkerOrders({ user, closeTrigger }) {
   const [orders, setOrders] = useState([]);
@@ -34,19 +35,12 @@ export default function WorkerOrders({ user, closeTrigger }) {
     }
   }, [closeTrigger]);
 
-  const ruMonths = {'января':'01','февраля':'02','марта':'03','апреля':'04','мая':'05','июня':'06',
-                    'июля':'07','августа':'08','сентября':'09','октября':'10','ноября':'11','декабря':'12'};
-
-  const parseLocalTime = (lt) => {
-    if (!lt) return new Date(0);
-    const replaced = lt.replace(/(\d+)\s+(\w+)\s+(\d+),\s+(\d+):(\d+)/,
-      (_, day, month, year, hours, minutes) => {
-        const m = ruMonths[month];
-        if (!m) return _;
-        return `${year}-${m}-${day.padStart(2,'0')}T${hours.padStart(2,'0')}:${minutes.padStart(2,'0')}:00`;
-      });
-    const d = new Date(replaced);
-    return isNaN(d.getTime()) ? new Date(0) : d;
+  const parseDateTime = (order) => {
+    const dateStr = order.created || order.created_date;
+    return {
+      date: formatLocalDate(dateStr, 'd MMMM yyyy'),
+      time: formatLocalTime(dateStr)
+    };
   };
 
   useEffect(() => { loadOrders(); }, []);
@@ -125,18 +119,6 @@ export default function WorkerOrders({ user, closeTrigger }) {
   });
 
   const totalRevenue = filteredOrders.reduce((sum, o) => sum + (o.total || 0), 0);
-
-  const getDateTime = (order) => {
-    if (order.local_time) {
-      const parts = order.local_time.split(', ');
-      return { date: parts[0] || '', time: parts[1] || '' };
-    }
-    const d = new Date(order.created_date);
-    return {
-      date: d.toLocaleDateString('ru-RU', { day: 'numeric', month: 'long', year: 'numeric' }),
-      time: d.toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' })
-    };
-  };
 
   const paymentLabels = { '0': 'Наличные', '1': 'Перевод', '2': 'Предоплата', 'cash': 'Наличные', 'transfer': 'Перевод', 'prepaid': 'Предоплата' };
 

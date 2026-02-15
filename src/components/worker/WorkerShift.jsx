@@ -3,6 +3,7 @@ import { Clock, RussianRuble, Package, X, CheckCircle, ChevronRight, RotateCcw }
 import { getActiveShift, getShifts, endShift, getOrders } from '../../lib/pocketbase';
 import pb from '../../lib/pocketbase';
 import { getOrFetch, invalidate } from '../../lib/cache';
+import { formatLocalDate, formatLocalTime, formatDuration } from '../../lib/dateUtils';
 
 export default function WorkerShift({ user }) {
   const [activeShift, setActiveShift] = useState(null);
@@ -141,7 +142,7 @@ export default function WorkerShift({ user }) {
                 <div className="flex items-center justify-between mb-1.5">
                   <div className="flex items-center gap-2">
                     <span className="text-xs font-semibold text-gray-700">
-                      {new Date(sale.created || sale.local_time).toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' })}
+                      {formatLocalTime(sale.created)}
                     </span>
                     <span className={`text-[10px] px-1.5 py-0.5 rounded ${
                       isRefund ? 'bg-orange-100 text-orange-600 font-bold' : 'bg-gray-100 text-gray-500'

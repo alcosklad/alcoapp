@@ -27,6 +27,7 @@ export default function DashboardDesktop({ user }) {
   const [showStockBreakdown, setShowStockBreakdown] = useState(false);
   const [salesData, setSalesData] = useState([]);
   const [receptionsData, setReceptionsData] = useState([]);
+  const [chartView, setChartView] = useState('purchases'); // 'purchases' or 'cities'
   
   const userRole = pb.authStore.model?.role;
   const isAdmin = userRole === 'admin';
@@ -130,6 +131,44 @@ export default function DashboardDesktop({ user }) {
 
   const PIE_COLORS = ['#22c55e', '#3b82f6', '#a855f7'];
 
+  // Данные для круговой диаграммы способов оплаты
+  const paymentMethodsData = useMemo(() => {
+    const paymentMap = { cash: 0, transfer: 0, prepaid: 0 };
+    const paymentLabels = { cash: 'Наличные', transfer: 'Перевод', prepaid: 'Предоплата' };
+    
+    salesData.forEach(order => {
+      if (order.status === 'refund') return;
+      const method = order.payment_method || 'cash';
+      const normalizedMethod = method === '0' ? 'cash' : method === '1' ? 'transfer' : method === '2' ? 'prepaid' : method;
+      if (paymentMap.hasOwnProperty(normalizedMethod)) {
+        paymentMap[normalizedMethod] += order.total || 0;
+      }
+    });
+    
+    return Object.entries(paymentMap)
+      .filter(([_, value]) => value > 0)
+      .map(([key, value]) => ({
+        name: paymentLabels[key],
+        value: value,
+        percentage: 0 // will calculate after
+      }))
+      .sort((a, b) => b.value - a.value);
+  }, [salesData]);
+
+  // Данные для круговой диаграммы продаж по городам
+  const citySalesData = useMemo(() => {
+    const cityMap = {};
+    salesData.forEach(order => {
+      if (order.status === 'refund') return;
+      const cityName = order.expand?.user?.expand?.supplier?.name || 'Неизвестно';
+      cityMap[cityName] = (cityMap[cityName] || 0) + (order.total || 0);
+    });
+    
+    return Object.entries(cityMap)
+      .map(([name, value]) => ({ name, value }))
+      .sort((a, b) => b.value - a.value);
+  }, [salesData]);
+
   const margin = stats.totalSaleValue - stats.totalPurchaseValue;
 
   if (loading) {
@@ -194,38 +233,79 @@ export default function DashboardDesktop({ user }) {
         </div>
       )}
 
-      {/* Линейный график закупок по городам — главный график */}
+      {/* Компактные графики: линейный график слева, круговая диаграмма справа */}
       {isAdmin && (
-        <div className="bg-white rounded-lg border border-gray-200 p-4">
-          <h3 className="text-sm font-semibold text-gray-700 mb-3">Сумма закупа по городам за 14 дней</h3>
-          {cityNames.length > 0 ? (
-            <ResponsiveContainer width="100%" height={280}>
-              <LineChart data={cityPurchaseChart} margin={{ top: 5, right: 20, left: 10, bottom: 5 }}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
-                <XAxis dataKey="label" tick={{ fontSize: 11, fill: '#9ca3af' }} />
-                <YAxis tick={{ fontSize: 11, fill: '#9ca3af' }} width={60} />
-                <Tooltip
-                  formatter={(value, name) => [value.toLocaleString('ru-RU'), name]}
-                  labelFormatter={(label) => `Дата: ${label}`}
-                  contentStyle={{ fontSize: 12, borderRadius: 8 }}
-                />
-                <Legend wrapperStyle={{ fontSize: 12 }} />
-                {cityNames.map((name, i) => (
-                  <Line
-                    key={name}
-                    type="monotone"
-                    dataKey={name}
-                    stroke={CITY_COLORS[i % CITY_COLORS.length]}
-                    strokeWidth={2}
-                    dot={{ r: 3 }}
-                    activeDot={{ r: 5 }}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+          {/* Линейный график закупок */}
+          <div className="bg-white rounded-lg border border-gray-200 p-4">
+            <h3 className="text-sm font-semibold text-gray-700 mb-3">Закупки за 7 дней</h3>
+            {cityNames.length > 0 ? (
+              <ResponsiveContainer width="100%" height={240}>
+                <LineChart data={cityPurchaseChart.slice(-7)} margin={{ top: 5, right: 10, left: 0, bottom: 5 }}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
+                  <XAxis dataKey="label" tick={{ fontSize: 10, fill: '#9ca3af' }} />
+                  <YAxis tick={{ fontSize: 10, fill: '#9ca3af' }} width={50} />
+                  <Tooltip
+                    formatter={(value) => value.toLocaleString('ru-RU') + ' ₽'}
+                    contentStyle={{ fontSize: 11, borderRadius: 8 }}
                   />
-                ))}
-              </LineChart>
-            </ResponsiveContainer>
-          ) : (
-            <div className="flex items-center justify-center h-[220px] text-gray-400 text-sm">Нет данных</div>
-          )}
+                  {cityNames.map((name, i) => (
+                    <Line
+                      key={name}
+                      type="monotone"
+                      dataKey={name}
+                      stroke={CITY_COLORS[i % CITY_COLORS.length]}
+                      strokeWidth={2}
+                      dot={false}
+                      activeDot={{ r: 4 }}
+                    />
+                  ))}
+                </LineChart>
+              </ResponsiveContainer>
+            ) : (
+              <div className="flex items-center justify-center h-[240px] text-gray-400 text-sm">Нет данных</div>
+            )}
+          </div>
+
+          {/* Круговая диаграмма с переключателем */}
+          <div className="bg-white rounded-lg border border-gray-200 p-4">
+            <div className="flex items-center justify-between mb-3">
+              <h3 className="text-sm font-semibold text-gray-700">
+                {chartView === 'purchases' ? 'Способы оплаты' : 'Продажи по городам'}
+              </h3>
+              <button
+                onClick={() => setChartView(chartView === 'purchases' ? 'cities' : 'purchases')}
+                className="text-xs text-blue-600 hover:text-blue-700 font-medium"
+              >
+                {chartView === 'purchases' ? 'По городам' : 'По оплате'}
+              </button>
+            </div>
+            {(chartView === 'purchases' ? paymentMethodsData : citySalesData).length > 0 ? (
+              <div className="flex items-center justify-center">
+                <ResponsiveContainer width="100%" height={240}>
+                  <PieChart>
+                    <Pie
+                      data={chartView === 'purchases' ? paymentMethodsData : citySalesData}
+                      cx="50%"
+                      cy="50%"
+                      labelLine={false}
+                      label={({ name, value }) => `${name}: ${value.toLocaleString('ru-RU')} ₽`}
+                      outerRadius={80}
+                      fill="#8884d8"
+                      dataKey="value"
+                    >
+                      {(chartView === 'purchases' ? paymentMethodsData : citySalesData).map((entry, index) => (
+                        <Cell key={`cell-${index}`} fill={chartView === 'purchases' ? PIE_COLORS[index % PIE_COLORS.length] : CITY_COLORS[index % CITY_COLORS.length]} />
+                      ))}
+                    </Pie>
+                    <Tooltip formatter={(value) => value.toLocaleString('ru-RU') + ' ₽'} />
+                  </PieChart>
+                </ResponsiveContainer>
+              </div>
+            ) : (
+              <div className="flex items-center justify-center h-[240px] text-gray-400 text-sm">Нет данных</div>
+            )}
+          </div>
         </div>
       )}
 

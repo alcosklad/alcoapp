@@ -1,10 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { Search, ChevronUp, ChevronDown, ChevronRight, RefreshCw, Plus, Eye, X, Trash2, Minus } from 'lucide-react';
 import { getReceptions, getSuppliers, getProducts, createReception, updateReception, deleteReception } from '../../lib/pocketbase';
-import { format } from 'date-fns';
-import { ru } from 'date-fns/locale';
 import pb from '../../lib/pocketbase';
 import { getOrFetch, invalidate } from '../../lib/cache';
+import { formatLocalDate } from '../../lib/dateUtils';
 import CreateReceptionModal from './CreateReceptionModal';
 
 export default function ReceptionDesktop() {
@@ -360,7 +359,7 @@ export default function ReceptionDesktop() {
                       className="border-b border-gray-100 hover:bg-gray-50"
                     >
                       <td className="px-3 py-1.5 text-gray-600">
-                        {format(new Date(reception.created), 'd MMMM yyyy, HH:mm', { locale: ru })}
+                        {formatLocalDate(reception.created, 'd MMMM yyyy, HH:mm')}
                       </td>
                       <td className="px-3 py-1.5">
                         {reception?.expand?.supplier?.name || '—'}
@@ -437,7 +436,7 @@ export default function ReceptionDesktop() {
             <div className="flex items-center justify-between p-4 border-b border-gray-200">
               <div>
                 <h3 className="text-lg font-semibold text-gray-900">
-                  Приёмка от {format(new Date(selectedReception.created), 'd MMMM yyyy', { locale: ru })}
+                  Приёмка от {formatLocalDate(selectedReception.created, 'd MMMM yyyy')}
                 </h3>
                 <p className="text-sm text-gray-500">
                   Город: {selectedReception?.expand?.supplier?.name || '—'}
