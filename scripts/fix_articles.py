@@ -11,31 +11,47 @@ def fix_articles():
     
     print(f"Всего товаров: {len(all_products)}")
     
-    # Находим максимальный артикул
+    # Находим максимальный номер в артикулах формата VIN-XXXX или просто XXXX
     max_article = 0
     for p in all_products:
         art = p.get('article', '')
         if art and art != '-':
-            try:
-                num = int(art)
-                if num > max_article:
-                    max_article = num
-            except:
-                pass
+            # Пытаемся извлечь число из VIN-XXXX или просто XXXX
+            if art.startswith('VIN-'):
+                try:
+                    num = int(art[4:])
+                    if num > max_article:
+                        max_article = num
+                except:
+                    pass
+            else:
+                try:
+                    num = int(art)
+                    if num > max_article:
+                        max_article = num
+                except:
+                    pass
     
-    print(f"Максимальный артикул: {max_article}")
+    print(f"Максимальный номер артикула: {max_article}")
     
-    # Получаем товары без артикула
-    resp = requests.get(f"{BASE_URL}/collections/products/records?perPage=500&filter=article=''")
-    no_article_products = resp.json()['items']
+    # Получаем товары с неправильным форматом артикула (не VIN-XXXX)
+    resp = requests.get(f"{BASE_URL}/collections/products/records?perPage=500")
+    all_products = resp.json()['items']
     
-    print(f"Товаров без артикула: {len(no_article_products)}")
+    to_fix = []
+    for p in all_products:
+        art = p.get('article', '')
+        # Если артикул пустой, или не начинается с VIN-, или это просто число
+        if not art or art == '-' or not art.startswith('VIN-'):
+            to_fix.append(p)
+    
+    print(f"Товаров для исправления: {len(to_fix)}")
     
     # Обновляем каждый товар
     updated = 0
-    for product in no_article_products:
+    for product in to_fix:
         max_article += 1
-        new_article = str(max_article).zfill(4)
+        new_article = f"VIN-{str(max_article).zfill(4)}"
         
         # Обновляем товар
         update_data = {"article": new_article}

@@ -224,13 +224,19 @@ export default function PriceListDesktop() {
       };
       // Авто-генерация артикула для нового товара или если артикул пустой
       if (!modalProduct || !modalProduct.article || modalProduct.article.trim() === '' || modalProduct.article === '-') {
-        // Находим максимальный числовой артикул среди всех товаров
+        // Находим максимальный числовой артикул среди всех товаров (формат VIN-XXXX)
         const maxArt = products.reduce((max, p) => {
           if (!p.article || p.article === '-') return max;
-          const num = parseInt(p.article, 10);
+          // Извлекаем число из VIN-XXXX или просто XXXX
+          let num = 0;
+          if (p.article.startsWith('VIN-')) {
+            num = parseInt(p.article.substring(4), 10);
+          } else {
+            num = parseInt(p.article, 10);
+          }
           return !isNaN(num) && num > max ? num : max;
         }, 0);
-        data.article = String(maxArt + 1).padStart(4, '0');
+        data.article = `VIN-${String(maxArt + 1).padStart(4, '0')}`;
       }
       if (modalProduct) {
         await updateProduct(modalProduct.id, data);
