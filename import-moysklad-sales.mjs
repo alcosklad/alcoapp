@@ -101,15 +101,31 @@ async function main() {
   console.log(`  ✅ Пользователей: ${users.length}`);
   console.log(`  ✅ Товаров: ${products.length}\n`);
 
-  // 3. Загружаем розничные смены из МойСклад
-  console.log('📡 Загружаем розничные смены из МойСклад...');
-  const retailShifts = await fetchAll('/entity/retailshift?expand=store,organization');
-  console.log(`  ✅ Смен: ${retailShifts.length}\n`);
+  // 3. Загружаем розничные смены из МойСклад (последние 90 дней)
+  console.log('📡 Загружаем розничные смены из МойСклад (последние 90 дней)...');
+  const ninetyDaysAgo = new Date();
+  ninetyDaysAgo.setDate(ninetyDaysAgo.getDate() - 90);
+  const dateFilterShifts = ninetyDaysAgo.toISOString().split('T')[0];
+  
+  let retailShifts = [];
+  try {
+    retailShifts = await fetchAll(`/entity/retailshift?filter=moment>=${dateFilterShifts}&expand=store,organization`);
+    console.log(`  ✅ Смен: ${retailShifts.length}\n`);
+  } catch (error) {
+    console.log(`  ⚠️  Ошибка загрузки смен: ${error.message}\n`);
+  }
 
-  // 4. Загружаем розничные продажи из МойСклад
-  console.log('📡 Загружаем розничные продажи из МойСклад...');
-  const retailDemands = await fetchAll('/entity/retaildemand?expand=store,agent,positions,retailShift');
-  console.log(`  ✅ Продаж: ${retailDemands.length}\n`);
+  // 4. Загружаем розничные продажи из МойСклад (последние 90 дней)
+  console.log('📡 Загружаем розничные продажи из МойСклад (последние 90 дней)...');
+  const dateFilterDemands = ninetyDaysAgo.toISOString().split('T')[0];
+  
+  let retailDemands = [];
+  try {
+    retailDemands = await fetchAll(`/entity/retaildemand?filter=moment>=${dateFilterDemands}&expand=store,agent,positions,retailShift`);
+    console.log(`  ✅ Продаж: ${retailDemands.length}\n`);
+  } catch (error) {
+    console.log(`  ⚠️  Ошибка загрузки продаж: ${error.message}\n`);
+  }
 
   if (DRY_RUN) {
     console.log('🧪 Тестовый прогон. Примеры данных:');

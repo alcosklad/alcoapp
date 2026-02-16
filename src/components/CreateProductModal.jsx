@@ -65,12 +65,40 @@ export default function CreateProductModal({ isOpen, onClose, onProductCreated }
     setLoading(true);
     setError('');
 
+    // Validation
+    if (!formData.name.trim()) {
+      setError('Введите название товара');
+      setLoading(false);
+      return;
+    }
+
+    const price = formData.price ? parseFloat(formData.price) : 0;
+    const cost = formData.cost ? parseFloat(formData.cost) : 0;
+
+    if (price < 0) {
+      setError('Цена продажи не может быть отрицательной');
+      setLoading(false);
+      return;
+    }
+
+    if (cost < 0) {
+      setError('Цена закупа не может быть отрицательной');
+      setLoading(false);
+      return;
+    }
+
+    if (price > 0 && cost > 0 && price < cost) {
+      setError('Цена продажи не может быть меньше цены закупа');
+      setLoading(false);
+      return;
+    }
+
     try {
       const productData = {
-        name: formData.name,
+        name: formData.name.trim(),
         category: formData.category,
-        price: formData.price ? parseFloat(formData.price) : null,
-        cost: formData.cost ? parseFloat(formData.cost) : null,
+        price: price || null,
+        cost: cost || null,
         cities: formData.cities,
         created: new Date().toISOString(),
         updated: new Date().toISOString()

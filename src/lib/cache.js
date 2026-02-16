@@ -74,7 +74,9 @@ export async function getOrFetch(key, fetchFn, ttlMs = 60000, onUpdate = null) {
         writeCache(key, freshData, ttlMs);
         if (onUpdate) onUpdate(freshData);
       }
-    }).catch(() => {});
+    }).catch((error) => {
+      console.warn(`[Cache] Background refresh failed for key "${key}":`, error.message);
+    });
     return entry.data;
   }
 
