@@ -335,17 +335,23 @@ export default function SalesDesktop() {
                 <th className="px-4 py-2.5 text-left font-medium text-gray-600 cursor-pointer select-none" onClick={() => handleSort('order_number')}>
                   <div className="flex items-center gap-1">Наименование <SI field="order_number" /></div>
                 </th>
-                <th className="px-4 py-2.5 text-center font-medium text-gray-600 w-24 cursor-pointer select-none" onClick={() => handleSort('items_count')}>
-                  <div className="flex items-center justify-center gap-1">Количество <SI field="items_count" /></div>
+                <th className="px-3 py-2.5 text-center font-medium text-gray-600 w-16">Кол-во</th>
+                <th className="px-3 py-2.5 text-right font-medium text-gray-600 w-20">Цена</th>
+                <th className="px-3 py-2.5 text-right font-medium text-gray-600 w-20">Себест.</th>
+                <th className="px-3 py-2.5 text-right font-medium text-gray-600 w-24 cursor-pointer select-none" onClick={() => handleSort('total')}>
+                  <div className="flex items-center justify-end gap-1">Сумма <SI field="total" /></div>
                 </th>
-                <th className="px-4 py-2.5 text-right font-medium text-gray-600 w-28 cursor-pointer select-none" onClick={() => handleSort('total')}>
-                  <div className="flex items-center justify-end gap-1">Стоимость <SI field="total" /></div>
+                <th className="px-3 py-2.5 text-right font-medium text-gray-600 w-24 cursor-pointer select-none" onClick={() => handleSort('cost_total')}>
+                  <div className="flex items-center justify-end gap-1">Σ себест. <SI field="cost_total" /></div>
+                </th>
+                <th className="px-3 py-2.5 text-right font-medium text-gray-600 w-24 cursor-pointer select-none" onClick={() => handleSort('profit')}>
+                  <div className="flex items-center justify-end gap-1">Прибыль <SI field="profit" /></div>
                 </th>
               </tr>
             </thead>
             <tbody>
               {filteredOrders.length === 0 ? (
-                <tr><td colSpan={3} className="px-4 py-12 text-center text-gray-400">Нет продаж за выбранный период</td></tr>
+                <tr><td colSpan={7} className="px-4 py-12 text-center text-gray-400">Нет продаж за выбранный период</td></tr>
               ) : filteredOrders.map(order => {
                 const isRef = order.status === 'refund';
                 const items = order.items || [];
@@ -356,7 +362,7 @@ export default function SalesDesktop() {
                       className={`border-t-2 border-gray-200 cursor-pointer hover:bg-gray-50 ${isRef ? 'bg-blue-50/30' : 'bg-gray-50/50'}`}
                       onDoubleClick={() => { setSelectedOrder(order); setEditingOrder(null); setRefundConfirm(false); }}
                     >
-                      <td className="px-4 py-2" colSpan={3}>
+                      <td className="px-4 py-2" colSpan={7}>
                         <div className="flex items-center gap-3">
                           <span className="font-semibold text-gray-900">{order.order_number || `#${order.id?.slice(-6)}`}</span>
                           {isRef && <span className="px-1.5 py-0.5 text-[10px] bg-blue-100 text-blue-700 rounded font-medium">ВОЗВРАТ</span>}
@@ -376,29 +382,56 @@ export default function SalesDesktop() {
                       </td>
                     </tr>
                     {/* Item rows */}
-                    {items.map((item, idx) => (
-                      <tr key={`${order.id}-${idx}`} className={`border-b border-gray-50 hover:bg-blue-50/30 group ${isRef ? 'opacity-60' : ''}`}>
-                        <td className="px-4 py-1.5 pl-8 relative">
-                          <span className={`text-sm ${isRef ? 'line-through text-gray-400' : 'text-gray-800'}`}>{item.name || 'Товар'}</span>
-                          {/* Tooltip on hover — reception info */}
-                          <div className="hidden group-hover:block absolute left-8 bottom-full mb-1 z-20 bg-gray-800 text-white text-[11px] rounded-lg px-3 py-2 shadow-lg whitespace-nowrap pointer-events-none">
-                            {item.batch_number ? (
-                              <>Партия: {item.batch_number}<br />Себест.: {fmtMoney(item.cost || 0)} ₽</>
-                            ) : (
-                              'Нет данных о приёмке'
-                            )}
-                          </div>
-                        </td>
-                        <td className={`px-4 py-1.5 text-center text-sm ${isRef ? 'line-through text-gray-400' : 'text-gray-600'}`}>{item.quantity || 1} шт</td>
-                        <td className={`px-4 py-1.5 text-right text-sm ${isRef ? 'line-through text-gray-400' : 'text-gray-800'}`}>{fmtMoney((item.price||0) * (item.quantity||1))}</td>
-                      </tr>
-                    ))}
+                    {items.map((item, idx) => {
+                      const itemPrice = item.price || 0;
+                      const itemCost = item.cost || 0;
+                      const itemQty = item.quantity || 1;
+                      const itemSum = itemPrice * itemQty;
+                      const itemCostSum = itemCost * itemQty;
+                      const itemProfit = itemPrice - itemCost;
+                      return (
+                        <tr key={`${order.id}-${idx}`} className={`border-b border-gray-50 hover:bg-blue-50/30 group ${isRef ? 'opacity-60' : ''}`}>
+                          <td className="px-4 py-1.5 pl-8 relative">
+                            <span className={`text-sm ${isRef ? 'line-through text-gray-400' : 'text-gray-800'}`}>{item.name || 'Товар'}</span>
+                            {/* Tooltip on hover — reception info */}
+                            <div className="hidden group-hover:block absolute left-8 bottom-full mb-1 z-20 bg-gray-800 text-white text-[11px] rounded-lg px-3 py-2 shadow-lg whitespace-nowrap pointer-events-none">
+                              {item.batch_number ? (
+                                <>Партия: {item.batch_number}<br />Себест.: {fmtMoney(itemCost)} ₽</>
+                              ) : (
+                                'Нет данных о приёмке'
+                              )}
+                            </div>
+                          </td>
+                          <td className={`px-3 py-1.5 text-center text-sm ${isRef ? 'line-through text-gray-400' : 'text-gray-600'}`}>{itemQty}</td>
+                          <td className={`px-3 py-1.5 text-right text-sm ${isRef ? 'line-through text-gray-400' : 'text-gray-800'}`}>{fmtMoney(itemPrice)}</td>
+                          <td className={`px-3 py-1.5 text-right text-sm ${isRef ? 'line-through text-gray-400' : 'text-gray-500'}`}>{itemCost > 0 ? fmtMoney(itemCost) : '—'}</td>
+                          <td className={`px-3 py-1.5 text-right text-sm ${isRef ? 'line-through text-gray-400' : 'text-gray-800'}`}>{fmtMoney(itemSum)}</td>
+                          <td className={`px-3 py-1.5 text-right text-sm ${isRef ? 'line-through text-gray-400' : 'text-gray-500'}`}>{itemCost > 0 ? fmtMoney(itemCostSum) : '—'}</td>
+                          <td className={`px-3 py-1.5 text-right text-sm font-medium ${isRef ? 'line-through text-gray-400' : itemProfit > 0 ? 'text-green-600' : itemProfit < 0 ? 'text-red-600' : 'text-gray-400'}`}>
+                            {itemCost > 0 ? fmtMoney(itemProfit) : '—'}
+                          </td>
+                        </tr>
+                      );
+                    })}
                     {/* Total row */}
-                    <tr className={`border-b border-gray-200 ${isRef ? 'bg-blue-50/20' : 'bg-gray-50/30'}`}>
-                      <td className="px-4 py-1.5 pl-8 text-xs font-medium text-gray-500">Итого {order.order_number || ''}</td>
-                      <td className="px-4 py-1.5 text-center text-xs text-gray-500">{items.reduce((s,i) => s+(i.quantity||1), 0)} шт</td>
-                      <td className={`px-4 py-1.5 text-right font-semibold ${isRef ? 'text-blue-500 line-through' : 'text-gray-900'}`}>{fmtMoney(order.total)}</td>
-                    </tr>
+                    {(() => {
+                      const totalQty = items.reduce((s,i) => s+(i.quantity||1), 0);
+                      const totalCostSum = items.reduce((s,i) => s + ((i.cost||0)*(i.quantity||1)), 0);
+                      const totalProfit = (order.total||0) - totalCostSum;
+                      return (
+                        <tr className={`border-b border-gray-200 ${isRef ? 'bg-blue-50/20' : 'bg-gray-50/30'}`}>
+                          <td className="px-4 py-1.5 pl-8 text-xs font-medium text-gray-500">Итого {order.order_number || ''}</td>
+                          <td className="px-3 py-1.5 text-center text-xs text-gray-500">{totalQty}</td>
+                          <td className="px-3 py-1.5"></td>
+                          <td className="px-3 py-1.5"></td>
+                          <td className={`px-3 py-1.5 text-right font-semibold ${isRef ? 'text-blue-500 line-through' : 'text-gray-900'}`}>{fmtMoney(order.total)}</td>
+                          <td className="px-3 py-1.5 text-right text-xs font-medium text-gray-500">{totalCostSum > 0 ? fmtMoney(totalCostSum) : '—'}</td>
+                          <td className={`px-3 py-1.5 text-right font-semibold ${isRef ? 'text-blue-500 line-through' : totalProfit > 0 ? 'text-green-600' : totalProfit < 0 ? 'text-red-600' : 'text-gray-500'}`}>
+                            {totalCostSum > 0 ? fmtMoney(totalProfit) : '—'}
+                          </td>
+                        </tr>
+                      );
+                    })()}
                   </React.Fragment>
                 );
               })}

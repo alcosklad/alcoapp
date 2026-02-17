@@ -35,7 +35,7 @@ export default function WorkerOrders({ user, closeTrigger }) {
     }
   }, [closeTrigger]);
 
-  const parseDateTime = (order) => {
+  const getDateTime = (order) => {
     const dateStr = order.created || order.created_date;
     return {
       date: formatLocalDate(dateStr, 'd MMMM yyyy'),

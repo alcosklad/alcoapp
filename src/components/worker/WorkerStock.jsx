@@ -85,15 +85,38 @@ export default function WorkerStock({ user, onCartOpen, cart, setCart }) {
     }
   };
 
+  // Aggregate batches by product (FIFO creates multiple stock records per product)
+  const aggregatedStocks = useMemo(() => {
+    const grouped = {};
+    stocks.forEach(stock => {
+      const productId = stock.product || stock?.expand?.product?.id;
+      if (!productId) return;
+      if (!grouped[productId]) {
+        grouped[productId] = {
+          ...stock,
+          quantity: 0,
+          _batchIds: []
+        };
+      }
+      grouped[productId].quantity += stock.quantity || 0;
+      grouped[productId]._batchIds.push(stock.id);
+      // Keep the expand with product data
+      if (stock.expand?.product && !grouped[productId].expand?.product) {
+        grouped[productId].expand = { ...grouped[productId].expand, product: stock.expand.product };
+      }
+    });
+    return Object.values(grouped);
+  }, [stocks]);
+
   const filteredStocks = useMemo(() => {
-    if (!searchQuery) return stocks;
+    if (!searchQuery) return aggregatedStocks;
     const q = searchQuery.toLowerCase();
-    return stocks.filter(s => {
+    return aggregatedStocks.filter(s => {
       const name = s?.expand?.product?.name || s?.product?.name || '';
       const article = s?.expand?.product?.article || s?.product?.article || '';
       return name.toLowerCase().includes(q) || article.toLowerCase().includes(q);
     });
-  }, [stocks, searchQuery]);
+  }, [aggregatedStocks, searchQuery]);
 
   const totalQuantity = filteredStocks.reduce((sum, s) => sum + (s?.quantity || 0), 0);
   const lowStockCount = filteredStocks.filter(s => (s?.quantity || 0) > 0 && (s?.quantity || 0) <= 3).length;

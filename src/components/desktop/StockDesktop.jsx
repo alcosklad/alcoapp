@@ -967,20 +967,24 @@ export default function StockDesktop() {
                   <p className="text-xs text-gray-400 py-2">Нет данных о приёмках</p>
                 ) : (
                   <div className="space-y-1.5 max-h-48 overflow-y-auto">
-                    {receptionHistory.map((h, idx) => (
-                      <div key={idx} className="flex items-center gap-2 bg-gray-50 rounded-lg px-3 py-2 text-xs">
-                        <Clock size={12} className="text-gray-400 shrink-0" />
-                        <span className="text-gray-500 w-28 shrink-0">
-                          {new Date(h.date).toLocaleDateString('ru-RU', { day: 'numeric', month: 'short', year: 'numeric' })}
-                          {', '}
-                          {new Date(h.date).toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' })}
-                        </span>
-                        <MapPin size={12} className="text-blue-400 shrink-0" />
-                        <span className="text-gray-700 flex-1 truncate">{h.city}</span>
-                        <span className="font-medium text-gray-900 shrink-0">{h.quantity} шт</span>
-                        <span className="text-gray-500 shrink-0">× {(h.cost || 0).toLocaleString('ru-RU')} ₽</span>
-                      </div>
-                    ))}
+                    {receptionHistory.map((h, idx) => {
+                      const d = h.date ? new Date(h.date.includes('T') ? h.date : h.date + 'T00:00:00') : null;
+                      const dateStr = d && !isNaN(d) ? d.toLocaleDateString('ru-RU', { day: 'numeric', month: 'short', year: 'numeric' }) : '—';
+                      const timeStr = d && !isNaN(d) && h.date.includes('T') ? d.toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' }) : '';
+                      return (
+                        <div key={idx} className="flex items-center gap-2 bg-gray-50 rounded-lg px-3 py-2 text-xs">
+                          <Clock size={12} className="text-gray-400 shrink-0" />
+                          <span className="text-gray-500 w-28 shrink-0">
+                            {dateStr}{timeStr ? `, ${timeStr}` : ''}
+                          </span>
+                          <MapPin size={12} className="text-blue-400 shrink-0" />
+                          <span className="text-gray-700 flex-1 truncate">{h.city || '—'}</span>
+                          <span className="font-medium text-gray-900 shrink-0">{h.quantity} шт</span>
+                          <span className="text-gray-500 shrink-0">× {(h.cost || 0).toLocaleString('ru-RU')} ₽</span>
+                          {h.batchNumber && <span className="text-gray-400 shrink-0 text-[10px]">{h.batchNumber}</span>}
+                        </div>
+                      );
+                    })}
                   </div>
                 )}
               </div>

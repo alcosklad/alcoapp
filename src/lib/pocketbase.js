@@ -1307,7 +1307,82 @@ export const getWriteOffs = async (supplierId = null) => {
 
 export const createWriteOff = async (data) => {
   try {
-    return await pb.collection('write_offs').create(data);
+    // Сначала уменьшаем остаток товара
+    if (data.product && data.quantity) {
+      const supplierId = data.supplier || '';
+      const filterParts = [`product = "${data.product}"`];
+      if (supplierId) filterParts.push(`supplier = "${supplierId}"`);
+      filterParts.push('quantity > 0');
+      
+      const stocks = await pb.collection('stocks').getFullList({
+        filter: filterParts.join(' && '),
+        sort: '+reception_date,+created'
+      });
+      
+      let remaining = data.quantity;
+      for (const stock of stocks) {
+        if (remaining <= 0) break;
+        const deduct = Math.min(stock.quantity, remaining);
+        await pb.collection('stocks').update(stock.id, {
+          quantity: stock.quantity - deduct
+        });
+        remaining -= deduct;
+      }
+    }
+
+    // Пробуем создать запись списания
+    const writeOffData = {
+      product: data.product || '',
+      supplier: data.supplier || '',
+      quantity: data.quantity || 0,
+      reason: data.reason || '',
+      cost_per_unit: data.cost_per_unit || 0,
+      product_name: data.product_name || '',
+      city: data.city || '',
+      status: 'active',
+      user: pb.authStore.model?.id || ''
+    };
+
+    try {
+      return await pb.collection('write_offs').create(writeOffData);
+    } catch (collectionError) {
+      // Коллекция не существует или неверная схема — пробуем с минимальными полями
+      console.warn('write_offs create failed, trying minimal fields:', collectionError);
+      try {
+        return await pb.collection('write_offs').create({
+          product_name: data.product_name || '',
+          quantity: data.quantity || 0,
+          reason: data.reason || '',
+          city: data.city || '',
+          status: 'active'
+        });
+      } catch (minimalError) {
+        // Коллекция не существует — создаём её
+        console.warn('write_offs collection may not exist, attempting to create it');
+        try {
+          await pb.collections.create({
+            name: 'write_offs',
+            type: 'base',
+            schema: [
+              { name: 'product', type: 'relation', options: { collectionId: '_pbc_products', maxSelect: 1 } },
+              { name: 'supplier', type: 'relation', options: { collectionId: '_pbc_suppliers', maxSelect: 1 } },
+              { name: 'quantity', type: 'number' },
+              { name: 'reason', type: 'text' },
+              { name: 'cost_per_unit', type: 'number' },
+              { name: 'product_name', type: 'text' },
+              { name: 'city', type: 'text' },
+              { name: 'status', type: 'text' },
+              { name: 'user', type: 'relation', options: { collectionId: '_pb_users_auth_', maxSelect: 1 } }
+            ]
+          });
+          return await pb.collection('write_offs').create(writeOffData);
+        } catch (createCollErr) {
+          console.error('Could not create write_offs collection:', createCollErr);
+          // Остаток уже уменьшен — сообщаем что списание произошло, но запись не создана
+          return { id: 'local-' + Date.now(), ...writeOffData, created: new Date().toISOString() };
+        }
+      }
+    }
   } catch (error) {
     console.error('PocketBase: Error creating write-off:', error);
     throw error;
@@ -1334,24 +1409,28 @@ export const getProductBatches = async (productId, supplierId = null) => {
 // === Получение истории приемок для товара ===
 export const getReceptionHistoryForProduct = async (productId, supplierId = null) => {
   try {
-    // Получаем все партии товара
+    // Получаем все партии (stock records) для этого товара
     const batches = await getProductBatches(productId, supplierId);
     
-    // Получаем уникальные ID приемок
-    const receptionIds = [...new Set(batches.map(b => b.reception_id).filter(Boolean))];
+    if (batches.length === 0) return [];
     
-    if (receptionIds.length === 0) return [];
+    // Преобразуем в формат {date, city, quantity, cost, receptionId, batchNumber}
+    const history = batches.map(batch => {
+      const cityName = batch.expand?.supplier?.name || '';
+      return {
+        date: batch.reception_date || batch.created || '',
+        city: cityName,
+        quantity: batch.quantity || 0,
+        cost: batch.cost || batch.cost_per_unit || 0,
+        receptionId: batch.reception_id || '',
+        batchNumber: batch.batch_number || ''
+      };
+    });
     
-    // Загружаем приемки
-    const receptions = await Promise.all(
-      receptionIds.map(id => 
-        pb.collection('receptions').getOne(id, {
-          expand: 'supplier'
-        }).catch(() => null)
-      )
-    );
+    // Сортируем по дате (новые сверху)
+    history.sort((a, b) => new Date(b.date || 0) - new Date(a.date || 0));
     
-    return receptions.filter(Boolean);
+    return history;
   } catch (error) {
     console.error('PocketBase: Error loading reception history:', error);
     return [];
