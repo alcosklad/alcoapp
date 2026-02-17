@@ -4,6 +4,8 @@ import { getStocksWithDetails, getSuppliers, updateStock, createOrder, getActive
 import pb from '../../lib/pocketbase';
 import { getOrFetch, invalidate } from '../../lib/cache';
 import WorkerCart from './WorkerCart';
+import { sellProductFIFO } from '../../lib/fifo';
+import { generateOrderNumber } from '../../lib/orderNumbers';
 
 export default function WorkerStock({ user, onCartOpen, cart, setCart }) {
   const [stocks, setStocks] = useState([]);
@@ -141,16 +143,56 @@ export default function WorkerStock({ user, onCartOpen, cart, setCart }) {
         setTimeout(() => setShiftToast(false), 3000);
       }
 
-      await createOrder(orderData);
-
-      // Update stock for each item
+      // Get user's city for order number generation
+      const userCity = pb.authStore.model?.expand?.supplier?.name || pb.authStore.model?.city;
+      
+      // Generate order number
+      const orderNumber = await generateOrderNumber(userCity);
+      
+      // Process each item with FIFO logic
+      const itemsWithCost = [];
+      let totalCost = 0;
+      
       for (const item of orderData.items) {
         const stock = stocks.find(s => s.id === item.id);
-        if (stock) {
-          const supplierId = stock.supplier?.id || stock.supplier || stock.expand?.supplier?.id;
-          await updateStock(item.productId, null, -item.quantity, supplierId);
+        if (!stock) continue;
+        
+        const supplierId = stock.supplier?.id || stock.supplier || stock.expand?.supplier?.id;
+        const productId = item.productId;
+        
+        // Use FIFO to sell product and get cost
+        const result = await sellProductFIFO(productId, supplierId, item.quantity);
+        
+        if (!result.success) {
+          throw new Error(result.error || 'Ошибка продажи товара');
         }
+        
+        // Calculate cost from FIFO result
+        const itemCost = result.soldItems.reduce((sum, sold) => sum + (sold.cost * sold.quantity), 0) / item.quantity;
+        const itemCostTotal = itemCost * item.quantity;
+        totalCost += itemCostTotal;
+        
+        itemsWithCost.push({
+          ...item,
+          cost: itemCost,
+          cost_subtotal: itemCostTotal,
+          subtotal: item.price * item.quantity,
+          profit: (item.price * item.quantity) - itemCostTotal,
+          batch_number: result.soldItems.map(s => s.batchNumber).join(', ')
+        });
       }
+      
+      // Create order with FIFO cost data
+      const enrichedOrderData = {
+        ...orderData,
+        items: itemsWithCost,
+        order_number: orderNumber,
+        city_code: orderNumber.charAt(0),
+        cost_total: totalCost,
+        profit: orderData.total - totalCost
+      };
+      
+      await createOrder(enrichedOrderData);
 
       setCart([]);
       try { localStorage.removeItem('ns_worker_cart'); } catch {}
