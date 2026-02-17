@@ -206,6 +206,9 @@ export const getStocksForProduct = async (productId) => {
 // Функции для работы с приемками
 export const createReception = async (data) => {
   try {
+    // Импортируем функцию генерации batch_number
+    const { generateBatchNumber } = await import('./orderNumbers.js');
+    
     // Рассчитываем суммы
     let totalPurchaseValue = 0;
     let totalSaleValue = 0;
@@ -221,21 +224,39 @@ export const createReception = async (data) => {
       });
     }
     
-    // Добавляем суммы в данные приемки
+    // Генерируем batch_number для этой приемки
+    const supplierData = await pb.collection('suppliers').getOne(data.supplier).catch(() => null);
+    const cityName = supplierData?.name || 'Unknown';
+    const batchNumber = await generateBatchNumber(cityName);
+    
+    // Добавляем суммы и batch_number в данные приемки
     const receptionData = {
       ...data,
       total_amount: totalPurchaseValue,  
-      total_sale: totalSaleValue
+      total_sale: totalSaleValue,
+      batch_number: batchNumber
     };
     
     const result = await pb.collection('receptions').create(receptionData);
     
-    // Обновляем остатки на складе (cost сохраняется в stocks per-city, НЕ в глобальном products)
+    // Создаем партии товаров (вместо обновления агрегированных остатков)
     if (data.items && data.supplier) {
-      const items = data.items;
-      for (const item of items) {
-        const purchasePrice = item.cost ?? item.purchase_price ?? null;
-        await updateStock(item.product, null, item.quantity, data.supplier, purchasePrice);
+      const receptionDate = new Date().toISOString().split('T')[0];
+      
+      for (const item of data.items) {
+        const purchasePrice = item.cost ?? item.purchase_price ?? 0;
+        
+        // Создаем новую партию для каждого товара
+        await pb.collection('stocks').create({
+          product: item.product,
+          supplier: data.supplier,
+          quantity: item.quantity,
+          cost: purchasePrice,
+          cost_per_unit: purchasePrice,
+          reception_id: result.id,
+          reception_date: receptionDate,
+          batch_number: batchNumber
+        });
       }
     }
     
@@ -422,37 +443,7 @@ export const getReceptions = async () => {
   }
 };
 
-// Получение истории приёмок для конкретного товара
-export const getReceptionHistoryForProduct = async (productId) => {
-  try {
-    const allReceptions = await pb.collection('receptions').getFullList({
-      expand: 'supplier',
-      sort: '-created'
-    });
-    // Фильтруем приёмки, содержащие этот товар
-    const history = [];
-    for (const rec of allReceptions) {
-      const items = rec.items || [];
-      const match = items.find(it => it.product === productId);
-      if (match) {
-        history.push({
-          receptionId: rec.id,
-          date: rec.created,
-          city: rec.expand?.supplier?.name || '—',
-          supplierId: rec.supplier,
-          stores: rec.stores || [],
-          quantity: match.quantity || 0,
-          cost: match.cost || match.purchase_price || 0,
-          name: match.name || '',
-        });
-      }
-    }
-    return history;
-  } catch (error) {
-    console.error('PocketBase: Error loading reception history:', error);
-    return [];
-  }
-};
+// Получение истории приёмок для конкретного товара (старая версия - используется новая в конце файла)
 
 export const createDocument = async (data) => {
   try {
@@ -1230,6 +1221,141 @@ export const calculateSalePrice = (purchasePrice, ratio = 1.0) => {
   // Формула: Цена продажи = Закуп * Накрутка
   // ratio = 1.3 означает наценку 30%
   return Math.round(purchasePrice * ratio);
+};
+
+// ============================================
+// === FIFO СИСТЕМА: ПАРТИИ И ИЗБРАННОЕ ===
+// ============================================
+
+// === Избранное для приемок ===
+export const getFavorites = async () => {
+  try {
+    return await pb.collection('favorites').getFullList({
+      sort: '+order',
+      expand: 'product'
+    });
+  } catch (error) {
+    console.error('PocketBase: Error loading favorites:', error);
+    return [];
+  }
+};
+
+export const addToFavorites = async (productId) => {
+  try {
+    // Проверяем, не добавлен ли уже
+    const existing = await pb.collection('favorites').getFirstListItem(
+      `product = "${productId}"`
+    ).catch(() => null);
+    
+    if (existing) {
+      return existing;
+    }
+    
+    // Получаем максимальный order
+    const all = await pb.collection('favorites').getFullList({ sort: '-order' });
+    const maxOrder = all.length > 0 ? (all[0].order || 0) : 0;
+    
+    return await pb.collection('favorites').create({
+      product: productId,
+      order: maxOrder + 1
+    });
+  } catch (error) {
+    console.error('PocketBase: Error adding to favorites:', error);
+    throw error;
+  }
+};
+
+export const removeFromFavorites = async (productId) => {
+  try {
+    const favorite = await pb.collection('favorites').getFirstListItem(
+      `product = "${productId}"`
+    );
+    await pb.collection('favorites').delete(favorite.id);
+    return true;
+  } catch (error) {
+    console.error('PocketBase: Error removing from favorites:', error);
+    throw error;
+  }
+};
+
+export const isFavorite = async (productId) => {
+  try {
+    const favorite = await pb.collection('favorites').getFirstListItem(
+      `product = "${productId}"`
+    ).catch(() => null);
+    return !!favorite;
+  } catch (error) {
+    console.error('PocketBase: Error checking favorite:', error);
+    return false;
+  }
+};
+
+// === Списания ===
+export const getWriteOffs = async (supplierId = null) => {
+  try {
+    const filter = supplierId ? `supplier = "${supplierId}"` : '';
+    return await pb.collection('write_offs').getFullList({
+      filter,
+      sort: '-writeoff_date',
+      expand: 'product,supplier,user,reception_id'
+    });
+  } catch (error) {
+    console.error('PocketBase: Error loading write-offs:', error);
+    return [];
+  }
+};
+
+export const createWriteOff = async (data) => {
+  try {
+    return await pb.collection('write_offs').create(data);
+  } catch (error) {
+    console.error('PocketBase: Error creating write-off:', error);
+    throw error;
+  }
+};
+
+// === Получение партий товара ===
+export const getProductBatches = async (productId, supplierId = null) => {
+  try {
+    const filterParts = [`product = "${productId}"`];
+    if (supplierId) filterParts.push(`supplier = "${supplierId}"`);
+    
+    return await pb.collection('stocks').getFullList({
+      filter: filterParts.join(' && '),
+      sort: '+reception_date,+created',
+      expand: 'product,supplier,reception_id'
+    });
+  } catch (error) {
+    console.error('PocketBase: Error loading product batches:', error);
+    return [];
+  }
+};
+
+// === Получение истории приемок для товара ===
+export const getReceptionHistoryForProduct = async (productId, supplierId = null) => {
+  try {
+    // Получаем все партии товара
+    const batches = await getProductBatches(productId, supplierId);
+    
+    // Получаем уникальные ID приемок
+    const receptionIds = [...new Set(batches.map(b => b.reception_id).filter(Boolean))];
+    
+    if (receptionIds.length === 0) return [];
+    
+    // Загружаем приемки
+    const receptions = await Promise.all(
+      receptionIds.map(id => 
+        pb.collection('receptions').getOne(id, {
+          expand: 'supplier'
+        }).catch(() => null)
+      )
+    );
+    
+    return receptions.filter(Boolean);
+  } catch (error) {
+    console.error('PocketBase: Error loading reception history:', error);
+    return [];
+  }
 };
 
 export default pb;
