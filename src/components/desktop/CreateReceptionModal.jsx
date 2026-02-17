@@ -319,7 +319,7 @@ export default function CreateReceptionModal({
                     : 'text-gray-700 hover:bg-gray-50'
                 }`}
               >
-                {cat === 'Избранное' && '⭐ '}{cat}
+                {cat === 'Избранное' && <Star size={11} className="inline mr-1 text-blue-500" fill="currentColor" />}{cat}
               </button>
             ))}
           </div>
@@ -351,7 +351,7 @@ export default function CreateReceptionModal({
                         <td className="px-2 py-1.5 text-center">
                           <button
                             onClick={() => handleToggleFavorite(product.id)}
-                            className={`p-0.5 rounded ${isFav ? 'text-yellow-500' : 'text-gray-300 hover:text-yellow-400'}`}
+                            className={`p-0.5 rounded ${isFav ? 'text-blue-500' : 'text-gray-300 hover:text-blue-400'}`}
                             title={isFav ? 'Убрать из избранного' : 'В избранное'}
                           >
                             <Star size={13} fill={isFav ? 'currentColor' : 'none'} />

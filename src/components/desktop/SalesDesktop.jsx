@@ -302,13 +302,19 @@ export default function SalesDesktop() {
               <input type="date" value={filterDateTo} onChange={e => setFilterDateTo(e.target.value)} className="border rounded-lg px-3 py-1.5 text-sm" />
             </>
           )}
-          <div className="flex items-center gap-1.5 flex-wrap">
-            {cities.map(c => (
-              <button key={c} onClick={() => setFilterCity(p => p.includes(c) ? p.filter(x=>x!==c) : [...p,c])}
-                className={`px-3 py-1.5 text-sm rounded-lg border transition-colors ${filterCity.includes(c) ? 'bg-blue-50 border-blue-300 text-blue-700 font-medium' : 'bg-white border-gray-200 text-gray-600 hover:border-gray-300'}`}>
-                {c}
-              </button>
-            ))}
+          <div className="flex items-center gap-1 shrink-0 max-w-[400px] overflow-hidden">
+            <button onClick={() => { const el = document.getElementById('cities-scroll'); if (el) el.scrollBy({left: -100, behavior: 'smooth'}); }}
+              className="p-1 text-gray-400 hover:text-gray-600 shrink-0"><ChevronDown size={14} className="rotate-90" /></button>
+            <div id="cities-scroll" className="flex items-center gap-1 overflow-x-auto scrollbar-hide" style={{scrollbarWidth:'none', msOverflowStyle:'none'}}>
+              {cities.map(c => (
+                <button key={c} onClick={() => setFilterCity(p => p.includes(c) ? p.filter(x=>x!==c) : [...p,c])}
+                  className={`px-2.5 py-1 text-xs rounded-lg border transition-colors whitespace-nowrap shrink-0 ${filterCity.includes(c) ? 'bg-blue-50 border-blue-300 text-blue-700 font-medium' : 'bg-white border-gray-200 text-gray-600 hover:border-gray-300'}`}>
+                  {c}
+                </button>
+              ))}
+            </div>
+            <button onClick={() => { const el = document.getElementById('cities-scroll'); if (el) el.scrollBy({left: 100, behavior: 'smooth'}); }}
+              className="p-1 text-gray-400 hover:text-gray-600 shrink-0"><ChevronDown size={14} className="-rotate-90" /></button>
           </div>
           <div className="relative flex-1 min-w-[200px]">
             <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
@@ -320,68 +326,80 @@ export default function SalesDesktop() {
         </div>
       </div>
 
-      {/* Table */}
+      {/* Table — grouped by sale */}
       <div className="bg-white rounded-xl shadow-sm overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead className="bg-gray-50 border-b">
               <tr>
-                <th className="px-4 py-3 text-left cursor-pointer select-none" onClick={() => handleSort('order_number')}><div className="flex items-center gap-1">Номер <SI field="order_number" /></div></th>
-                <th className="px-4 py-3 text-left cursor-pointer select-none" onClick={() => handleSort('local_time')}><div className="flex items-center gap-1">Дата <SI field="local_time" /></div></th>
-                <th className="px-4 py-3 text-left cursor-pointer select-none" onClick={() => handleSort('courier')}><div className="flex items-center gap-1">Курьер <SI field="courier" /></div></th>
-                <th className="px-4 py-3 text-left cursor-pointer select-none" onClick={() => handleSort('city')}><div className="flex items-center gap-1">Город <SI field="city" /></div></th>
-                <th className="px-4 py-3 text-center cursor-pointer select-none" onClick={() => handleSort('items_count')}><div className="flex items-center justify-center gap-1">Товары <SI field="items_count" /></div></th>
-                <th className="px-4 py-3 text-right cursor-pointer select-none" onClick={() => handleSort('total')}><div className="flex items-center justify-end gap-1">Сумма <SI field="total" /></div></th>
-                <th className="px-4 py-3 text-right cursor-pointer select-none" onClick={() => handleSort('cost_total')}><div className="flex items-center justify-end gap-1">Себест. <SI field="cost_total" /></div></th>
-                <th className="px-4 py-3 text-right cursor-pointer select-none" onClick={() => handleSort('profit')}><div className="flex items-center justify-end gap-1">Прибыль <SI field="profit" /></div></th>
-                <th className="px-4 py-3 text-center">Оплата</th>
-                <th className="px-4 py-3 text-center w-20"></th>
+                <th className="px-4 py-2.5 text-left font-medium text-gray-600 cursor-pointer select-none" onClick={() => handleSort('order_number')}>
+                  <div className="flex items-center gap-1">Наименование <SI field="order_number" /></div>
+                </th>
+                <th className="px-4 py-2.5 text-center font-medium text-gray-600 w-24 cursor-pointer select-none" onClick={() => handleSort('items_count')}>
+                  <div className="flex items-center justify-center gap-1">Количество <SI field="items_count" /></div>
+                </th>
+                <th className="px-4 py-2.5 text-right font-medium text-gray-600 w-28 cursor-pointer select-none" onClick={() => handleSort('total')}>
+                  <div className="flex items-center justify-end gap-1">Стоимость <SI field="total" /></div>
+                </th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-gray-100">
+            <tbody>
               {filteredOrders.length === 0 ? (
-                <tr><td colSpan={10} className="px-4 py-12 text-center text-gray-400">Нет продаж за выбранный период</td></tr>
+                <tr><td colSpan={3} className="px-4 py-12 text-center text-gray-400">Нет продаж за выбранный период</td></tr>
               ) : filteredOrders.map(order => {
                 const isRef = order.status === 'refund';
-                const itemsCount = (order.items||[]).reduce((s,i) => s+(i.quantity||1), 0);
+                const items = order.items || [];
                 return (
-                  <tr key={order.id} className={`hover:bg-gray-50 transition-colors cursor-pointer ${isRef ? 'bg-blue-50/30' : ''}`} onClick={() => { setSelectedOrder(order); setEditingOrder(null); setRefundConfirm(false); }}>
-                    <td className="px-4 py-3">
-                      <div className="font-mono text-sm font-semibold text-gray-900">{order.order_number || '—'}</div>
-                      {isRef && <div className="text-[10px] text-blue-600 mt-0.5">ВОЗВРАТ</div>}
-                    </td>
-                    <td className="px-4 py-3">
-                      <div className="font-medium text-gray-900">{fmtDate(order.created_date || order.created)}</div>
-                      <div className="text-xs text-gray-400">{fmtTime(order.created_date || order.created)}</div>
-                      {order.edited_at && <div className="text-[10px] text-amber-500 mt-0.5">✎ ред. {fmtDate(order.edited_at)}</div>}
-                    </td>
-                    <td className="px-4 py-3 text-gray-700">{order.expand?.user?.name || '—'}</td>
-                    <td className="px-4 py-3"><span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-700">{order.city || '—'}</span></td>
-                    <td className="px-4 py-3 text-center text-gray-600">{itemsCount} шт</td>
-                    <td className="px-4 py-3 text-right">
-                      <span className={`font-medium ${isRef ? 'text-blue-500 line-through' : 'text-gray-900'}`}>{fmtMoney(order.total)}</span>
-                    </td>
-                    <td className="px-4 py-3 text-right">
-                      <span className="text-gray-600">{order.cost_total ? fmtMoney(order.cost_total) : '—'}</span>
-                    </td>
-                    <td className="px-4 py-3 text-right">
-                      <span className={`font-medium ${order.profit > 0 ? 'text-green-600' : order.profit < 0 ? 'text-red-600' : 'text-gray-600'}`}>
-                        {order.profit !== undefined && order.profit !== null ? fmtMoney(order.profit) : '—'}
-                      </span>
-                    </td>
-                    <td className="px-4 py-3 text-center">
-                      <span className={`inline-flex items-center gap-1 text-xs ${order.payment_method==='0' ? 'text-green-600' : order.payment_method==='1' ? 'text-blue-600' : 'text-purple-600'}`}>
-                        {payLabel[order.payment_method] || '—'}
-                      </span>
-                    </td>
-                    <td className="px-4 py-3 text-center" onClick={e => e.stopPropagation()}>
-                      <div className="flex items-center justify-center gap-1">
-                        {isAdmin && (
-                          <button onClick={() => handleDeleteOrder(order)} className="p-1 hover:bg-red-50 rounded text-gray-400 hover:text-red-600" title="Удалить"><Trash2 size={14} /></button>
-                        )}
-                      </div>
-                    </td>
-                  </tr>
+                  <React.Fragment key={order.id}>
+                    {/* Sale header row */}
+                    <tr
+                      className={`border-t-2 border-gray-200 cursor-pointer hover:bg-gray-50 ${isRef ? 'bg-blue-50/30' : 'bg-gray-50/50'}`}
+                      onDoubleClick={() => { setSelectedOrder(order); setEditingOrder(null); setRefundConfirm(false); }}
+                    >
+                      <td className="px-4 py-2" colSpan={3}>
+                        <div className="flex items-center gap-3">
+                          <span className="font-semibold text-gray-900">{order.order_number || `#${order.id?.slice(-6)}`}</span>
+                          {isRef && <span className="px-1.5 py-0.5 text-[10px] bg-blue-100 text-blue-700 rounded font-medium">ВОЗВРАТ</span>}
+                          <span className={`inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded ${order.payment_method==='0'?'bg-green-50 text-green-600':order.payment_method==='1'?'bg-blue-50 text-blue-600':'bg-purple-50 text-purple-600'}`}>
+                            {payLabel[order.payment_method] || '—'}
+                          </span>
+                          <span className="text-xs text-gray-400 px-1.5 py-0.5 bg-gray-100 rounded">{order.city || '—'}</span>
+                          <span className="text-xs text-gray-400">{order.expand?.user?.name || ''}</span>
+                          {isAdmin && (
+                            <button onClick={e => { e.stopPropagation(); handleDeleteOrder(order); }} className="ml-auto p-1 hover:bg-red-50 rounded text-gray-300 hover:text-red-500" title="Удалить"><Trash2 size={13} /></button>
+                          )}
+                        </div>
+                        <div className="text-[11px] text-gray-400 mt-0.5">
+                          {fmtDate(order.created_date || order.created)} {fmtTime(order.created_date || order.created)}
+                          {order.edited_at && <span className="ml-2 text-amber-500">✎ ред. {fmtDate(order.edited_at)}</span>}
+                        </div>
+                      </td>
+                    </tr>
+                    {/* Item rows */}
+                    {items.map((item, idx) => (
+                      <tr key={`${order.id}-${idx}`} className={`border-b border-gray-50 hover:bg-blue-50/30 group ${isRef ? 'opacity-60' : ''}`}>
+                        <td className="px-4 py-1.5 pl-8 relative">
+                          <span className={`text-sm ${isRef ? 'line-through text-gray-400' : 'text-gray-800'}`}>{item.name || 'Товар'}</span>
+                          {/* Tooltip on hover — reception info */}
+                          <div className="hidden group-hover:block absolute left-8 bottom-full mb-1 z-20 bg-gray-800 text-white text-[11px] rounded-lg px-3 py-2 shadow-lg whitespace-nowrap pointer-events-none">
+                            {item.batch_number ? (
+                              <>Партия: {item.batch_number}<br />Себест.: {fmtMoney(item.cost || 0)} ₽</>
+                            ) : (
+                              'Нет данных о приёмке'
+                            )}
+                          </div>
+                        </td>
+                        <td className={`px-4 py-1.5 text-center text-sm ${isRef ? 'line-through text-gray-400' : 'text-gray-600'}`}>{item.quantity || 1} шт</td>
+                        <td className={`px-4 py-1.5 text-right text-sm ${isRef ? 'line-through text-gray-400' : 'text-gray-800'}`}>{fmtMoney((item.price||0) * (item.quantity||1))}</td>
+                      </tr>
+                    ))}
+                    {/* Total row */}
+                    <tr className={`border-b border-gray-200 ${isRef ? 'bg-blue-50/20' : 'bg-gray-50/30'}`}>
+                      <td className="px-4 py-1.5 pl-8 text-xs font-medium text-gray-500">Итого {order.order_number || ''}</td>
+                      <td className="px-4 py-1.5 text-center text-xs text-gray-500">{items.reduce((s,i) => s+(i.quantity||1), 0)} шт</td>
+                      <td className={`px-4 py-1.5 text-right font-semibold ${isRef ? 'text-blue-500 line-through' : 'text-gray-900'}`}>{fmtMoney(order.total)}</td>
+                    </tr>
+                  </React.Fragment>
                 );
               })}
             </tbody>
@@ -389,8 +407,8 @@ export default function SalesDesktop() {
         </div>
         {filteredOrders.length > 0 && (
           <div className="border-t bg-gray-50 px-4 py-3 flex items-center justify-between text-sm">
-            <span className="text-gray-500">Показано: {filteredOrders.length} из {orders.length}</span>
-            <span className="font-semibold text-gray-900">Итого: {fmtMoney(stats.totalSum)}</span>
+            <span className="text-gray-500">Показано: {filteredOrders.length} продаж из {orders.length}</span>
+            <span className="font-semibold text-gray-900">Итого: {fmtMoney(stats.totalSum)} ₽</span>
           </div>
         )}
       </div>
