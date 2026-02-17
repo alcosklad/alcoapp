@@ -323,23 +323,30 @@ export default function SalesDesktop() {
           <table className="w-full text-sm">
             <thead className="bg-gray-50 border-b">
               <tr>
+                <th className="px-4 py-3 text-left cursor-pointer select-none" onClick={() => handleSort('order_number')}><div className="flex items-center gap-1">Номер <SI field="order_number" /></div></th>
                 <th className="px-4 py-3 text-left cursor-pointer select-none" onClick={() => handleSort('local_time')}><div className="flex items-center gap-1">Дата <SI field="local_time" /></div></th>
                 <th className="px-4 py-3 text-left cursor-pointer select-none" onClick={() => handleSort('courier')}><div className="flex items-center gap-1">Курьер <SI field="courier" /></div></th>
                 <th className="px-4 py-3 text-left cursor-pointer select-none" onClick={() => handleSort('city')}><div className="flex items-center gap-1">Город <SI field="city" /></div></th>
                 <th className="px-4 py-3 text-center cursor-pointer select-none" onClick={() => handleSort('items_count')}><div className="flex items-center justify-center gap-1">Товары <SI field="items_count" /></div></th>
                 <th className="px-4 py-3 text-right cursor-pointer select-none" onClick={() => handleSort('total')}><div className="flex items-center justify-end gap-1">Сумма <SI field="total" /></div></th>
+                <th className="px-4 py-3 text-right cursor-pointer select-none" onClick={() => handleSort('cost_total')}><div className="flex items-center justify-end gap-1">Себест. <SI field="cost_total" /></div></th>
+                <th className="px-4 py-3 text-right cursor-pointer select-none" onClick={() => handleSort('profit')}><div className="flex items-center justify-end gap-1">Прибыль <SI field="profit" /></div></th>
                 <th className="px-4 py-3 text-center">Оплата</th>
                 <th className="px-4 py-3 text-center w-20"></th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
               {filteredOrders.length === 0 ? (
-                <tr><td colSpan={7} className="px-4 py-12 text-center text-gray-400">Нет продаж за выбранный период</td></tr>
+                <tr><td colSpan={10} className="px-4 py-12 text-center text-gray-400">Нет продаж за выбранный период</td></tr>
               ) : filteredOrders.map(order => {
                 const isRef = order.status === 'refund';
                 const itemsCount = (order.items||[]).reduce((s,i) => s+(i.quantity||1), 0);
                 return (
                   <tr key={order.id} className={`hover:bg-gray-50 transition-colors cursor-pointer ${isRef ? 'bg-blue-50/30' : ''}`} onClick={() => { setSelectedOrder(order); setEditingOrder(null); setRefundConfirm(false); }}>
+                    <td className="px-4 py-3">
+                      <div className="font-mono text-sm font-semibold text-gray-900">{order.order_number || '—'}</div>
+                      {isRef && <div className="text-[10px] text-blue-600 mt-0.5">ВОЗВРАТ</div>}
+                    </td>
                     <td className="px-4 py-3">
                       <div className="font-medium text-gray-900">{fmtDate(order.created_date || order.created)}</div>
                       <div className="text-xs text-gray-400">{fmtTime(order.created_date || order.created)}</div>
@@ -350,7 +357,14 @@ export default function SalesDesktop() {
                     <td className="px-4 py-3 text-center text-gray-600">{itemsCount} шт</td>
                     <td className="px-4 py-3 text-right">
                       <span className={`font-medium ${isRef ? 'text-blue-500 line-through' : 'text-gray-900'}`}>{fmtMoney(order.total)}</span>
-                      {isRef && <span className="ml-2 inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-blue-100 text-blue-700">Возврат</span>}
+                    </td>
+                    <td className="px-4 py-3 text-right">
+                      <span className="text-gray-600">{order.cost_total ? fmtMoney(order.cost_total) : '—'}</span>
+                    </td>
+                    <td className="px-4 py-3 text-right">
+                      <span className={`font-medium ${order.profit > 0 ? 'text-green-600' : order.profit < 0 ? 'text-red-600' : 'text-gray-600'}`}>
+                        {order.profit !== undefined && order.profit !== null ? fmtMoney(order.profit) : '—'}
+                      </span>
                     </td>
                     <td className="px-4 py-3 text-center">
                       <span className={`inline-flex items-center gap-1 text-xs ${order.payment_method==='0' ? 'text-green-600' : order.payment_method==='1' ? 'text-blue-600' : 'text-purple-600'}`}>
