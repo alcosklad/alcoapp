@@ -3,8 +3,8 @@
  * Формат: {CITY_CODE}{NNNNN} (например: S00001, V00042, K00123)
  */
 
-import pb from './pocketbase';
-import { getCityCode } from './cityCodes';
+import pb from './pocketbase.js';
+import { getCityCode } from './cityCodes.js';
 
 /**
  * Генерировать следующий номер продажи для города
