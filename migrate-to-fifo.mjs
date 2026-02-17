@@ -4,12 +4,83 @@
  */
 
 import PocketBase from 'pocketbase';
-import { generateBatchNumber, generateOrderNumber } from './src/lib/orderNumbers.js';
 import { getCityCode } from './src/lib/cityCodes.js';
 
 const POCKETBASE_URL = 'http://146.103.121.96:8090';
 const PB_ADMIN_EMAIL = 'admin@sklad.ru';
 const PB_ADMIN_PASSWORD = '323282sssS';
+
+// Функции генерации номеров (копируем логику из orderNumbers.js)
+async function generateBatchNumber(pb, cityName, date = new Date()) {
+  const cityCode = getCityCode(cityName);
+  
+  if (!cityCode) {
+    throw new Error(`Неизвестный город: ${cityName}`);
+  }
+
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  const dateStr = `${year}-${month}-${day}`;
+
+  try {
+    const lastBatch = await pb.collection('stocks').getFirstListItem(
+      `batch_number ~ "${cityCode}-${dateStr}-%"`,
+      {
+        sort: '-batch_number',
+        fields: 'batch_number'
+      }
+    ).catch(() => null);
+
+    let sequence = 1;
+
+    if (lastBatch && lastBatch.batch_number) {
+      const parts = lastBatch.batch_number.split('-');
+      const lastSequence = parseInt(parts[parts.length - 1], 10);
+      sequence = lastSequence + 1;
+    }
+
+    const batchNumber = `${cityCode}-${dateStr}-${String(sequence).padStart(3, '0')}`;
+    return batchNumber;
+  } catch (error) {
+    console.error('Error generating batch number:', error);
+    const timestamp = Date.now().toString().slice(-3);
+    return `${cityCode}-${dateStr}-${timestamp}`;
+  }
+}
+
+async function generateOrderNumber(pb, cityName) {
+  const cityCode = getCityCode(cityName);
+  
+  if (!cityCode) {
+    throw new Error(`Неизвестный город: ${cityName}`);
+  }
+
+  try {
+    const lastOrder = await pb.collection('orders').getFirstListItem(
+      `city_code = "${cityCode}"`,
+      {
+        sort: '-order_number',
+        fields: 'order_number'
+      }
+    ).catch(() => null);
+
+    let nextNumber = 1;
+
+    if (lastOrder && lastOrder.order_number) {
+      const numberPart = lastOrder.order_number.substring(1);
+      const currentNumber = parseInt(numberPart, 10);
+      nextNumber = currentNumber + 1;
+    }
+
+    const orderNumber = `${cityCode}${String(nextNumber).padStart(5, '0')}`;
+    return orderNumber;
+  } catch (error) {
+    console.error('Error generating order number:', error);
+    const timestamp = Date.now().toString().slice(-5);
+    return `${cityCode}${timestamp}`;
+  }
+}
 
 const DRY_RUN = process.argv.includes('--dry-run');
 
@@ -64,7 +135,7 @@ async function main() {
       const cityName = supplierMap.get(stock.supplier) || 'Unknown';
       
       // Генерируем batch_number для существующего остатка
-      const batchNumber = await generateBatchNumber(cityName, new Date(stock.created));
+      const batchNumber = await generateBatchNumber(pb, cityName, new Date(stock.created));
       
       // Устанавливаем reception_date как дату создания записи
       const receptionDate = new Date(stock.created).toISOString().split('T')[0];
@@ -125,7 +196,7 @@ async function main() {
       }
       
       // Генерируем order_number
-      const orderNumber = await generateOrderNumber(cityName);
+      const orderNumber = await generateOrderNumber(pb, cityName);
       const cityCode = getCityCode(cityName);
       
       // Рассчитываем себестоимость и прибыль (если возможно)
