@@ -1,5 +1,8 @@
-import React, { useState, useEffect } from 'react';
-import { X, Plus, Minus, Trash2, Search } from 'lucide-react';
+import React, { useState, useEffect, useMemo } from 'react';
+import { X, Plus, Minus, Trash2, Search, Star, ChevronLeft, ChevronRight } from 'lucide-react';
+import { getFavorites, addToFavorites, removeFromFavorites } from '../../lib/pocketbase';
+
+const ITEMS_PER_PAGE = 15;
 
 export default function CreateReceptionModal({ 
   isOpen, 
@@ -9,7 +12,6 @@ export default function CreateReceptionModal({
   products,
   onSave 
 }) {
-  // Статичный список магазинов (пока коллекция stores не создана в PocketBase)
   const defaultStores = [
     { id: 'lenta', name: 'Лента' },
     { id: 'magnit', name: 'Магнит' },
@@ -29,25 +31,177 @@ export default function CreateReceptionModal({
     selectedStores: [],
     items: []
   });
-  const [productSearch, setProductSearch] = useState('');
-  const [searchResults, setSearchResults] = useState([]);
-  const [showSearch, setShowSearch] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [activeCategory, setActiveCategory] = useState('Избранное');
+  const [favorites, setFavorites] = useState([]);
+  const [currentPage, setCurrentPage] = useState(1);
   const [errors, setErrors] = useState({});
 
   useEffect(() => {
-    if (productSearch.length > 0) {
-      const query = productSearch.toLowerCase();
-      const filtered = products.filter(p => 
-        p.name.toLowerCase().includes(query) || 
-        p.article.toLowerCase().includes(query)
-      );
-      setSearchResults(filtered.slice(0, 10));
-      setShowSearch(true);
-    } else {
-      setSearchResults([]);
-      setShowSearch(false);
+    if (isOpen) {
+      loadFavorites();
     }
-  }, [productSearch, products]);
+  }, [isOpen]);
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [activeCategory, searchQuery]);
+
+  const loadFavorites = async () => {
+    try {
+      const data = await getFavorites();
+      setFavorites(data || []);
+    } catch (err) {
+      console.error('Error loading favorites:', err);
+    }
+  };
+
+  const favoriteIds = useMemo(() => new Set(favorites.map(f => f.product)), [favorites]);
+
+  // Категории из товаров
+  const categories = useMemo(() => {
+    const cats = new Set();
+    products.forEach(p => {
+      const c = Array.isArray(p?.category) ? p.category[0] : p?.category;
+      if (c) cats.add(c);
+    });
+    return ['Избранное', ...Array.from(cats).sort()];
+  }, [products]);
+
+  // Товары текущей категории
+  const categoryProducts = useMemo(() => {
+    let list;
+    if (activeCategory === 'Избранное') {
+      list = products.filter(p => favoriteIds.has(p.id));
+    } else {
+      list = products.filter(p => {
+        const c = Array.isArray(p?.category) ? p.category[0] : p?.category;
+        return c === activeCategory;
+      });
+    }
+    list.sort((a, b) => (a.name || '').localeCompare(b.name || ''));
+
+    if (searchQuery) {
+      const q = searchQuery.toLowerCase();
+      list = list.filter(p => (p.name || '').toLowerCase().includes(q));
+    }
+    return list;
+  }, [products, activeCategory, favoriteIds, searchQuery]);
+
+  // Пагинация
+  const totalPages = Math.ceil(categoryProducts.length / ITEMS_PER_PAGE);
+  const paginatedProducts = categoryProducts.slice(
+    (currentPage - 1) * ITEMS_PER_PAGE,
+    currentPage * ITEMS_PER_PAGE
+  );
+
+  const handleToggleFavorite = async (productId) => {
+    try {
+      if (favoriteIds.has(productId)) {
+        const fav = favorites.find(f => f.product === productId);
+        if (fav) await removeFromFavorites(fav.id);
+      } else {
+        await addToFavorites(productId);
+      }
+      await loadFavorites();
+    } catch (err) {
+      console.error('Error toggling favorite:', err);
+    }
+  };
+
+  const getItemQuantity = (productId) => {
+    const item = formData.items.find(i => i.product === productId);
+    return item ? item.quantity : 0;
+  };
+
+  const handleQuantityDelta = (product, delta) => {
+    setFormData(prev => {
+      const existing = prev.items.find(i => i.product === product.id);
+      if (existing) {
+        const newQty = existing.quantity + delta;
+        if (newQty <= 0) {
+          return { ...prev, items: prev.items.filter(i => i.product !== product.id) };
+        }
+        return {
+          ...prev,
+          items: prev.items.map(i =>
+            i.product === product.id ? { ...i, quantity: newQty } : i
+          )
+        };
+      } else if (delta > 0) {
+        return {
+          ...prev,
+          items: [...prev.items, {
+            product: product.id,
+            name: product.name,
+            article: product.article,
+            quantity: 1,
+            cost: product.cost || 0
+          }]
+        };
+      }
+      return prev;
+    });
+  };
+
+  const handleSetQuantity = (productId, value) => {
+    const qty = parseInt(value) || 0;
+    setFormData(prev => {
+      if (qty <= 0) {
+        return { ...prev, items: prev.items.filter(i => i.product !== productId) };
+      }
+      const existing = prev.items.find(i => i.product === productId);
+      if (existing) {
+        return {
+          ...prev,
+          items: prev.items.map(i =>
+            i.product === productId ? { ...i, quantity: qty } : i
+          )
+        };
+      }
+      const product = products.find(p => p.id === productId);
+      if (!product) return prev;
+      return {
+        ...prev,
+        items: [...prev.items, {
+          product: product.id,
+          name: product.name,
+          article: product.article,
+          quantity: qty,
+          cost: product.cost || 0
+        }]
+      };
+    });
+  };
+
+  const handleCartCostChange = (productId, value) => {
+    setFormData(prev => ({
+      ...prev,
+      items: prev.items.map(i =>
+        i.product === productId ? { ...i, cost: parseFloat(value) || 0 } : i
+      )
+    }));
+  };
+
+  const handleCartQuantityChange = (productId, delta) => {
+    setFormData(prev => ({
+      ...prev,
+      items: prev.items.map(i => {
+        if (i.product === productId) {
+          const newQty = Math.max(1, i.quantity + delta);
+          return { ...i, quantity: newQty };
+        }
+        return i;
+      })
+    }));
+  };
+
+  const handleRemoveItem = (productId) => {
+    setFormData(prev => ({
+      ...prev,
+      items: prev.items.filter(i => i.product !== productId)
+    }));
+  };
 
   const handleAddStore = (storeId) => {
     if (!formData.selectedStores.includes(storeId)) {
@@ -65,327 +219,268 @@ export default function CreateReceptionModal({
     }));
   };
 
-  const handleAddProduct = (product) => {
-    const existingItem = formData.items.find(item => item.product === product.id);
-    
-    if (existingItem) {
-      // Увеличиваем количество если товар уже добавлен
-      setFormData(prev => ({
-        ...prev,
-        items: prev.items.map(item => 
-          item.product === product.id 
-            ? { ...item, quantity: item.quantity + 1 }
-            : item
-        )
-      }));
-    } else {
-      // Добавляем новый товар с ценой закупа из поля cost
-      setFormData(prev => ({
-        ...prev,
-        items: [...prev.items, {
-          product: product.id,
-          productData: product,
-          name: product.name,
-          article: product.article,
-          quantity: 1,
-          cost: product.cost || 0
-        }]
-      }));
-    }
-    
-    setProductSearch('');
-    setShowSearch(false);
-  };
-
-  const handleQuantityChange = (productId, delta) => {
-    setFormData(prev => ({
-      ...prev,
-      items: prev.items.map(item => {
-        if (item.product === productId) {
-          const newQuantity = Math.max(1, item.quantity + delta);
-          return { ...item, quantity: newQuantity };
-        }
-        return item;
-      })
-    }));
-  };
-
-  const handleCostChange = (productId, value) => {
-    setFormData(prev => ({
-      ...prev,
-      items: prev.items.map(item => 
-        item.product === productId 
-          ? { ...item, cost: parseFloat(value) || 0 }
-          : item
-      )
-    }));
-  };
-
-  const handleRemoveItem = (productId) => {
-    setFormData(prev => ({
-      ...prev,
-      items: prev.items.filter(item => item.product !== productId)
-    }));
-  };
-
   const validateForm = () => {
     const newErrors = {};
-    
-    if (!formData.supplier) {
-      newErrors.supplier = 'Выберите город';
-    }
-    
-    if (formData.selectedStores.length === 0) {
-      newErrors.stores = 'Выберите хотя бы один магазин';
-    }
-    
-    if (formData.items.length === 0) {
-      newErrors.items = 'Добавьте хотя бы один товар';
-    }
-    
+    if (!formData.supplier) newErrors.supplier = 'Выберите город';
+    if (formData.selectedStores.length === 0) newErrors.stores = 'Выберите хотя бы один магазин';
+    if (formData.items.length === 0) newErrors.items = 'Добавьте хотя бы один товар';
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };
 
   const handleSubmit = () => {
-    if (!validateForm()) {
-      return;
-    }
-
-    const totalAmount = formData.items.reduce((sum, item) => 
-      sum + (item.cost * item.quantity), 0
-    );
-
-    const receptionData = {
+    if (!validateForm()) return;
+    const totalAmount = formData.items.reduce((s, i) => s + (i.cost * i.quantity), 0);
+    onSave({
       supplier: formData.supplier,
       stores: formData.selectedStores,
-      items: formData.items.map(item => ({
-        product: item.product,
-        name: item.name,
-        article: item.article,
-        quantity: item.quantity,
-        cost: item.cost
+      items: formData.items.map(i => ({
+        product: i.product,
+        name: i.name,
+        article: i.article,
+        quantity: i.quantity,
+        cost: i.cost
       })),
       total_amount: totalAmount
-    };
-
-    onSave(receptionData);
+    });
   };
 
-  const totalAmount = formData.items.reduce((sum, item) => 
-    sum + (item.cost * item.quantity), 0
-  );
+  const totalAmount = formData.items.reduce((s, i) => s + (i.cost * i.quantity), 0);
+  const totalItems = formData.items.reduce((s, i) => s + i.quantity, 0);
 
   if (!isOpen) return null;
 
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4" onClick={onClose}>
-      <div className="bg-white rounded-lg w-full max-w-6xl h-[95vh] overflow-hidden flex flex-col" onClick={(e) => e.stopPropagation()}>
+      <div className="bg-white rounded-lg w-full max-w-6xl h-[95vh] overflow-hidden flex flex-col" onClick={e => e.stopPropagation()}>
         {/* Заголовок */}
-        <div className="flex items-center justify-between p-4 border-b border-gray-200">
+        <div className="flex items-center justify-between px-4 py-3 border-b border-gray-200">
           <h2 className="text-lg font-semibold text-gray-900">Создать новую приёмку</h2>
-          <button onClick={onClose} className="text-gray-400 hover:text-gray-600">
-            <X size={20} />
-          </button>
+          <button onClick={onClose} className="text-gray-400 hover:text-gray-600"><X size={20} /></button>
         </div>
 
-        {/* Контент */}
-        <div className="flex-1 overflow-y-auto p-4 space-y-4">
-          {/* Выбор города */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Город <span className="text-red-500">*</span>
-            </label>
+        {/* Город + Магазины */}
+        <div className="flex items-center gap-4 px-4 py-2 border-b border-gray-100 bg-gray-50">
+          <div className="flex items-center gap-2">
+            <label className="text-xs font-medium text-gray-600">Город <span className="text-red-500">*</span></label>
             <select
               value={formData.supplier}
-              onChange={(e) => setFormData({ ...formData, supplier: e.target.value })}
-              className={`w-full px-3 py-2 border rounded text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 ${errors.supplier ? 'border-red-500' : 'border-gray-300'}`}
+              onChange={e => setFormData({ ...formData, supplier: e.target.value })}
+              className={`px-2 py-1 border rounded text-xs focus:outline-none focus:ring-1 focus:ring-blue-500 ${errors.supplier ? 'border-red-500' : 'border-gray-300'}`}
             >
               <option value="">Выберите город</option>
-              {suppliers.map(supplier => (
-                <option key={supplier.id} value={supplier.id}>
-                  {supplier.name}
-                </option>
-              ))}
+              {suppliers.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
             </select>
-            {errors.supplier && <p className="text-xs text-red-500 mt-1">{errors.supplier}</p>}
           </div>
-
-          {/* Выбор магазинов */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Магазины <span className="text-red-500">*</span>
-            </label>
+          <div className="flex items-center gap-2">
+            <label className="text-xs font-medium text-gray-600">Магазины <span className="text-red-500">*</span></label>
             <select
-              onChange={(e) => {
-                if (e.target.value) {
-                  handleAddStore(e.target.value);
-                  e.target.value = '';
-                }
-              }}
-              className="w-full px-3 py-2 border border-gray-300 rounded text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 mb-2"
+              onChange={e => { if (e.target.value) { handleAddStore(e.target.value); e.target.value = ''; } }}
+              className={`px-2 py-1 border rounded text-xs focus:outline-none focus:ring-1 focus:ring-blue-500 ${errors.stores ? 'border-red-500' : 'border-gray-300'}`}
             >
-              <option value="">Выберите магазин для добавления</option>
-              {storesList.filter(store => !formData.selectedStores.includes(store.id)).map(store => (
-                <option key={store.id} value={store.id}>
-                  {store.name}
-                </option>
+              <option value="">Выберите магазин</option>
+              {storesList.filter(st => !formData.selectedStores.includes(st.id)).map(st => (
+                <option key={st.id} value={st.id}>{st.name}</option>
               ))}
             </select>
-            
-            {/* Выбранные магазины */}
-            {formData.selectedStores.length > 0 && (
-              <div className="flex flex-wrap gap-2">
-                {formData.selectedStores.map(storeId => {
-                  const store = storesList.find(s => s.id === storeId);
-                  return (
-                    <div
-                      key={storeId}
-                      className="flex items-center gap-1 px-2 py-1 bg-blue-100 text-blue-700 rounded text-xs"
-                    >
-                      <span>{store?.name || storeId}</span>
-                      <button
-                        onClick={() => handleRemoveStore(storeId)}
-                        className="hover:bg-blue-200 rounded p-0.5"
-                      >
-                        <X size={12} />
-                      </button>
-                    </div>
-                  );
-                })}
-              </div>
-            )}
-            {errors.stores && <p className="text-xs text-red-500 mt-1">{errors.stores}</p>}
+            {formData.selectedStores.map(storeId => {
+              const st = storesList.find(s => s.id === storeId);
+              return (
+                <span key={storeId} className="inline-flex items-center gap-1 px-2 py-0.5 bg-blue-100 text-blue-700 rounded text-xs">
+                  {st?.name || storeId}
+                  <button onClick={() => handleRemoveStore(storeId)} className="hover:bg-blue-200 rounded"><X size={10} /></button>
+                </span>
+              );
+            })}
+          </div>
+          <div className="relative ml-auto">
+            <Search size={13} className="absolute left-2 top-1/2 -translate-y-1/2 text-gray-400" />
+            <input
+              type="text"
+              placeholder="Поиск товара..."
+              value={searchQuery}
+              onChange={e => setSearchQuery(e.target.value)}
+              className="pl-7 pr-2 py-1 border border-gray-300 rounded text-xs w-48 focus:outline-none focus:ring-1 focus:ring-blue-500"
+            />
+          </div>
+        </div>
+
+        {/* Основная область: категории + таблица */}
+        <div className="flex-1 flex overflow-hidden">
+          {/* Сайдбар категорий */}
+          <div className="w-40 border-r border-gray-200 overflow-y-auto bg-white shrink-0">
+            {categories.map(cat => (
+              <button
+                key={cat}
+                onClick={() => setActiveCategory(cat)}
+                className={`w-full text-left px-3 py-2 text-xs border-b border-gray-100 transition-colors ${
+                  activeCategory === cat
+                    ? 'bg-blue-50 text-blue-700 font-medium border-l-2 border-l-blue-600'
+                    : 'text-gray-700 hover:bg-gray-50'
+                }`}
+              >
+                {cat === 'Избранное' && '⭐ '}{cat}
+              </button>
+            ))}
           </div>
 
-          {/* Поиск товаров */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Добавить товары <span className="text-red-500">*</span>
-            </label>
-            <div className="relative">
-              <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
-              <input
-                type="text"
-                placeholder="Поиск по названию или артикулу..."
-                value={productSearch}
-                onChange={(e) => setProductSearch(e.target.value)}
-                className="w-full pl-9 pr-3 py-2 border border-gray-300 rounded text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-              />
-              
-              {/* Результаты поиска */}
-              {showSearch && searchResults.length > 0 && (
-                <div className="absolute z-10 w-full mt-1 bg-white border border-gray-300 rounded shadow-lg max-h-60 overflow-y-auto">
-                  {searchResults.map(product => (
-                    <button
-                      key={product.id}
-                      onClick={() => handleAddProduct(product)}
-                      className="w-full px-3 py-2 text-left hover:bg-gray-50 flex items-center justify-between text-sm"
-                    >
-                      <div>
-                        <p className="font-medium text-gray-900">{product.name}</p>
-                        <p className="text-xs text-gray-500">Артикул: {product.article}</p>
-                      </div>
-                      <Plus size={16} className="text-blue-600" />
-                    </button>
-                  ))}
-                </div>
-              )}
-            </div>
-            {errors.items && <p className="text-xs text-red-500 mt-1">{errors.items}</p>}
-          </div>
-
-          {/* Список добавленных товаров */}
-          {formData.items.length > 0 && (
-            <div>
-              <h3 className="text-sm font-medium text-gray-700 mb-2">Выбранные товары:</h3>
-              <div className="border border-gray-200 rounded overflow-hidden">
-                <table className="w-full text-xs">
-                  <thead className="bg-gray-50">
+          {/* Таблица товаров */}
+          <div className="flex-1 flex flex-col overflow-hidden">
+            <div className="overflow-y-auto flex-1">
+              <table className="w-full text-xs">
+                <thead className="bg-gray-50 border-b border-gray-200 sticky top-0">
+                  <tr>
+                    <th className="w-8 px-2 py-2"></th>
+                    <th className="text-left px-2 py-2 font-medium text-gray-600">Наименование</th>
+                    <th className="text-center px-2 py-2 font-medium text-gray-600 w-28">Количество</th>
+                    <th className="text-right px-2 py-2 font-medium text-gray-600 w-28">Цена закупа</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {paginatedProducts.length === 0 ? (
                     <tr>
-                      <th className="text-left px-3 py-2 font-medium text-gray-600">Товар</th>
-                      <th className="text-left px-3 py-2 font-medium text-gray-600">Артикул</th>
-                      <th className="text-center px-3 py-2 font-medium text-gray-600">Количество</th>
-                      <th className="text-right px-3 py-2 font-medium text-gray-600">Цена закупа</th>
-                      <th className="text-right px-3 py-2 font-medium text-gray-600">Сумма</th>
-                      <th className="w-10 px-3 py-2"></th>
+                      <td colSpan={4} className="px-4 py-8 text-center text-gray-400 text-xs">
+                        {activeCategory === 'Избранное' ? 'Нет избранных товаров' : 'Нет товаров в категории'}
+                      </td>
                     </tr>
-                  </thead>
-                  <tbody>
-                    {formData.items.map(item => (
-                      <tr key={item.product} className="border-t border-gray-100">
-                        <td className="px-3 py-2">{item.name}</td>
-                        <td className="px-3 py-2 text-gray-600">{item.article}</td>
-                        <td className="px-3 py-2">
+                  ) : paginatedProducts.map(product => {
+                    const qty = getItemQuantity(product.id);
+                    const isFav = favoriteIds.has(product.id);
+                    return (
+                      <tr key={product.id} className={`border-b border-gray-100 hover:bg-gray-50 ${qty > 0 ? 'bg-blue-50/40' : ''}`}>
+                        <td className="px-2 py-1.5 text-center">
+                          <button
+                            onClick={() => handleToggleFavorite(product.id)}
+                            className={`p-0.5 rounded ${isFav ? 'text-yellow-500' : 'text-gray-300 hover:text-yellow-400'}`}
+                            title={isFav ? 'Убрать из избранного' : 'В избранное'}
+                          >
+                            <Star size={13} fill={isFav ? 'currentColor' : 'none'} />
+                          </button>
+                        </td>
+                        <td className="px-2 py-1.5 text-gray-900">{product.name}</td>
+                        <td className="px-2 py-1.5">
                           <div className="flex items-center justify-center gap-1">
                             <button
-                              onClick={() => handleQuantityChange(item.product, -1)}
-                              className="p-1 hover:bg-gray-100 rounded"
+                              onClick={() => handleQuantityDelta(product, -1)}
+                              className="text-blue-600 hover:bg-blue-100 rounded px-1"
+                              disabled={qty === 0}
                             >
-                              <Minus size={14} />
+                              —
                             </button>
-                            <span className="w-8 text-center">{item.quantity}</span>
+                            <input
+                              type="number"
+                              value={qty || ''}
+                              onChange={e => handleSetQuantity(product.id, e.target.value)}
+                              placeholder="0"
+                              className="w-12 text-center border border-gray-300 rounded py-0.5 text-xs focus:outline-none focus:ring-1 focus:ring-blue-500"
+                              min="0"
+                            />
                             <button
-                              onClick={() => handleQuantityChange(item.product, 1)}
-                              className="p-1 hover:bg-gray-100 rounded"
+                              onClick={() => handleQuantityDelta(product, 1)}
+                              className="text-blue-600 hover:bg-blue-100 rounded px-1"
                             >
-                              <Plus size={14} />
+                              +
                             </button>
                           </div>
                         </td>
-                        <td className="px-3 py-2 text-right">
-                          <input
-                            type="number"
-                            value={item.cost}
-                            onChange={(e) => handleCostChange(item.product, e.target.value)}
-                            className="w-20 px-2 py-1 border border-gray-300 rounded text-right text-xs"
-                            min="0"
-                            step="0.01"
-                          />
-                        </td>
-                        <td className="px-3 py-2 text-right font-medium">
-                          {(item.cost * item.quantity).toLocaleString('ru-RU')}                        </td>
-                        <td className="px-3 py-2">
-                          <button
-                            onClick={() => handleRemoveItem(item.product)}
-                            className="p-1 text-red-600 hover:bg-red-50 rounded"
-                          >
-                            <Trash2 size={14} />
-                          </button>
+                        <td className="px-2 py-1.5 text-right text-gray-500">
+                          {(product.cost || 0).toLocaleString('ru-RU')}
                         </td>
                       </tr>
-                    ))}
-                  </tbody>
-                  <tfoot className="bg-gray-50 border-t-2 border-gray-200">
-                    <tr>
-                      <td colSpan="4" className="px-3 py-2 text-right font-medium text-gray-700">
-                        Итого:
-                      </td>
-                      <td className="px-3 py-2 text-right font-bold text-gray-900">
-                        {totalAmount.toLocaleString('ru-RU')}                      </td>
-                      <td></td>
-                    </tr>
-                  </tfoot>
-                </table>
-              </div>
+                    );
+                  })}
+                </tbody>
+              </table>
             </div>
-          )}
+
+            {/* Пагинация */}
+            {totalPages > 1 && (
+              <div className="flex items-center justify-center gap-2 py-1.5 border-t border-gray-200 bg-gray-50 text-xs">
+                <button
+                  onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                  disabled={currentPage === 1}
+                  className="p-1 rounded hover:bg-gray-200 disabled:opacity-30"
+                >
+                  <ChevronLeft size={14} />
+                </button>
+                <span className="text-gray-600">{currentPage} / {totalPages}</span>
+                <button
+                  onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+                  disabled={currentPage === totalPages}
+                  className="p-1 rounded hover:bg-gray-200 disabled:opacity-30"
+                >
+                  <ChevronRight size={14} />
+                </button>
+              </div>
+            )}
+          </div>
         </div>
 
+        {/* Корзина - выбранные товары */}
+        {formData.items.length > 0 && (
+          <div className="border-t-2 border-blue-200 bg-blue-50/30 max-h-[30vh] overflow-y-auto">
+            <div className="px-3 py-1.5 text-xs font-medium text-blue-800 bg-blue-100/60 border-b border-blue-200 sticky top-0">
+              Выбрано: {formData.items.length} поз. / {totalItems} шт. / Итого: {totalAmount.toLocaleString('ru-RU')} ₽
+            </div>
+            <table className="w-full text-xs">
+              <thead className="bg-blue-50/50 sticky top-7">
+                <tr className="border-b border-blue-100">
+                  <th className="text-left px-3 py-1.5 font-medium text-gray-600">Товар</th>
+                  <th className="text-center px-2 py-1.5 font-medium text-gray-600 w-28">Кол-во</th>
+                  <th className="text-right px-2 py-1.5 font-medium text-gray-600 w-28">Цена закупа</th>
+                  <th className="text-right px-2 py-1.5 font-medium text-gray-600 w-24">Сумма</th>
+                  <th className="w-8 px-2 py-1.5"></th>
+                </tr>
+              </thead>
+              <tbody>
+                {formData.items.map(item => (
+                  <tr key={item.product} className="border-b border-blue-100/50 hover:bg-blue-50/50">
+                    <td className="px-3 py-1 text-gray-900">{item.name}</td>
+                    <td className="px-2 py-1">
+                      <div className="flex items-center justify-center gap-1">
+                        <button onClick={() => handleCartQuantityChange(item.product, -1)} className="text-blue-600 hover:bg-blue-100 rounded px-1">—</button>
+                        <span className="w-8 text-center font-medium">{item.quantity}</span>
+                        <button onClick={() => handleCartQuantityChange(item.product, 1)} className="text-blue-600 hover:bg-blue-100 rounded px-1">+</button>
+                      </div>
+                    </td>
+                    <td className="px-2 py-1 text-right">
+                      <input
+                        type="number"
+                        value={item.cost}
+                        onChange={e => handleCartCostChange(item.product, e.target.value)}
+                        className="w-20 px-1.5 py-0.5 border border-gray-300 rounded text-right text-xs focus:outline-none focus:ring-1 focus:ring-blue-500"
+                        min="0"
+                      />
+                    </td>
+                    <td className="px-2 py-1 text-right font-medium text-gray-900">{(item.cost * item.quantity).toLocaleString('ru-RU')}</td>
+                    <td className="px-2 py-1">
+                      <button onClick={() => handleRemoveItem(item.product)} className="p-0.5 text-red-500 hover:bg-red-50 rounded"><Trash2 size={12} /></button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+
+        {/* Ошибки */}
+        {(errors.supplier || errors.stores || errors.items) && (
+          <div className="px-4 py-1 bg-red-50 text-red-600 text-xs">
+            {errors.supplier || errors.stores || errors.items}
+          </div>
+        )}
+
         {/* Футер */}
-        <div className="flex items-center justify-end gap-2 p-4 border-t border-gray-200">
-          <button
-            onClick={onClose}
-            className="px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 rounded"
-          >
-            Отмена
-          </button>
-          <button
-            onClick={handleSubmit}
-            className="px-4 py-2 text-sm bg-blue-600 text-white rounded hover:bg-blue-700"
-          >
-            Создать приёмку
-          </button>
+        <div className="flex items-center justify-between px-4 py-3 border-t border-gray-200">
+          <div className="text-sm text-gray-500">
+            {formData.items.length > 0 && (
+              <span>Итого: <strong className="text-gray-900">{totalAmount.toLocaleString('ru-RU')} ₽</strong></span>
+            )}
+          </div>
+          <div className="flex items-center gap-2">
+            <button onClick={onClose} className="px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 rounded">Отмена</button>
+            <button onClick={handleSubmit} className="px-4 py-2 text-sm bg-blue-600 text-white rounded hover:bg-blue-700">Создать приёмку</button>
+          </div>
         </div>
       </div>
     </div>

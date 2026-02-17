@@ -198,6 +198,9 @@ export default function SalesDesktop() {
         case 'city': return sortDir==='asc' ? (a.city||'').localeCompare(b.city||'') : (b.city||'').localeCompare(a.city||'');
         case 'courier': return sortDir==='asc' ? (a.expand?.user?.name||'').localeCompare(b.expand?.user?.name||'') : (b.expand?.user?.name||'').localeCompare(a.expand?.user?.name||'');
         case 'items_count': aV=(a.items||[]).length; bV=(b.items||[]).length; break;
+        case 'order_number': return sortDir==='asc' ? (a.order_number||'').localeCompare(b.order_number||'') : (b.order_number||'').localeCompare(a.order_number||'');
+        case 'cost_total': aV=a.cost_total||0; bV=b.cost_total||0; break;
+        case 'profit': aV=a.profit||0; bV=b.profit||0; break;
         default: aV=0; bV=0;
       }
       return sortDir==='asc' ? aV-bV : bV-aV;
@@ -399,7 +402,7 @@ export default function SalesDesktop() {
             <div className="shrink-0 border-b px-6 py-4 flex justify-between items-start">
               <div>
                 <div className="flex items-center gap-2">
-                  <h3 className="text-lg font-semibold">Чек #{selectedOrder.id?.slice(-6)}</h3>
+                  <h3 className="text-lg font-semibold">Продажа {selectedOrder.order_number || `#${selectedOrder.id?.slice(-6)}`}</h3>
                   {selectedOrder.status === 'refund' && <span className="px-2 py-0.5 text-xs bg-blue-100 text-blue-700 rounded-lg font-medium">Возврат</span>}
                 </div>
                 <p className="text-sm text-gray-500">

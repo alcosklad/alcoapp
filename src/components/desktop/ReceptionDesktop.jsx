@@ -1,11 +1,10 @@
 import React, { useState, useEffect } from 'react';
-import { Search, ChevronUp, ChevronDown, ChevronRight, RefreshCw, Plus, Eye, X, Trash2, Minus, Zap } from 'lucide-react';
+import { Search, ChevronUp, ChevronDown, ChevronRight, RefreshCw, Plus, Eye, X, Trash2, Minus } from 'lucide-react';
 import { getReceptions, getSuppliers, getProducts, createReception, updateReception, deleteReception } from '../../lib/pocketbase';
 import pb from '../../lib/pocketbase';
 import { getOrFetch, invalidate } from '../../lib/cache';
 import { formatLocalDate } from '../../lib/dateUtils';
 import CreateReceptionModal from './CreateReceptionModal';
-import QuickReceptionPanel from './QuickReceptionPanel';
 
 export default function ReceptionDesktop() {
   const [receptions, setReceptions] = useState([]);
@@ -18,7 +17,6 @@ export default function ReceptionDesktop() {
   const [sortDir, setSortDir] = useState('desc');
   const [selectedReception, setSelectedReception] = useState(null);
   const [showCreateModal, setShowCreateModal] = useState(false);
-  const [showQuickMode, setShowQuickMode] = useState(false);
   const [editedItems, setEditedItems] = useState([]);
   const [hasChanges, setHasChanges] = useState(false);
   const [expandedStores, setExpandedStores] = useState({});
@@ -114,27 +112,6 @@ export default function ReceptionDesktop() {
     } finally {
       setLoading(false);
     }
-  };
-
-  const handleQuickReceptionCreate = async (items) => {
-    if (!selectedSupplier) {
-      alert('Выберите город для создания приёмки');
-      return;
-    }
-
-    if (items.length === 0) {
-      alert('Выберите хотя бы один товар');
-      return;
-    }
-
-    const receptionData = {
-      supplier: selectedSupplier,
-      items: items,
-      stores: []
-    };
-
-    await handleCreateReception(receptionData);
-    setShowQuickMode(false);
   };
 
   const handleDeleteReception = async (receptionId) => {
@@ -300,41 +277,19 @@ export default function ReceptionDesktop() {
         </button>
 
         {isAdmin && (
-          <>
-            <button
-              onClick={() => setShowQuickMode(!showQuickMode)}
-              className={`flex items-center gap-1 px-3 py-1 rounded text-xs ${
-                showQuickMode 
-                  ? 'bg-green-600 text-white hover:bg-green-700' 
-                  : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-              }`}
-              title="Быстрое создание приемки"
-            >
-              <Zap size={14} />
-              Быстрый режим
-            </button>
-            <button
-              onClick={() => setShowCreateModal(true)}
-              className="flex items-center gap-1 px-3 py-1 bg-blue-600 text-white rounded text-xs hover:bg-blue-700"
-            >
-              <Plus size={14} />
-              Создать приёмку
-            </button>
-          </>
+          <button
+            onClick={() => setShowCreateModal(true)}
+            className="flex items-center gap-1 px-3 py-1 bg-blue-600 text-white rounded text-xs hover:bg-blue-700"
+          >
+            <Plus size={14} />
+            Создать приёмку
+          </button>
         )}
 
         <span className="text-xs text-gray-500 ml-auto">
           Найдено: {filteredReceptions.length}
         </span>
       </div>
-
-      {/* Быстрое создание приемки */}
-      {showQuickMode && isAdmin && (
-        <QuickReceptionPanel 
-          onItemsSelected={handleQuickReceptionCreate}
-          selectedSupplier={selectedSupplier}
-        />
-      )}
 
       {/* Таблица */}
       <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
