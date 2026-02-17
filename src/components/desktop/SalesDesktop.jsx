@@ -1,12 +1,13 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { ShoppingCart, RussianRuble, TrendingUp, CreditCard, Banknote, Search, ChevronDown, ChevronUp, X, Eye, Trash2, RotateCcw, Wallet, Pencil, Check, Package } from 'lucide-react';
-import { getAllOrders, getUsers, deleteOrder, refundOrder, updateOrder } from '../../lib/pocketbase';
+import { RussianRuble, TrendingUp, CreditCard, Banknote, Search, ChevronDown, ChevronUp, X, Trash2, RotateCcw, Pencil, Check, Package } from 'lucide-react';
+import { getAllOrders, getUsers, deleteOrder, refundOrder, updateOrder, getProducts } from '../../lib/pocketbase';
 import pb from '../../lib/pocketbase';
 import { getOrFetch, invalidate } from '../../lib/cache';
 
 export default function SalesDesktop() {
   const [orders, setOrders] = useState([]);
   const [users, setUsers] = useState([]);
+  const [products, setProducts] = useState([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
 
@@ -58,12 +59,14 @@ export default function SalesDesktop() {
   const loadData = async () => {
     try {
       setLoading(true);
-      const [ordersData, usersData] = await Promise.all([
+      const [ordersData, usersData, productsData] = await Promise.all([
         getOrFetch('orders:all', () => getAllOrders(), 60000, (fresh) => setOrders(fresh)),
-        getOrFetch('users:all', () => getUsers(), 300000)
+        getOrFetch('users:all', () => getUsers(), 300000),
+        getOrFetch('products:all', () => getProducts(), 300000, (fresh) => setProducts(fresh))
       ]);
       setOrders(ordersData);
       setUsers(usersData);
+      setProducts(productsData || []);
     } catch (error) {
       console.error('Error loading sales data:', error);
     } finally {
@@ -167,6 +170,16 @@ export default function SalesDesktop() {
 
   const refundCount = useMemo(() => orders.filter(o => o.status === 'refund').length, [orders]);
 
+  const productCostMap = useMemo(() => {
+    const byId = {};
+    const byName = {};
+    (products || []).forEach(p => {
+      if (p.id && p.cost) byId[p.id] = p.cost;
+      if (p.name && p.cost) byName[p.name.toLowerCase()] = p.cost;
+    });
+    return { byId, byName };
+  }, [products]);
+
   const filteredOrders = useMemo(() => {
     let result = [...orders];
     if (filterStatus === 'active') result = result.filter(o => o.status !== 'refund');
@@ -247,7 +260,7 @@ export default function SalesDesktop() {
           <p className="text-xl font-bold text-gray-900">{fmtMoney(stats.totalSum)}</p>
         </div>
         <div className="bg-white rounded-xl shadow-sm p-4">
-          <div className="flex items-center gap-2 text-gray-500 mb-1"><ShoppingCart size={18} /><span className="text-sm">Продаж</span></div>
+          <div className="flex items-center gap-2 text-gray-500 mb-1"><Package size={18} /><span className="text-sm">Продаж</span></div>
           <p className="text-xl font-bold text-gray-900">{stats.totalCount}</p>
           <p className="text-xs text-gray-400">{stats.totalItems} товаров</p>
         </div>
@@ -329,29 +342,29 @@ export default function SalesDesktop() {
       {/* Table — grouped by sale */}
       <div className="bg-white rounded-xl shadow-sm overflow-hidden">
         <div className="overflow-x-auto">
-          <table className="w-full text-sm">
+          <table className="w-full text-xs whitespace-nowrap">
             <thead className="bg-gray-50 border-b">
               <tr>
-                <th className="px-4 py-2.5 text-left font-medium text-gray-600 cursor-pointer select-none" onClick={() => handleSort('order_number')}>
+                <th className="px-3 py-2 text-left font-medium text-gray-500 cursor-pointer select-none" onClick={() => handleSort('order_number')}>
                   <div className="flex items-center gap-1">Наименование <SI field="order_number" /></div>
                 </th>
-                <th className="px-3 py-2.5 text-center font-medium text-gray-600 w-16">Кол-во</th>
-                <th className="px-3 py-2.5 text-right font-medium text-gray-600 w-20">Цена</th>
-                <th className="px-3 py-2.5 text-right font-medium text-gray-600 w-20">Себест.</th>
-                <th className="px-3 py-2.5 text-right font-medium text-gray-600 w-24 cursor-pointer select-none" onClick={() => handleSort('total')}>
+                <th className="px-2 py-2 text-center font-medium text-gray-500 w-14">Кол-во</th>
+                <th className="px-2 py-2 text-right font-medium text-gray-500 w-16">Цена</th>
+                <th className="px-2 py-2 text-right font-medium text-gray-500 w-20">Себестоимость</th>
+                <th className="px-2 py-2 text-right font-medium text-gray-500 w-16 cursor-pointer select-none" onClick={() => handleSort('total')}>
                   <div className="flex items-center justify-end gap-1">Сумма <SI field="total" /></div>
                 </th>
-                <th className="px-3 py-2.5 text-right font-medium text-gray-600 w-24 cursor-pointer select-none" onClick={() => handleSort('cost_total')}>
-                  <div className="flex items-center justify-end gap-1">Σ себест. <SI field="cost_total" /></div>
+                <th className="px-2 py-2 text-right font-medium text-gray-500 w-24 cursor-pointer select-none" onClick={() => handleSort('cost_total')}>
+                  <div className="flex items-center justify-end gap-1">Сумма себест. <SI field="cost_total" /></div>
                 </th>
-                <th className="px-3 py-2.5 text-right font-medium text-gray-600 w-24 cursor-pointer select-none" onClick={() => handleSort('profit')}>
+                <th className="px-2 py-2 text-right font-medium text-gray-500 w-16 cursor-pointer select-none" onClick={() => handleSort('profit')}>
                   <div className="flex items-center justify-end gap-1">Прибыль <SI field="profit" /></div>
                 </th>
               </tr>
             </thead>
             <tbody>
               {filteredOrders.length === 0 ? (
-                <tr><td colSpan={7} className="px-4 py-12 text-center text-gray-400">Нет продаж за выбранный период</td></tr>
+                <tr><td colSpan={7} className="px-3 py-12 text-center text-gray-400">Нет продаж за выбранный период</td></tr>
               ) : filteredOrders.map(order => {
                 const isRef = order.status === 'refund';
                 const items = order.items || [];
@@ -362,76 +375,45 @@ export default function SalesDesktop() {
                       className={`border-t-2 border-gray-200 cursor-pointer hover:bg-gray-50 ${isRef ? 'bg-blue-50/30' : 'bg-gray-50/50'}`}
                       onDoubleClick={() => { setSelectedOrder(order); setEditingOrder(null); setRefundConfirm(false); }}
                     >
-                      <td className="px-4 py-2" colSpan={7}>
-                        <div className="flex items-center gap-3">
-                          <span className="font-semibold text-gray-900">{order.order_number || `#${order.id?.slice(-6)}`}</span>
-                          {isRef && <span className="px-1.5 py-0.5 text-[10px] bg-blue-100 text-blue-700 rounded font-medium">ВОЗВРАТ</span>}
-                          <span className={`inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded ${order.payment_method==='0'?'bg-green-50 text-green-600':order.payment_method==='1'?'bg-blue-50 text-blue-600':'bg-purple-50 text-purple-600'}`}>
+                      <td className="px-3 py-1.5" colSpan={7}>
+                        <div className="flex items-center gap-2">
+                          <span className="font-semibold text-gray-900 text-xs">{order.order_number || `#${order.id?.slice(-6)}`}</span>
+                          {isRef && <span className="px-1 py-0.5 text-[9px] bg-blue-100 text-blue-700 rounded font-medium">ВОЗВРАТ</span>}
+                          <span className={`text-[10px] px-1.5 py-0.5 rounded ${order.payment_method==='0'?'bg-green-50 text-green-600':order.payment_method==='1'?'bg-blue-50 text-blue-600':'bg-purple-50 text-purple-600'}`}>
                             {payLabel[order.payment_method] || '—'}
                           </span>
-                          <span className="text-xs text-gray-400 px-1.5 py-0.5 bg-gray-100 rounded">{order.city || '—'}</span>
-                          <span className="text-xs text-gray-400">{order.expand?.user?.name || ''}</span>
-                          {isAdmin && (
-                            <button onClick={e => { e.stopPropagation(); handleDeleteOrder(order); }} className="ml-auto p-1 hover:bg-red-50 rounded text-gray-300 hover:text-red-500" title="Удалить"><Trash2 size={13} /></button>
-                          )}
-                        </div>
-                        <div className="text-[11px] text-gray-400 mt-0.5">
-                          {fmtDate(order.created_date || order.created)} {fmtTime(order.created_date || order.created)}
-                          {order.edited_at && <span className="ml-2 text-amber-500">✎ ред. {fmtDate(order.edited_at)}</span>}
+                          <span className="text-[10px] text-gray-500">{order.city || '—'}</span>
+                          <span className="text-[10px] text-gray-400">
+                            {fmtDate(order.created_date || order.created)} {fmtTime(order.created_date || order.created)}
+                          </span>
+                          {order.edited_at && <span className="text-[10px] text-amber-500">ред. {fmtDate(order.edited_at)}</span>}
                         </div>
                       </td>
                     </tr>
                     {/* Item rows */}
                     {items.map((item, idx) => {
                       const itemPrice = item.price || 0;
-                      const itemCost = item.cost || 0;
+                      const itemCost = item.cost || productCostMap.byId[item.productId] || productCostMap.byName[(item.name||'').toLowerCase()] || 0;
                       const itemQty = item.quantity || 1;
                       const itemSum = itemPrice * itemQty;
                       const itemCostSum = itemCost * itemQty;
                       const itemProfit = itemPrice - itemCost;
                       return (
-                        <tr key={`${order.id}-${idx}`} className={`border-b border-gray-50 hover:bg-blue-50/30 group ${isRef ? 'opacity-60' : ''}`}>
-                          <td className="px-4 py-1.5 pl-8 relative">
-                            <span className={`text-sm ${isRef ? 'line-through text-gray-400' : 'text-gray-800'}`}>{item.name || 'Товар'}</span>
-                            {/* Tooltip on hover — reception info */}
-                            <div className="hidden group-hover:block absolute left-8 bottom-full mb-1 z-20 bg-gray-800 text-white text-[11px] rounded-lg px-3 py-2 shadow-lg whitespace-nowrap pointer-events-none">
-                              {item.batch_number ? (
-                                <>Партия: {item.batch_number}<br />Себест.: {fmtMoney(itemCost)} ₽</>
-                              ) : (
-                                'Нет данных о приёмке'
-                              )}
-                            </div>
+                        <tr key={`${order.id}-${idx}`} className={`border-b border-gray-50 hover:bg-blue-50/30 ${isRef ? 'opacity-60' : ''}`}>
+                          <td className="px-3 py-1 pl-6">
+                            <span className={`${isRef ? 'line-through text-gray-400' : 'text-gray-800'}`}>{item.name || 'Товар'}</span>
                           </td>
-                          <td className={`px-3 py-1.5 text-center text-sm ${isRef ? 'line-through text-gray-400' : 'text-gray-600'}`}>{itemQty}</td>
-                          <td className={`px-3 py-1.5 text-right text-sm ${isRef ? 'line-through text-gray-400' : 'text-gray-800'}`}>{fmtMoney(itemPrice)}</td>
-                          <td className={`px-3 py-1.5 text-right text-sm ${isRef ? 'line-through text-gray-400' : 'text-gray-500'}`}>{itemCost > 0 ? fmtMoney(itemCost) : '—'}</td>
-                          <td className={`px-3 py-1.5 text-right text-sm ${isRef ? 'line-through text-gray-400' : 'text-gray-800'}`}>{fmtMoney(itemSum)}</td>
-                          <td className={`px-3 py-1.5 text-right text-sm ${isRef ? 'line-through text-gray-400' : 'text-gray-500'}`}>{itemCost > 0 ? fmtMoney(itemCostSum) : '—'}</td>
-                          <td className={`px-3 py-1.5 text-right text-sm font-medium ${isRef ? 'line-through text-gray-400' : itemProfit > 0 ? 'text-green-600' : itemProfit < 0 ? 'text-red-600' : 'text-gray-400'}`}>
-                            {itemCost > 0 ? fmtMoney(itemProfit) : '—'}
+                          <td className={`px-2 py-1 text-center ${isRef ? 'line-through text-gray-400' : 'text-gray-600'}`}>{itemQty}</td>
+                          <td className={`px-2 py-1 text-right ${isRef ? 'line-through text-gray-400' : 'text-gray-800'}`}>{fmtMoney(itemPrice)}</td>
+                          <td className={`px-2 py-1 text-right ${isRef ? 'line-through text-gray-400' : 'text-gray-500'}`}>{fmtMoney(itemCost)}</td>
+                          <td className={`px-2 py-1 text-right ${isRef ? 'line-through text-gray-400' : 'text-gray-800'}`}>{fmtMoney(itemSum)}</td>
+                          <td className={`px-2 py-1 text-right ${isRef ? 'line-through text-gray-400' : 'text-gray-500'}`}>{fmtMoney(itemCostSum)}</td>
+                          <td className={`px-2 py-1 text-right font-medium ${isRef ? 'line-through text-gray-400' : itemProfit > 0 ? 'text-green-600' : itemProfit < 0 ? 'text-red-500' : 'text-gray-400'}`}>
+                            {fmtMoney(itemProfit)}
                           </td>
                         </tr>
                       );
                     })}
-                    {/* Total row */}
-                    {(() => {
-                      const totalQty = items.reduce((s,i) => s+(i.quantity||1), 0);
-                      const totalCostSum = items.reduce((s,i) => s + ((i.cost||0)*(i.quantity||1)), 0);
-                      const totalProfit = (order.total||0) - totalCostSum;
-                      return (
-                        <tr className={`border-b border-gray-200 ${isRef ? 'bg-blue-50/20' : 'bg-gray-50/30'}`}>
-                          <td className="px-4 py-1.5 pl-8 text-xs font-medium text-gray-500">Итого {order.order_number || ''}</td>
-                          <td className="px-3 py-1.5 text-center text-xs text-gray-500">{totalQty}</td>
-                          <td className="px-3 py-1.5"></td>
-                          <td className="px-3 py-1.5"></td>
-                          <td className={`px-3 py-1.5 text-right font-semibold ${isRef ? 'text-blue-500 line-through' : 'text-gray-900'}`}>{fmtMoney(order.total)}</td>
-                          <td className="px-3 py-1.5 text-right text-xs font-medium text-gray-500">{totalCostSum > 0 ? fmtMoney(totalCostSum) : '—'}</td>
-                          <td className={`px-3 py-1.5 text-right font-semibold ${isRef ? 'text-blue-500 line-through' : totalProfit > 0 ? 'text-green-600' : totalProfit < 0 ? 'text-red-600' : 'text-gray-500'}`}>
-                            {totalCostSum > 0 ? fmtMoney(totalProfit) : '—'}
-                          </td>
-                        </tr>
-                      );
-                    })()}
                   </React.Fragment>
                 );
               })}
