@@ -53,6 +53,15 @@ function App() {
     setLoading(false);
   }, []);
 
+  // Admin/operator на мобиле — переключаем на приёмку если текущий таб недоступен
+  const adminMobileTabs = ['reception', 'stock', 'pricelist'];
+  useEffect(() => {
+    const isDesktop = user?.role === 'admin' || user?.role === 'operator';
+    if (isDesktop && isMobile && !adminMobileTabs.includes(activeTab)) {
+      setActiveTab('reception');
+    }
+  }, [isMobile, activeTab, user]);
+
   const handleAuth = (userData) => {
     setUser(userData);
     // Если воркер или оператор, показываем остатки
@@ -79,14 +88,6 @@ function App() {
 
   const isWorker = user?.role === 'worker';
   const isDesktopUser = user?.role === 'admin' || user?.role === 'operator';
-
-  // Admin/operator на мобиле — упрощённый мобильный UI (приёмки, остатки, прайс)
-  const adminMobileTabs = ['reception', 'stock', 'pricelist'];
-  useEffect(() => {
-    if (isDesktopUser && isMobile && !adminMobileTabs.includes(activeTab)) {
-      setActiveTab('reception');
-    }
-  }, [isMobile, activeTab]);
 
   if (isDesktopUser && isMobile) {
     const mobileTab = adminMobileTabs.includes(activeTab) ? activeTab : 'reception';

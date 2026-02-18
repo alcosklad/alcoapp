@@ -28,18 +28,16 @@ const pb = new PocketBase(pbUrl);
 // Отключаем автоотмену запросов для мобильных устройств
 pb.autoCancellation(false);
 
-// Логируем URL всегда (для диагностики проблем на других устройствах)
-console.log('PocketBase: URL сервера:', pb.baseUrl);
-console.log('PocketBase: Протокол страницы:', window.location.protocol);
-console.log('PocketBase: Хост страницы:', window.location.host);
-
-// Детальное логирование только в dev режиме
+// Логирование только в dev режиме
 if (import.meta.env.DEV) {
+  console.log('PocketBase: URL сервера:', pb.baseUrl);
+  console.log('PocketBase: Протокол страницы:', window.location.protocol);
+  console.log('PocketBase: Хост страницы:', window.location.host);
+  console.log('PocketBase: Auth state:', pb.authStore.isValid);
   pb.beforeSend = function(url, options) {
     console.log('PocketBase Request:', url);
     return { url, options };
   };
-  console.log('PocketBase: Auth state:', pb.authStore.isValid);
 }
 
 // Функции для работы с поставщиками
