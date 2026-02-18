@@ -22,10 +22,21 @@ import pb from './lib/pocketbase';
 import { clearAll as clearCache, cleanInvalidCache } from './lib/cache';
 import ErrorBoundary from './components/ErrorBoundary';
 
+function useIsMobile(breakpoint = 768) {
+  const [isMobile, setIsMobile] = useState(() => window.innerWidth < breakpoint);
+  useEffect(() => {
+    const check = () => setIsMobile(window.innerWidth < breakpoint);
+    window.addEventListener('resize', check);
+    return () => window.removeEventListener('resize', check);
+  }, [breakpoint]);
+  return isMobile;
+}
+
 function App() {
   const [activeTab, setActiveTab] = useState('dashboard');
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
+  const isMobile = useIsMobile();
 
   useEffect(() => {
     // Clean up invalid cache entries on app init
@@ -68,6 +79,42 @@ function App() {
 
   const isWorker = user?.role === 'worker';
   const isDesktopUser = user?.role === 'admin' || user?.role === 'operator';
+
+  // Admin/operator на мобиле — упрощённый мобильный UI (приёмки, остатки, прайс)
+  if (isDesktopUser && isMobile) {
+    const mobileTab = activeTab;
+    const renderAdminMobile = () => {
+      switch (mobileTab) {
+        case 'reception': return <Reception onNavigate={setActiveTab} />;
+        case 'stock': return <Stock />;
+        case 'pricelist': return <PriceList />;
+        default: return <Reception onNavigate={setActiveTab} />;
+      }
+    };
+    // Если admin на мобиле и выбрана вкладка, которой нет в мобиле — переключаем на приёмку
+    if (!['reception', 'stock', 'pricelist'].includes(activeTab)) {
+      setActiveTab('reception');
+    }
+    return (
+      <div className="relative min-h-screen bg-[#F7F8FA]">
+        <header className="bg-white px-5 pt-3 pb-3 flex items-center justify-between shadow-sm sticky top-0 z-30">
+          <div>
+            <h1 className="text-lg font-bold text-gray-900">
+              {{ reception: 'Приёмки', stock: 'Остатки', pricelist: 'Прайс-лист' }[mobileTab] || 'Приёмки'}
+            </h1>
+            <p className="text-xs text-gray-400">{user?.name || 'Админ'} · моб. версия</p>
+          </div>
+          <button onClick={handleLogout} className="p-2 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-xl transition-colors" title="Выйти">
+            <span className="text-sm">Выйти</span>
+          </button>
+        </header>
+        <main className="pb-24">
+          {renderAdminMobile()}
+        </main>
+        <Navigation activeTab={activeTab} onTabChange={setActiveTab} userRole={user?.role} />
+      </div>
+    );
+  }
 
   // Desktop версия для админа и оператора
   if (isDesktopUser) {
