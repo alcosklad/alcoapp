@@ -1,6 +1,8 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { X, Plus, Minus, Trash2, Search, Star, ChevronLeft, ChevronRight } from 'lucide-react';
-import { getFavorites, addToFavorites, removeFromFavorites } from '../../lib/pocketbase';
+import { X, Plus, Minus, Trash2, Search, Star, ChevronLeft, ChevronRight, PlusCircle } from 'lucide-react';
+import { getFavorites, addToFavorites, removeFromFavorites, createProduct } from '../../lib/pocketbase';
+import { CATEGORY_ORDER, ALL_SUBCATEGORIES, detectSubcategory } from '../../lib/subcategories';
+import { invalidate } from '../../lib/cache';
 
 const ITEMS_PER_PAGE = 15;
 
@@ -37,6 +39,12 @@ export default function CreateReceptionModal({
   const [currentPage, setCurrentPage] = useState(1);
   const [errors, setErrors] = useState({});
 
+  // Создание нового товара
+  const [showCreateProduct, setShowCreateProduct] = useState(false);
+  const [createForm, setCreateForm] = useState({ name: '', category: '', subcategory: '', cost: 0, price: 0 });
+  const [createSaving, setCreateSaving] = useState(false);
+  const [createError, setCreateError] = useState('');
+
   useEffect(() => {
     if (isOpen) {
       loadFavorites();
@@ -58,14 +66,16 @@ export default function CreateReceptionModal({
 
   const favoriteIds = useMemo(() => new Set(favorites.map(f => f.product)), [favorites]);
 
-  // Категории из товаров
+  // Категории из товаров — в порядке CATEGORY_ORDER
   const categories = useMemo(() => {
     const cats = new Set();
     products.forEach(p => {
       const c = Array.isArray(p?.category) ? p.category[0] : p?.category;
       if (c) cats.add(c);
     });
-    return ['Избранное', ...Array.from(cats).sort()];
+    const ordered = CATEGORY_ORDER.filter(c => cats.has(c));
+    cats.forEach(c => { if (!ordered.includes(c)) ordered.push(c); });
+    return ['Избранное', ...ordered];
   }, [products]);
 
   // Товары текущей категории
@@ -219,6 +229,44 @@ export default function CreateReceptionModal({
     }));
   };
 
+  const handleCreateProduct = async () => {
+    if (!createForm.name.trim()) { setCreateError('Введите название'); return; }
+    if (!createForm.category) { setCreateError('Выберите категорию'); return; }
+    setCreateSaving(true);
+    setCreateError('');
+    try {
+      const sub = createForm.subcategory || detectSubcategory(createForm.name);
+      const cityName = suppliers.find(s => s.id === formData.supplier)?.name || '';
+      const newProduct = await createProduct({
+        name: createForm.name.trim(),
+        category: [createForm.category],
+        subcategory: sub,
+        cost: Number(createForm.cost) || 0,
+        price: Number(createForm.price) || 0,
+        cities: cityName ? [cityName] : [],
+      });
+      invalidate('products');
+      // Добавляем в корзину приёмки
+      setFormData(prev => ({
+        ...prev,
+        items: [...prev.items, {
+          product: newProduct.id,
+          name: newProduct.name,
+          article: newProduct.article || '',
+          quantity: 1,
+          cost: Number(createForm.cost) || 0,
+        }]
+      }));
+      setShowCreateProduct(false);
+      setCreateForm({ name: '', category: '', subcategory: '', cost: 0, price: 0 });
+    } catch (err) {
+      console.error('Error creating product:', err);
+      setCreateError('Ошибка: ' + (err?.message || ''));
+    } finally {
+      setCreateSaving(false);
+    }
+  };
+
   const validateForm = () => {
     const newErrors = {};
     if (!formData.supplier) newErrors.supplier = 'Выберите город';
@@ -293,17 +341,76 @@ export default function CreateReceptionModal({
               );
             })}
           </div>
-          <div className="relative ml-auto">
-            <Search size={13} className="absolute left-2 top-1/2 -translate-y-1/2 text-gray-400" />
-            <input
-              type="text"
-              placeholder="Поиск товара..."
-              value={searchQuery}
-              onChange={e => setSearchQuery(e.target.value)}
-              className="pl-7 pr-2 py-1 border border-gray-300 rounded text-xs w-48 focus:outline-none focus:ring-1 focus:ring-blue-500"
-            />
+          <div className="relative ml-auto flex items-center gap-2">
+            <div className="relative">
+              <Search size={13} className="absolute left-2 top-1/2 -translate-y-1/2 text-gray-400" />
+              <input
+                type="text"
+                placeholder="Поиск товара..."
+                value={searchQuery}
+                onChange={e => setSearchQuery(e.target.value)}
+                className="pl-7 pr-2 py-1 border border-gray-300 rounded text-xs w-48 focus:outline-none focus:ring-1 focus:ring-blue-500"
+              />
+            </div>
+            <button
+              onClick={() => { setShowCreateProduct(v => !v); setCreateError(''); }}
+              className={`flex items-center gap-1 px-2 py-1 rounded text-xs transition-colors ${showCreateProduct ? 'bg-green-100 text-green-700' : 'bg-green-600 text-white hover:bg-green-700'}`}
+            >
+              <PlusCircle size={13} /> Создать
+            </button>
           </div>
         </div>
+
+        {/* Форма создания нового товара */}
+        {showCreateProduct && (
+          <div className="px-4 py-2 border-b border-green-200 bg-green-50/50">
+            <div className="flex items-center gap-2 flex-wrap">
+              <input
+                type="text" placeholder="Название товара *"
+                value={createForm.name}
+                onChange={e => setCreateForm(f => ({ ...f, name: e.target.value }))}
+                className="flex-1 min-w-[200px] px-2 py-1 border border-gray-300 rounded text-xs focus:outline-none focus:ring-1 focus:ring-green-500"
+              />
+              <select
+                value={createForm.category}
+                onChange={e => setCreateForm(f => ({ ...f, category: e.target.value }))}
+                className="px-2 py-1 border border-gray-300 rounded text-xs focus:outline-none focus:ring-1 focus:ring-green-500"
+              >
+                <option value="">Категория *</option>
+                {CATEGORY_ORDER.map(c => <option key={c} value={c}>{c}</option>)}
+              </select>
+              <select
+                value={createForm.subcategory}
+                onChange={e => setCreateForm(f => ({ ...f, subcategory: e.target.value }))}
+                className="px-2 py-1 border border-gray-300 rounded text-xs focus:outline-none focus:ring-1 focus:ring-green-500"
+              >
+                <option value="">Подкат. (авто)</option>
+                {ALL_SUBCATEGORIES.map(s => <option key={s} value={s}>{s}</option>)}
+              </select>
+              <input
+                type="number" placeholder="Закуп"
+                value={createForm.cost || ''}
+                onChange={e => setCreateForm(f => ({ ...f, cost: e.target.value }))}
+                className="w-20 px-2 py-1 border border-gray-300 rounded text-xs focus:outline-none focus:ring-1 focus:ring-green-500"
+              />
+              <input
+                type="number" placeholder="Продажа"
+                value={createForm.price || ''}
+                onChange={e => setCreateForm(f => ({ ...f, price: e.target.value }))}
+                className="w-20 px-2 py-1 border border-gray-300 rounded text-xs focus:outline-none focus:ring-1 focus:ring-green-500"
+              />
+              <button
+                onClick={handleCreateProduct}
+                disabled={createSaving}
+                className="flex items-center gap-1 px-3 py-1 bg-green-600 text-white rounded text-xs hover:bg-green-700 disabled:opacity-50"
+              >
+                {createSaving ? '...' : 'Создать и добавить'}
+              </button>
+              <button onClick={() => setShowCreateProduct(false)} className="p-1 text-gray-400 hover:text-gray-600"><X size={14} /></button>
+            </div>
+            {createError && <p className="text-xs text-red-500 mt-1">{createError}</p>}
+          </div>
+        )}
 
         {/* Основная область: категории + таблица */}
         <div className="flex-1 flex overflow-hidden">

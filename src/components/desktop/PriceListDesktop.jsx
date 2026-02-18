@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { Search, ChevronUp, ChevronDown, RefreshCw, X, Plus, Check, Trash2, Copy, Merge, Filter, SlidersHorizontal } from 'lucide-react';
+import { Search, ChevronUp, ChevronDown, RefreshCw, X, Plus, Check, Trash2, Copy, Merge, Filter, SlidersHorizontal, CheckSquare, Square } from 'lucide-react';
 import { getProducts, updateProduct, createProduct, deleteProduct, getStocksForProduct, mergeProducts, getStocksWithDetails } from '../../lib/pocketbase';
 import { detectSubcategory, ALL_SUBCATEGORIES, CATEGORY_ORDER, SUBCATEGORIES_BY_CATEGORY } from '../../lib/subcategories';
 import pb from '../../lib/pocketbase';
@@ -33,6 +33,11 @@ export default function PriceListDesktop() {
   const [duplicates, setDuplicates] = useState([]);
   const [showDuplicates, setShowDuplicates] = useState(false);
   const [merging, setMerging] = useState(false);
+
+  // Мультивыбор
+  const [selectMode, setSelectMode] = useState(false);
+  const [selectedIds, setSelectedIds] = useState(new Set());
+  const [batchProcessing, setBatchProcessing] = useState(false);
 
   const userRole = pb.authStore.model?.role;
   const canEdit = userRole === 'admin';
@@ -405,6 +410,76 @@ export default function PriceListDesktop() {
     return sortDir === 'asc' ? <ChevronUp size={14} /> : <ChevronDown size={14} />;
   };
 
+  const toggleSelectMode = () => {
+    setSelectMode(v => !v);
+    setSelectedIds(new Set());
+  };
+
+  const toggleSelect = (id) => {
+    setSelectedIds(prev => {
+      const next = new Set(prev);
+      next.has(id) ? next.delete(id) : next.add(id);
+      return next;
+    });
+  };
+
+  const toggleSelectAll = () => {
+    if (selectedIds.size === filteredProducts.length) {
+      setSelectedIds(new Set());
+    } else {
+      setSelectedIds(new Set(filteredProducts.map(p => p.id)));
+    }
+  };
+
+  const handleBatchDelete = async () => {
+    if (selectedIds.size === 0) return;
+    if (!window.confirm(`Удалить ${selectedIds.size} товаров? Это действие необратимо.`)) return;
+    setBatchProcessing(true);
+    let ok = 0, fail = 0;
+    for (const id of selectedIds) {
+      try {
+        const stockRecords = await getStocksForProduct(id);
+        if (stockRecords?.length) {
+          for (const sr of stockRecords) {
+            try { await pb.collection('stocks').delete(sr.id); } catch {}
+          }
+        }
+        await deleteProduct(id);
+        ok++;
+      } catch { fail++; }
+    }
+    setBatchProcessing(false);
+    setSelectedIds(new Set());
+    invalidate('products');
+    invalidate('stocks');
+    loadProducts();
+    alert(`Удалено: ${ok}${fail ? `, ошибок: ${fail}` : ''}`);
+  };
+
+  const handleBatchMerge = async () => {
+    if (selectedIds.size < 2) { alert('Выберите минимум 2 товара для объединения'); return; }
+    const ids = [...selectedIds];
+    const main = products.find(p => p.id === ids[0]);
+    const others = ids.slice(1).map(id => products.find(p => p.id === id)).filter(Boolean);
+    if (!main || others.length === 0) return;
+    const names = others.map(p => p.name).join(', ');
+    if (!window.confirm(`Объединить ${others.length} товаров в "${main.name}"?\n\nБудут объединены: ${names}`)) return;
+    setBatchProcessing(true);
+    let ok = 0, fail = 0;
+    for (const other of others) {
+      try {
+        await mergeProducts(main.id, other.id);
+        ok++;
+      } catch { fail++; }
+    }
+    setBatchProcessing(false);
+    setSelectedIds(new Set());
+    invalidate('products');
+    invalidate('stocks');
+    loadProducts();
+    alert(`Объединено: ${ok}${fail ? `, ошибок: ${fail}` : ''}`);
+  };
+
   return (
     <div className="space-y-4">
       {/* Панель фильтров */}
@@ -454,6 +529,16 @@ export default function PriceListDesktop() {
         </button>
 
         {canEdit && (
+          <button
+            onClick={toggleSelectMode}
+            className={`p-1.5 rounded transition-colors ${selectMode ? 'bg-blue-100 text-blue-700' : 'text-gray-500 hover:text-gray-700 hover:bg-gray-100'}`}
+            title={selectMode ? 'Выйти из режима выбора' : 'Выбрать несколько'}
+          >
+            <CheckSquare size={18} />
+          </button>
+        )}
+
+        {canEdit && (
           <button onClick={openCreateModal}
             className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-600 text-white rounded text-sm hover:bg-blue-700 transition-colors">
             <Plus size={16} /> Добавить товар
@@ -462,6 +547,36 @@ export default function PriceListDesktop() {
 
         <span className="text-sm text-gray-500 ml-auto">Найдено: {filteredProducts.length}</span>
       </div>
+
+      {/* Панель массовых действий */}
+      {selectMode && selectedIds.size > 0 && (
+        <div className="flex items-center gap-3 px-4 py-2 bg-blue-50 border border-blue-200 rounded-lg">
+          <span className="text-sm font-medium text-blue-800">Выбрано: {selectedIds.size}</span>
+          <div className="flex items-center gap-2 ml-auto">
+            <button
+              onClick={handleBatchMerge}
+              disabled={batchProcessing || selectedIds.size < 2}
+              className="flex items-center gap-1.5 px-3 py-1.5 text-xs bg-white border border-blue-300 text-blue-700 rounded hover:bg-blue-100 transition-colors disabled:opacity-40"
+            >
+              <Merge size={14} /> Объединить
+            </button>
+            <button
+              onClick={handleBatchDelete}
+              disabled={batchProcessing}
+              className="flex items-center gap-1.5 px-3 py-1.5 text-xs bg-red-600 text-white rounded hover:bg-red-700 transition-colors disabled:opacity-40"
+            >
+              <Trash2 size={14} /> Удалить
+            </button>
+            <button
+              onClick={() => setSelectedIds(new Set())}
+              className="p-1.5 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded"
+              title="Снять выбор"
+            >
+              <X size={16} />
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Панель фильтров (анимированная) */}
       <div
@@ -553,6 +668,13 @@ export default function PriceListDesktop() {
           <table className="w-full text-xs">
             <thead>
               <tr className="bg-gray-50 border-b border-gray-200">
+                {selectMode && (
+                  <th className="w-8 px-2 py-2 text-center">
+                    <button onClick={toggleSelectAll} className="text-gray-400 hover:text-blue-600">
+                      {selectedIds.size === filteredProducts.length && filteredProducts.length > 0 ? <CheckSquare size={15} className="text-blue-600" /> : <Square size={15} />}
+                    </button>
+                  </th>
+                )}
                 <th className="text-left px-2 py-2 font-medium text-gray-600 cursor-pointer hover:bg-gray-100 w-[70px] max-w-[70px]" onClick={() => handleSort('article')}>
                   <div className="flex items-center gap-1">Арт. <SortIcon field="article" /></div>
                 </th>
@@ -573,13 +695,13 @@ export default function PriceListDesktop() {
             <tbody>
               {loading ? (
                 <tr>
-                  <td colSpan={5} className="px-4 py-8 text-center text-gray-500">
+                  <td colSpan={selectMode ? 6 : 5} className="px-4 py-8 text-center text-gray-500">
                     <div className="flex items-center justify-center gap-2"><RefreshCw size={16} className="animate-spin" /> Загрузка...</div>
                   </td>
                 </tr>
               ) : filteredProducts.length === 0 ? (
                 <tr>
-                  <td colSpan={5} className="px-4 py-8 text-center text-gray-500">
+                  <td colSpan={selectMode ? 6 : 5} className="px-4 py-8 text-center text-gray-500">
                     {searchQuery ? 'Ничего не найдено' : 'Нет данных'}
                   </td>
                 </tr>
@@ -600,19 +722,25 @@ export default function PriceListDesktop() {
                     <React.Fragment key={product.id}>
                       {showCategoryHeader && category && (
                         <tr className="bg-blue-50 border-y border-blue-200">
-                          <td colSpan={5} className="px-3 py-1.5 font-semibold text-blue-800 text-xs sticky top-0">{category}</td>
+                          <td colSpan={selectMode ? 6 : 5} className="px-3 py-1.5 font-semibold text-blue-800 text-xs sticky top-0">{category}</td>
                         </tr>
                       )}
                       {showSubcategoryHeader && subcategory && (
                         <tr className="bg-indigo-50/60 border-y border-indigo-100">
-                          <td colSpan={5} className="px-6 py-1.5 font-semibold text-indigo-700 text-xs border-l-[3px] border-indigo-400">{subcategory}</td>
+                          <td colSpan={selectMode ? 6 : 5} className="px-6 py-1.5 font-semibold text-indigo-700 text-xs border-l-[3px] border-indigo-400">{subcategory}</td>
                         </tr>
                       )}
                     <tr
-                      className="border-b border-gray-100 hover:bg-gray-50 cursor-pointer"
-                      onDoubleClick={() => canEdit && openEditModal(product)}
-                      title={canEdit ? 'Двойной клик для редактирования' : ''}
+                      className={`border-b border-gray-100 hover:bg-gray-50 cursor-pointer ${selectMode && selectedIds.has(product.id) ? 'bg-blue-50' : ''}`}
+                      onClick={() => selectMode && toggleSelect(product.id)}
+                      onDoubleClick={() => !selectMode && canEdit && openEditModal(product)}
+                      title={selectMode ? 'Клик для выбора' : canEdit ? 'Двойной клик для редактирования' : ''}
                     >
+                      {selectMode && (
+                        <td className="w-8 px-2 py-1.5 text-center">
+                          {selectedIds.has(product.id) ? <CheckSquare size={15} className="text-blue-600" /> : <Square size={15} className="text-gray-300" />}
+                        </td>
+                      )}
                       <td className="px-2 py-1.5 font-mono text-xs text-gray-500 w-[70px] max-w-[70px] truncate">{product.article || '—'}</td>
                       <td className="px-3 py-1.5">{product.name || 'Без названия'}</td>
                       <td className="px-3 py-1.5 text-gray-600">{category || '—'}</td>

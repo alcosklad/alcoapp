@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { Search, ChevronUp, ChevronDown, RefreshCw, MapPin, X, Plus, Trash2, Check, Calendar, Clock, FileX, RotateCcw } from 'lucide-react';
+import { Search, ChevronUp, ChevronDown, RefreshCw, MapPin, X, Plus, Trash2, Check, Calendar, Clock, FileX, RotateCcw, CheckSquare, Square, Merge } from 'lucide-react';
 import { getStocksAggregated, getSuppliers, getProducts, updateProduct, createStockRecord, deleteStockRecord, updateStockRecord, getReceptionHistoryForProduct, getWriteOffs, createWriteOff } from '../../lib/pocketbase';
-import { detectSubcategory, ALL_SUBCATEGORIES } from '../../lib/subcategories';
+import { detectSubcategory, ALL_SUBCATEGORIES, CATEGORY_ORDER } from '../../lib/subcategories';
 import pb from '../../lib/pocketbase';
 import { getOrFetch, invalidate } from '../../lib/cache';
 
@@ -44,6 +44,11 @@ export default function StockDesktop() {
   const [showWriteOffModal, setShowWriteOffModal] = useState(false);
   const [writeOffForm, setWriteOffForm] = useState({ quantity: 1, reason: '' });
   const [writeOffSaving, setWriteOffSaving] = useState(false);
+
+  // Мультивыбор
+  const [selectMode, setSelectMode] = useState(false);
+  const [selectedIds, setSelectedIds] = useState(new Set());
+  const [batchProcessing, setBatchProcessing] = useState(false);
 
   const userRole = pb.authStore.model?.role;
   const isAdmin = userRole === 'admin';
@@ -466,6 +471,117 @@ export default function StockDesktop() {
     return sortDir === 'asc' ? <ChevronUp size={14} /> : <ChevronDown size={14} />;
   };
 
+  const toggleSelectMode = () => {
+    setSelectMode(v => !v);
+    setSelectedIds(new Set());
+  };
+
+  const toggleSelect = (id) => {
+    setSelectedIds(prev => {
+      const next = new Set(prev);
+      next.has(id) ? next.delete(id) : next.add(id);
+      return next;
+    });
+  };
+
+  const toggleSelectAll = () => {
+    if (selectedIds.size === paginatedStocks.length) {
+      setSelectedIds(new Set());
+    } else {
+      setSelectedIds(new Set(paginatedStocks.map(s => s.id)));
+    }
+  };
+
+  const handleBatchDelete = async () => {
+    if (selectedIds.size === 0) return;
+    if (!window.confirm(`Удалить остатки для ${selectedIds.size} товаров?`)) return;
+    setBatchProcessing(true);
+    let ok = 0, fail = 0;
+    for (const stockId of selectedIds) {
+      const stock = stocks.find(s => s.id === stockId);
+      if (!stock) continue;
+      try {
+        if (stock._stockRecordIds?.length) {
+          for (const rid of stock._stockRecordIds) {
+            try { await deleteStockRecord(rid); } catch {}
+          }
+        } else {
+          await deleteStockRecord(stockId);
+        }
+        ok++;
+      } catch { fail++; }
+    }
+    setBatchProcessing(false);
+    setSelectedIds(new Set());
+    invalidate('stocks');
+    loadStocks();
+    alert(`Удалено: ${ok}${fail ? `, ошибок: ${fail}` : ''}`);
+  };
+
+  const handleBatchWriteOff = async () => {
+    if (selectedIds.size === 0) return;
+    const reason = window.prompt(`Причина списания для ${selectedIds.size} товаров:`);
+    if (reason === null) return;
+    setBatchProcessing(true);
+    let ok = 0, fail = 0;
+    const supplierId = selectedSupplier || '';
+    const cityName = suppliers.find(s => s.id === supplierId)?.name || '';
+    for (const stockId of selectedIds) {
+      const stock = stocks.find(s => s.id === stockId);
+      if (!stock) continue;
+      const product = getProduct(stock);
+      try {
+        await createWriteOff({
+          product: product.id,
+          supplier: supplierId || (stock._cityBreakdown?.[0]?.supplierId) || '',
+          quantity: stock.quantity || 1,
+          reason: reason || '',
+          cost_per_unit: stock.cost || product.cost || 0,
+          product_name: product.name,
+          city: cityName || (stock._cityBreakdown?.[0]?.supplierName) || ''
+        });
+        ok++;
+      } catch { fail++; }
+    }
+    setBatchProcessing(false);
+    setSelectedIds(new Set());
+    invalidate('stocks');
+    invalidate('writeoffs');
+    loadStocks();
+    if (activeTab === 'writeoffs') loadWriteOffs();
+    alert(`Списано: ${ok}${fail ? `, ошибок: ${fail}` : ''}`);
+  };
+
+  const handleBatchMerge = async () => {
+    if (selectedIds.size < 2) { alert('Выберите минимум 2 товара для объединения'); return; }
+    const ids = [...selectedIds];
+    const mainStock = stocks.find(s => s.id === ids[0]);
+    const mainProduct = getProduct(mainStock);
+    const others = ids.slice(1).map(id => {
+      const s = stocks.find(st => st.id === id);
+      return s ? getProduct(s) : null;
+    }).filter(Boolean);
+    if (!mainProduct || others.length === 0) return;
+    const { mergeProducts } = await import('../../lib/pocketbase');
+    const names = others.map(p => p.name).join(', ');
+    if (!window.confirm(`Объединить ${others.length} товаров в "${mainProduct.name}"?\n\nБудут объединены: ${names}`)) return;
+    setBatchProcessing(true);
+    let ok = 0, fail = 0;
+    for (const other of others) {
+      try {
+        await mergeProducts(mainProduct.id, other.id);
+        ok++;
+      } catch { fail++; }
+    }
+    setBatchProcessing(false);
+    setSelectedIds(new Set());
+    invalidate('products');
+    invalidate('stocks');
+    loadStocks();
+    loadAllProducts();
+    alert(`Объединено: ${ok}${fail ? `, ошибок: ${fail}` : ''}`);
+  };
+
   // Пагинация
   const totalPages = Math.ceil(filteredStocks.length / ITEMS_PER_PAGE);
   const paginatedStocks = filteredStocks.slice((currentPage - 1) * ITEMS_PER_PAGE, currentPage * ITEMS_PER_PAGE);
@@ -486,7 +602,7 @@ export default function StockDesktop() {
   }, 0);
   const totalMargin = totalSaleValue - totalCostValue;
 
-  const colCount = isAdmin ? 9 : 6;
+  const colCount = (isAdmin ? 9 : 6) + (selectMode ? 1 : 0);
 
   return (
     <div className="space-y-4">
@@ -562,6 +678,16 @@ export default function StockDesktop() {
 
         {isAdmin && (
           <button
+            onClick={toggleSelectMode}
+            className={`p-1 rounded transition-colors ${selectMode ? 'bg-blue-100 text-blue-700' : 'text-gray-500 hover:text-gray-700 hover:bg-gray-100'}`}
+            title={selectMode ? 'Выйти из режима выбора' : 'Выбрать несколько'}
+          >
+            <CheckSquare size={16} />
+          </button>
+        )}
+
+        {isAdmin && (
+          <button
             onClick={openCreateModal}
             className="flex items-center gap-1.5 px-3 py-1 bg-blue-600 text-white rounded text-xs hover:bg-blue-700 transition-colors"
           >
@@ -575,12 +701,56 @@ export default function StockDesktop() {
         </span>
       </div>
 
+      {/* Панель массовых действий */}
+      {selectMode && selectedIds.size > 0 && (
+        <div className="flex items-center gap-3 px-4 py-2 bg-blue-50 border border-blue-200 rounded-lg">
+          <span className="text-xs font-medium text-blue-800">Выбрано: {selectedIds.size}</span>
+          <div className="flex items-center gap-2 ml-auto">
+            <button
+              onClick={handleBatchWriteOff}
+              disabled={batchProcessing}
+              className="flex items-center gap-1.5 px-3 py-1.5 text-xs bg-white border border-orange-300 text-orange-700 rounded hover:bg-orange-50 transition-colors disabled:opacity-40"
+            >
+              <FileX size={14} /> Списать
+            </button>
+            <button
+              onClick={handleBatchMerge}
+              disabled={batchProcessing || selectedIds.size < 2}
+              className="flex items-center gap-1.5 px-3 py-1.5 text-xs bg-white border border-blue-300 text-blue-700 rounded hover:bg-blue-100 transition-colors disabled:opacity-40"
+            >
+              <Merge size={14} /> Объединить
+            </button>
+            <button
+              onClick={handleBatchDelete}
+              disabled={batchProcessing}
+              className="flex items-center gap-1.5 px-3 py-1.5 text-xs bg-red-600 text-white rounded hover:bg-red-700 transition-colors disabled:opacity-40"
+            >
+              <Trash2 size={14} /> Удалить
+            </button>
+            <button
+              onClick={() => setSelectedIds(new Set())}
+              className="p-1.5 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded"
+              title="Снять выбор"
+            >
+              <X size={14} />
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* Таблица */}
       <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full text-xs">
             <thead>
               <tr className="bg-gray-50 border-b border-gray-200">
+                {selectMode && (
+                  <th className="w-8 px-2 py-2 text-center">
+                    <button onClick={toggleSelectAll} className="text-gray-400 hover:text-blue-600">
+                      {selectedIds.size === paginatedStocks.length && paginatedStocks.length > 0 ? <CheckSquare size={15} className="text-blue-600" /> : <Square size={15} />}
+                    </button>
+                  </th>
+                )}
                 <th className="text-left px-2 py-2 font-medium text-gray-600 cursor-pointer hover:bg-gray-100 w-[70px] max-w-[70px]" onClick={() => handleSort('article')}>
                   <div className="flex items-center gap-1">Арт. <SortIcon field="article" /></div>
                 </th>
@@ -662,10 +832,16 @@ export default function StockDesktop() {
                             </tr>
                           )}
                           <tr
-                            className="border-b border-gray-100 hover:bg-gray-50 cursor-pointer"
-                            onDoubleClick={() => isAdmin && openEditModal(stock)}
-                            title={isAdmin ? 'Двойной клик для редактирования' : ''}
+                            className={`border-b border-gray-100 hover:bg-gray-50 cursor-pointer ${selectMode && selectedIds.has(stock.id) ? 'bg-blue-50' : ''}`}
+                            onClick={() => selectMode && toggleSelect(stock.id)}
+                            onDoubleClick={() => !selectMode && isAdmin && openEditModal(stock)}
+                            title={selectMode ? 'Клик для выбора' : isAdmin ? 'Двойной клик для редактирования' : ''}
                           >
+                            {selectMode && (
+                              <td className="w-8 px-2 py-1.5 text-center">
+                                {selectedIds.has(stock.id) ? <CheckSquare size={15} className="text-blue-600" /> : <Square size={15} className="text-gray-300" />}
+                              </td>
+                            )}
                             <td className="px-2 py-1.5 font-mono text-xs text-gray-500 w-[70px] max-w-[70px] truncate">{product.article || '—'}</td>
                             <td className="px-3 py-1.5">{product.name || 'Без названия'}</td>
                             <td className="px-2 py-1.5 text-gray-500 text-xs">{subcategory || '—'}</td>
