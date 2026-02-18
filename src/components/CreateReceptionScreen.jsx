@@ -280,9 +280,6 @@ export default function CreateReceptionScreen({ onBack, onContinue }) {
                     >
                       <div className="text-left">
                         <p className="font-medium text-gray-900">{product?.name || 'Товар'}</p>
-                        {product?.article && (
-                          <p className="text-sm text-gray-500">Арт. {product.article}</p>
-                        )}
                       </div>
                       {product?.price && (
                         <p className="text-sm font-semibold text-blue-600">

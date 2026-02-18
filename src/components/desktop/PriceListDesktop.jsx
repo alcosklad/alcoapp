@@ -235,19 +235,13 @@ export default function PriceListDesktop() {
       };
       // Авто-генерация артикула для нового товара или если артикул пустой
       if (!modalProduct || !modalProduct.article || modalProduct.article.trim() === '' || modalProduct.article === '-') {
-        // Находим максимальный числовой артикул среди всех товаров (формат VIN-XXXX)
         const maxArt = products.reduce((max, p) => {
-          if (!p.article || p.article === '-') return max;
-          // Извлекаем число из VIN-XXXX или просто XXXX
-          let num = 0;
-          if (p.article.startsWith('VIN-')) {
-            num = parseInt(p.article.substring(4), 10);
-          } else {
-            num = parseInt(p.article, 10);
-          }
-          return !isNaN(num) && num > max ? num : max;
+          if (!p.article) return max;
+          const m = p.article.match(/ALC-(\d+)/); 
+          const num = m ? parseInt(m[1], 10) : 0;
+          return num > max ? num : max;
         }, 0);
-        data.article = `VIN-${String(maxArt + 1).padStart(4, '0')}`;
+        data.article = `ALC-${String(maxArt + 1).padStart(4, '0')}`;
       }
       if (modalProduct) {
         await updateProduct(modalProduct.id, data);
@@ -347,9 +341,8 @@ export default function PriceListDesktop() {
   const filteredProducts = products
     .filter(product => {
       const name = product?.name || '';
-      const article = product?.article || '';
       const query = searchQuery.toLowerCase();
-      const matchesSearch = name.toLowerCase().includes(query) || article.toLowerCase().includes(query);
+      const matchesSearch = name.toLowerCase().includes(query);
 
       if (selectedCityName) {
         const cities = product?.cities || [];
@@ -393,7 +386,6 @@ export default function PriceListDesktop() {
       let aVal, bVal;
       switch (sortField) {
         case 'name': aVal = a?.name || ''; bVal = b?.name || ''; break;
-        case 'article': aVal = a?.article || ''; bVal = b?.article || ''; break;
         case 'purchasePrice': aVal = a?.cost || 0; bVal = b?.cost || 0; break;
         case 'price': aVal = a?.price || 0; bVal = b?.price || 0; break;
         default: aVal = a?.name || ''; bVal = b?.name || '';
@@ -675,9 +667,6 @@ export default function PriceListDesktop() {
                     </button>
                   </th>
                 )}
-                <th className="text-left px-2 py-2 font-medium text-gray-600 cursor-pointer hover:bg-gray-100 w-[70px] max-w-[70px]" onClick={() => handleSort('article')}>
-                  <div className="flex items-center gap-1">Арт. <SortIcon field="article" /></div>
-                </th>
                 <th className="text-left px-3 py-2 font-medium text-gray-600 cursor-pointer hover:bg-gray-100" onClick={() => handleSort('name')}>
                   <div className="flex items-center gap-1">Наименование <SortIcon field="name" /></div>
                 </th>
@@ -741,7 +730,6 @@ export default function PriceListDesktop() {
                           {selectedIds.has(product.id) ? <CheckSquare size={15} className="text-blue-600" /> : <Square size={15} className="text-gray-300" />}
                         </td>
                       )}
-                      <td className="px-2 py-1.5 font-mono text-xs text-gray-500 w-[70px] max-w-[70px] truncate">{product.article || '—'}</td>
                       <td className="px-3 py-1.5">{product.name || 'Без названия'}</td>
                       <td className="px-3 py-1.5 text-gray-600">{category || '—'}</td>
                       <td className="px-3 py-1.5 text-right">

@@ -88,9 +88,6 @@ export default function SellModal({ isOpen, onClose, stock, onSell }) {
         {/* Product Info */}
         <div className="mb-6 p-4 bg-gray-50 rounded-lg">
           <h3 className="font-semibold text-gray-900">{stock.expand?.product?.name || 'Товар'}</h3>
-          {stock.expand?.product?.article && (
-            <p className="text-sm text-gray-500">Арт. {stock.expand.product.article}</p>
-          )}
           <div className="mt-3 space-y-1">
             <p className="text-sm text-gray-600">
               Текущее количество: <span className="font-medium">{maxQuantity} шт</span>

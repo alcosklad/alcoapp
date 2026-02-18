@@ -101,9 +101,6 @@ export default function AddItemModal({ isOpen, onClose, onAdd }) {
                       className="w-full text-left p-3 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors"
                     >
                       <div className="font-medium text-gray-900">{product.name}</div>
-                      {product.article && (
-                        <div className="text-sm text-gray-500">Арт. {product.article}</div>
-                      )}
                       {product.price && (
                         <div className="text-sm text-blue-600">Цена: {product.price}</div>
                       )}
@@ -119,9 +116,6 @@ export default function AddItemModal({ isOpen, onClose, onAdd }) {
                 <div className="flex justify-between items-start">
                   <div>
                     <h3 className="font-semibold text-gray-900">{selectedProduct.name}</h3>
-                    {selectedProduct.article && (
-                      <p className="text-sm text-gray-500 mt-1">Арт. {selectedProduct.article}</p>
-                    )}
                   </div>
                   <button
                     onClick={() => setSelectedProduct(null)}

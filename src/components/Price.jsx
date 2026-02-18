@@ -86,9 +86,6 @@ export default function Price() {
                           <h3 className="font-semibold text-gray-900">
                             {stock.product?.name || 'Товар не найден'}
                           </h3>
-                          {stock.product?.article && (
-                            <p className="text-sm text-gray-500 mt-1">Арт. {stock.product.article}</p>
-                          )}
                           {stock.product?.barcode && (
                             <p className="text-xs text-gray-400 mt-1">ШК {stock.product.barcode}</p>
                           )}

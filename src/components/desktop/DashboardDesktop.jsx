@@ -384,7 +384,6 @@ export default function DashboardDesktop({ user }) {
                     <div className="flex items-center justify-between mb-1">
                       <div>
                         <p className="font-medium text-gray-900">{stock?.expand?.product?.name || 'Товар'}</p>
-                        <p className="text-xs text-gray-500">Артикул: {stock?.expand?.product?.article || '—'}</p>
                       </div>
                       <div className="text-right">
                         <p className="text-gray-900">{stock.quantity} шт</p>

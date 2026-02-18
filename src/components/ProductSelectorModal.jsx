@@ -127,10 +127,6 @@ export default function ProductSelectorModal({ isOpen, onClose, onAdd }) {
                     {product?.name || 'Товар без названия'}
                   </h3>
                   
-                  {/* Артикул */}
-                  {product?.article && (
-                    <p className="text-xs text-gray-500 mb-2">Арт. {product.article}</p>
-                  )}
                   
                   {/* Цена */}
                   {product?.cost && (
@@ -232,9 +228,6 @@ function QuantityModal({ isOpen, onClose, onConfirm, product }) {
                 <h4 className="font-semibold text-gray-900">
                   {product?.name || 'Товар'}
                 </h4>
-                {product?.article && (
-                  <p className="text-sm text-gray-500">Арт. {product.article}</p>
-                )}
               </div>
             </div>
           </div>

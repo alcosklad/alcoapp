@@ -131,9 +131,6 @@ export default function ProductSelector({ isOpen, onClose, onAdd }) {
                     <h3 className="font-semibold text-gray-900 break-words">
                       {product?.name || 'Товар без названия'}
                     </h3>
-                    {product?.article && (
-                      <p className="text-sm text-gray-500">Арт. {product.article}</p>
-                    )}
                     {product?.price && (
                       <p className="text-sm text-blue-600">Цена: {product.price}</p>
                     )}

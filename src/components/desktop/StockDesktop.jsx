@@ -403,11 +403,10 @@ export default function StockDesktop() {
       .filter(stock => {
         const product = getProduct(stock);
         const name = product.name || '';
-        const article = product.article || '';
         const category = Array.isArray(product.category) ? product.category[0] : (product.category || '');
         const query = searchQuery.toLowerCase();
         
-        const matchesSearch = name.toLowerCase().includes(query) || article.toLowerCase().includes(query);
+        const matchesSearch = name.toLowerCase().includes(query);
         const matchesCategory = !selectedCategory || category === selectedCategory;
         
         return matchesSearch && matchesCategory;
@@ -429,10 +428,6 @@ export default function StockDesktop() {
           case 'name':
             aVal = pA.name || '';
             bVal = pB.name || '';
-            break;
-          case 'article':
-            aVal = pA.article || '';
-            bVal = pB.article || '';
             break;
           case 'quantity':
             aVal = a?.quantity || 0;
@@ -751,9 +746,6 @@ export default function StockDesktop() {
                     </button>
                   </th>
                 )}
-                <th className="text-left px-2 py-2 font-medium text-gray-600 cursor-pointer hover:bg-gray-100 w-[70px] max-w-[70px]" onClick={() => handleSort('article')}>
-                  <div className="flex items-center gap-1">Арт. <SortIcon field="article" /></div>
-                </th>
                 <th className="text-left px-3 py-2 font-medium text-gray-600 cursor-pointer hover:bg-gray-100" onClick={() => handleSort('name')}>
                   <div className="flex items-center gap-1">Наименование <SortIcon field="name" /></div>
                 </th>
@@ -842,7 +834,6 @@ export default function StockDesktop() {
                                 {selectedIds.has(stock.id) ? <CheckSquare size={15} className="text-blue-600" /> : <Square size={15} className="text-gray-300" />}
                               </td>
                             )}
-                            <td className="px-2 py-1.5 font-mono text-xs text-gray-500 w-[70px] max-w-[70px] truncate">{product.article || '—'}</td>
                             <td className="px-3 py-1.5">{product.name || 'Без названия'}</td>
                             <td className="px-2 py-1.5 text-gray-500 text-xs">{subcategory || '—'}</td>
                             <td className={`px-3 py-1.5 text-right font-medium ${quantity < 3 ? 'text-red-600' : ''}`}>

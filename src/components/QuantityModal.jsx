@@ -35,9 +35,6 @@ export default function QuantityModal({ isOpen, onClose, onConfirm, product }) {
 
         {/* Content */}
         <div className="p-4 space-y-4">
-          {product.article && (
-            <p className="text-sm text-gray-500">Арт. {product.article}</p>
-          )}
 
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">

@@ -117,33 +117,18 @@ export default function AddProductModal({ isOpen, onClose, onAdd }) {
               />
             </div>
             
-            {/* Артикул и Штрихкод */}
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Артикул
-                </label>
-                <input
-                  type="text"
-                  value={formData.article}
-                  onChange={(e) => handleInputChange('article', e.target.value)}
-                  placeholder="W001"
-                  className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:bg-white transition-colors"
-                />
-              </div>
-              
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Штрихкод
-                </label>
-                <input
-                  type="text"
-                  value={formData.barcode}
-                  onChange={(e) => handleInputChange('barcode', e.target.value)}
-                  placeholder="4600000000000"
-                  className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:bg-white transition-colors"
-                />
-              </div>
+            {/* Штрихкод */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Штрихкод
+              </label>
+              <input
+                type="text"
+                value={formData.barcode}
+                onChange={(e) => handleInputChange('barcode', e.target.value)}
+                placeholder="4600000000000"
+                className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:bg-white transition-colors"
+              />
             </div>
             
             {/* Цена и Закупка */}

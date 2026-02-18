@@ -359,61 +359,88 @@ export default function ShiftsDesktop() {
         </div>
       </div>
 
-      {/* Table */}
+      {/* Table — grouped by shift, same style as SalesDesktop */}
       <div className="bg-white rounded-xl shadow-sm overflow-hidden">
         <div className="overflow-x-auto">
-          <table className="w-full text-sm">
+          <table className="w-full text-xs whitespace-nowrap">
             <thead className="bg-gray-50 border-b">
               <tr>
-                <th className="px-4 py-3 text-left cursor-pointer select-none" onClick={() => handleSort('start')}><div className="flex items-center gap-1">Дата <SI field="start" /></div></th>
-                <th className="px-4 py-3 text-left cursor-pointer select-none" onClick={() => handleSort('courier')}><div className="flex items-center gap-1">Курьер <SI field="courier" /></div></th>
-                <th className="px-4 py-3 text-left cursor-pointer select-none" onClick={() => handleSort('city')}><div className="flex items-center gap-1">Город <SI field="city" /></div></th>
-                <th className="px-4 py-3 text-center cursor-pointer select-none" onClick={() => handleSort('duration')}><div className="flex items-center justify-center gap-1">Время <SI field="duration" /></div></th>
-                <th className="px-4 py-3 text-center cursor-pointer select-none" onClick={() => handleSort('totalItems')}><div className="flex items-center justify-center gap-1">Продаж <SI field="totalItems" /></div></th>
-                <th className="px-4 py-3 text-right cursor-pointer select-none" onClick={() => handleSort('totalAmount')}><div className="flex items-center justify-end gap-1">Выручка <SI field="totalAmount" /></div></th>
-                <th className="px-4 py-3 text-center">Статус</th>
-                <th className="px-4 py-3 text-center w-20"></th>
+                <th className="px-3 py-2 text-left font-medium text-gray-500 cursor-pointer select-none" onClick={() => handleSort('start')}>
+                  <div className="flex items-center gap-1">Наименование <SI field="start" /></div>
+                </th>
+                <th className="px-2 py-2 text-center font-medium text-gray-500 w-14">Кол-во</th>
+                <th className="px-2 py-2 text-right font-medium text-gray-500 w-16">Цена</th>
+                <th className="px-2 py-2 text-right font-medium text-gray-500 w-16 cursor-pointer select-none" onClick={() => handleSort('totalAmount')}>
+                  <div className="flex items-center justify-end gap-1">Сумма <SI field="totalAmount" /></div>
+                </th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-gray-100">
+            <tbody>
               {filteredShifts.length === 0 ? (
-                <tr><td colSpan={8} className="px-4 py-12 text-center text-gray-400">Нет смен за выбранный период</td></tr>
-              ) : filteredShifts.map(shift => (
-                <tr key={shift.id} className="hover:bg-gray-50 transition-colors cursor-pointer" onClick={() => { setSelectedShift(shift); setExpandedSale(null); }}>
-                  <td className="px-4 py-3">
-                    <div className="font-medium text-gray-900">{fmtDate(shift.start)}</div>
-                    <div className="text-xs text-gray-400">{fmtTime(shift.start)} — {fmtTime(shift.end)}</div>
-                    {shift.edited_at && <div className="text-[10px] text-amber-500 mt-0.5">✎ ред. {fmtDate(shift.edited_at)}</div>}
-                  </td>
-                  <td className="px-4 py-3 text-gray-700">{shift.expand?.user?.name || '—'}</td>
-                  <td className="px-4 py-3"><span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-700">{shift.city || '—'}</span></td>
-                  <td className="px-4 py-3 text-center text-gray-600">{fmtDur(shift.start, shift.end)}</td>
-                  <td className="px-4 py-3 text-center text-gray-600">{shift.totalItems || 0}</td>
-                  <td className="px-4 py-3 text-right font-medium text-gray-900">{fmtMoney(shift.totalAmount)}</td>
-                  <td className="px-4 py-3 text-center">
-                    <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${shift.status==='active' ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500'}`}>
-                      {shift.status === 'active' ? 'Активна' : 'Закрыта'}
-                    </span>
-                  </td>
-                  <td className="px-4 py-3 text-center" onClick={e => e.stopPropagation()}>
-                    <div className="flex items-center justify-center gap-1">
-                      {isAdmin && shift.status === 'active' && (
-                        <button onClick={() => handleForceClose(shift)} className="p-1 hover:bg-orange-50 rounded text-gray-400 hover:text-orange-600" title="Закрыть смену"><Square size={14} /></button>
-                      )}
-                      {isAdmin && (
-                        <button onClick={() => handleDeleteShift(shift)} className="p-1 hover:bg-red-50 rounded text-gray-400 hover:text-red-600" title="Удалить"><Trash2 size={14} /></button>
-                      )}
-                    </div>
-                  </td>
-                </tr>
-              ))}
+                <tr><td colSpan={4} className="px-3 py-12 text-center text-gray-400">Нет смен за выбранный период</td></tr>
+              ) : filteredShifts.map(shift => {
+                const allItems = (shift.sales || []).flatMap(s => (s.items || []).map(item => ({ ...item, isRefund: s.status === 'refund', paymentMethod: s.payment_method, saleTime: s.created })));
+                const uniqueNames = new Set(allItems.map(i => i.name));
+                const isActive = shift.status === 'active';
+                return (
+                  <React.Fragment key={shift.id}>
+                    {/* Shift header row */}
+                    <tr
+                      className={`border-t-2 border-gray-200 cursor-pointer hover:bg-gray-50 ${isActive ? 'bg-green-50/30' : 'bg-gray-50/50'}`}
+                      onDoubleClick={() => { setSelectedShift(shift); setExpandedSale(null); }}
+                    >
+                      <td className="px-3 py-1.5" colSpan={4}>
+                        <div className="flex items-center gap-2">
+                          <span className="font-semibold text-gray-900 text-xs">
+                            {fmtDate(shift.start)} {fmtTime(shift.start)} — {fmtTime(shift.end) || 'сейчас'}
+                          </span>
+                          <span className="text-[10px] px-1.5 py-0.5 bg-gray-100 text-gray-600 rounded">{fmtDur(shift.start, shift.end)}</span>
+                          <span className={`text-[10px] px-1.5 py-0.5 rounded font-medium ${isActive ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500'}`}>
+                            {isActive ? 'Активна' : 'Закрыта'}
+                          </span>
+                          <span className="text-[10px] text-gray-500">{shift.expand?.user?.name || '—'}</span>
+                          <span className="text-[10px] text-gray-400">{shift.city || '—'}</span>
+                          <span className="text-[10px] text-gray-400 ml-auto">{uniqueNames.size} наим. · {shift.totalItems || 0} шт</span>
+                          <span className="text-xs font-semibold text-green-600">{fmtMoney(shift.totalAmount)} ₽</span>
+                          {isAdmin && (
+                            <span className="flex items-center gap-0.5 ml-1" onClick={e => e.stopPropagation()}>
+                              {isActive && (
+                                <button onClick={() => handleForceClose(shift)} className="p-0.5 hover:bg-orange-50 rounded text-gray-400 hover:text-orange-600" title="Закрыть смену"><Square size={12} /></button>
+                              )}
+                              <button onClick={() => handleDeleteShift(shift)} className="p-0.5 hover:bg-red-50 rounded text-gray-400 hover:text-red-600" title="Удалить"><Trash2 size={12} /></button>
+                            </span>
+                          )}
+                          {shift.edited_at && <span className="text-[10px] text-amber-500">✎ ред.</span>}
+                        </div>
+                      </td>
+                    </tr>
+                    {/* Item rows — all products sold in this shift */}
+                    {allItems.map((item, idx) => (
+                      <tr key={`${shift.id}-${idx}`} className={`border-b border-gray-50 hover:bg-blue-50/30 ${item.isRefund ? 'opacity-60' : ''}`}>
+                        <td className="px-3 py-1 pl-6">
+                          <span className={`${item.isRefund ? 'line-through text-gray-400' : 'text-gray-800'}`}>{item.name || 'Товар'}</span>
+                          {item.isRefund && <span className="ml-1.5 text-[9px] px-1 py-0.5 bg-blue-100 text-blue-700 rounded">возврат</span>}
+                        </td>
+                        <td className={`px-2 py-1 text-center ${item.isRefund ? 'line-through text-gray-400' : 'text-gray-600'}`}>{item.quantity || 1}</td>
+                        <td className={`px-2 py-1 text-right ${item.isRefund ? 'line-through text-gray-400' : 'text-gray-800'}`}>{fmtMoney(item.price)}</td>
+                        <td className={`px-2 py-1 text-right ${item.isRefund ? 'line-through text-gray-400' : 'text-gray-800'}`}>{fmtMoney((item.price||0) * (item.quantity||1))}</td>
+                      </tr>
+                    ))}
+                    {allItems.length === 0 && (
+                      <tr className="border-b border-gray-50">
+                        <td colSpan={4} className="px-3 py-1 pl-6 text-gray-400 italic">Нет данных о продажах</td>
+                      </tr>
+                    )}
+                  </React.Fragment>
+                );
+              })}
             </tbody>
           </table>
         </div>
         {filteredShifts.length > 0 && (
           <div className="border-t bg-gray-50 px-4 py-3 flex items-center justify-between text-sm">
-            <span className="text-gray-500">Показано: {filteredShifts.length} из {shifts.length}</span>
-            <span className="font-semibold text-gray-900">Итого: {fmtMoney(stats.totalSum)}</span>
+            <span className="text-gray-500">Показано: {filteredShifts.length} смен из {shifts.length}</span>
+            <span className="font-semibold text-gray-900">Итого: {fmtMoney(stats.totalSum)} ₽</span>
           </div>
         )}
       </div>

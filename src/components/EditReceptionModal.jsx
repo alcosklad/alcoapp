@@ -285,9 +285,6 @@ export default function EditReceptionModal({ isOpen, onClose, reception, onSave,
                       <h4 className="font-medium text-gray-900">
                         {item.product?.name || `Товар ${index + 1}`}
                       </h4>
-                      {item.product?.article && (
-                        <p className="text-sm text-gray-500">Арт. {item.product.article}</p>
-                      )}
                     </div>
                     <button
                       onClick={() => handleRemoveItem(index)}
@@ -382,9 +379,6 @@ export default function EditReceptionModal({ isOpen, onClose, reception, onSave,
                         }`}
                       >
                         <div className="font-medium text-sm">{product.name}</div>
-                        {product.article && (
-                          <div className="text-xs text-gray-500">Арт. {product.article}</div>
-                        )}
                         <div className="text-xs text-gray-600">{product.price}</div>
                       </div>
                     ))
