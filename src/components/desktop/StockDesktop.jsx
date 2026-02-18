@@ -1146,18 +1146,19 @@ export default function StockDesktop() {
                     {receptionHistory.map((h, idx) => {
                       const d = h.date ? new Date(h.date.includes('T') ? h.date : h.date + 'T00:00:00') : null;
                       const dateStr = d && !isNaN(d) ? d.toLocaleDateString('ru-RU', { day: 'numeric', month: 'short', year: 'numeric' }) : '—';
-                      const timeStr = d && !isNaN(d) && h.date.includes('T') ? d.toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' }) : '';
+                      const timeStr = d && !isNaN(d) ? d.toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' }) : '';
+                      const receptionLabel = h.receptionName || h.batchNumber || '';
                       return (
                         <div key={idx} className="flex items-center gap-2 bg-gray-50 rounded-lg px-3 py-2 text-xs">
                           <Clock size={12} className="text-gray-400 shrink-0" />
-                          <span className="text-gray-500 w-28 shrink-0">
+                          <span className="text-gray-500 w-32 shrink-0">
                             {dateStr}{timeStr ? `, ${timeStr}` : ''}
                           </span>
+                          {receptionLabel && <span className="px-1.5 py-0.5 bg-blue-100 text-blue-700 rounded text-[10px] font-medium shrink-0">{receptionLabel}</span>}
                           <MapPin size={12} className="text-blue-400 shrink-0" />
                           <span className="text-gray-700 flex-1 truncate">{h.city || '—'}</span>
                           <span className="font-medium text-gray-900 shrink-0">{h.quantity} шт</span>
                           <span className="text-gray-500 shrink-0">× {(h.cost || 0).toLocaleString('ru-RU')} ₽</span>
-                          {h.batchNumber && <span className="text-gray-400 shrink-0 text-[10px]">{h.batchNumber}</span>}
                         </div>
                       );
                     })}

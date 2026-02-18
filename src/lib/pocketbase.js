@@ -241,7 +241,7 @@ export const createReception = async (data) => {
     
     // Создаем партии товаров (вместо обновления агрегированных остатков)
     if (data.items && data.supplier) {
-      const receptionDate = new Date().toISOString().split('T')[0];
+      const receptionDate = new Date().toISOString();
       
       for (const item of data.items) {
         const purchasePrice = item.cost ?? item.purchase_price ?? 0;
@@ -1417,13 +1417,16 @@ export const getReceptionHistoryForProduct = async (productId, supplierId = null
     // Преобразуем в формат {date, city, quantity, cost, receptionId, batchNumber}
     const history = batches.map(batch => {
       const cityName = batch.expand?.supplier?.name || '';
+      // Используем created (полный ISO timestamp от PocketBase) как основной источник даты
+      const fullDate = batch.created || batch.reception_date || '';
       return {
-        date: batch.reception_date || batch.created || '',
+        date: fullDate,
         city: cityName,
         quantity: batch.quantity || 0,
         cost: batch.cost || batch.cost_per_unit || 0,
         receptionId: batch.reception_id || '',
-        batchNumber: batch.batch_number || ''
+        batchNumber: batch.batch_number || '',
+        receptionName: batch.expand?.reception_id?.batch_number || batch.batch_number || ''
       };
     });
     
