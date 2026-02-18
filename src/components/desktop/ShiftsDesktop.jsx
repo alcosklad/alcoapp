@@ -379,7 +379,12 @@ export default function ShiftsDesktop() {
               {filteredShifts.length === 0 ? (
                 <tr><td colSpan={4} className="px-3 py-12 text-center text-gray-400">Нет смен за выбранный период</td></tr>
               ) : filteredShifts.map(shift => {
-                const allItems = (shift.sales || []).flatMap(s => (s.items || []).map(item => ({ ...item, isRefund: s.status === 'refund', paymentMethod: s.payment_method, saleTime: s.created })));
+                const allItems = (Array.isArray(shift.sales) ? shift.sales : []).flatMap(s => {
+                  let items = s.items;
+                  if (typeof items === 'string') { try { items = JSON.parse(items); } catch { items = []; } }
+                  if (!Array.isArray(items)) items = [];
+                  return items.map(item => ({ ...item, isRefund: s.status === 'refund', paymentMethod: s.payment_method, saleTime: s.created }));
+                });
                 const uniqueNames = new Set(allItems.map(i => i.name));
                 const isActive = shift.status === 'active';
                 return (
