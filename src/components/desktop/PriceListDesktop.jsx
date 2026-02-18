@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { Search, ChevronUp, ChevronDown, RefreshCw, X, Plus, Check, Trash2, Copy, Merge, Filter, SlidersHorizontal } from 'lucide-react';
 import { getProducts, updateProduct, createProduct, deleteProduct, getStocksForProduct, mergeProducts, getStocksWithDetails } from '../../lib/pocketbase';
-import { detectSubcategory, ALL_SUBCATEGORIES } from '../../lib/subcategories';
+import { detectSubcategory, ALL_SUBCATEGORIES, CATEGORY_ORDER, SUBCATEGORIES_BY_CATEGORY } from '../../lib/subcategories';
 import pb from '../../lib/pocketbase';
 import { getOrFetch, invalidate } from '../../lib/cache';
 
@@ -97,24 +97,30 @@ export default function PriceListDesktop() {
     }
   };
 
-  // Категории для select
+  // Категории для select — в порядке из CATEGORY_ORDER
   const allCategories = useMemo(() => {
     const cats = new Set();
     products.forEach(p => {
       const c = Array.isArray(p?.category) ? p.category[0] : p?.category;
       if (c) cats.add(c);
     });
-    return [...cats].sort();
+    const ordered = CATEGORY_ORDER.filter(c => cats.has(c));
+    // Добавить категории, которых нет в CATEGORY_ORDER (на случай новых)
+    cats.forEach(c => { if (!ordered.includes(c)) ordered.push(c); });
+    return ordered;
   }, [products]);
 
-  // Подкатегории для select
+  // Подкатегории для select — зависят от выбранной категории
   const allSubcategories = useMemo(() => {
+    if (filterCategory && SUBCATEGORIES_BY_CATEGORY[filterCategory]) {
+      return SUBCATEGORIES_BY_CATEGORY[filterCategory];
+    }
     const subs = new Set(ALL_SUBCATEGORIES);
     products.forEach(p => {
       if (p?.subcategory) subs.add(p.subcategory);
     });
-    return [...subs].sort();
-  }, [products]);
+    return [...subs];
+  }, [products, filterCategory]);
 
   // Поиск дублей по имени (улучшенный)
   const COMMON_WORDS = new Set(['vino', 'вино', 'красн', 'бел', 'розов', 'полусладк', 'полусух', 'сух', 'сладк', 'игрист', 'тих', 'шампанск']);
@@ -369,7 +375,11 @@ export default function PriceListDesktop() {
     .sort((a, b) => {
       const catA = (Array.isArray(a?.category) ? a.category[0] : (a?.category || '')) || '';
       const catB = (Array.isArray(b?.category) ? b.category[0] : (b?.category || '')) || '';
-      if (catA !== catB) return catA.localeCompare(catB);
+      if (catA !== catB) {
+        const idxA = CATEGORY_ORDER.indexOf(catA);
+        const idxB = CATEGORY_ORDER.indexOf(catB);
+        return (idxA === -1 ? 999 : idxA) - (idxB === -1 ? 999 : idxB);
+      }
 
       const subA = (a?.subcategory || detectSubcategory(a?.name)) || '';
       const subB = (b?.subcategory || detectSubcategory(b?.name)) || '';
