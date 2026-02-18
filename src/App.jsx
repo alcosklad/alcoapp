@@ -81,8 +81,15 @@ function App() {
   const isDesktopUser = user?.role === 'admin' || user?.role === 'operator';
 
   // Admin/operator на мобиле — упрощённый мобильный UI (приёмки, остатки, прайс)
+  const adminMobileTabs = ['reception', 'stock', 'pricelist'];
+  useEffect(() => {
+    if (isDesktopUser && isMobile && !adminMobileTabs.includes(activeTab)) {
+      setActiveTab('reception');
+    }
+  }, [isMobile, activeTab]);
+
   if (isDesktopUser && isMobile) {
-    const mobileTab = activeTab;
+    const mobileTab = adminMobileTabs.includes(activeTab) ? activeTab : 'reception';
     const renderAdminMobile = () => {
       switch (mobileTab) {
         case 'reception': return <Reception onNavigate={setActiveTab} />;
@@ -91,10 +98,6 @@ function App() {
         default: return <Reception onNavigate={setActiveTab} />;
       }
     };
-    // Если admin на мобиле и выбрана вкладка, которой нет в мобиле — переключаем на приёмку
-    if (!['reception', 'stock', 'pricelist'].includes(activeTab)) {
-      setActiveTab('reception');
-    }
     return (
       <div className="relative min-h-screen bg-[#F7F8FA]">
         <header className="bg-white px-5 pt-3 pb-3 flex items-center justify-between shadow-sm sticky top-0 z-30">
