@@ -577,15 +577,34 @@ export default function StockDesktop() {
       if (!stock) continue;
       const product = getProduct(stock);
       try {
-        await createWriteOff({
-          product: product.id,
-          supplier: supplierId || (stock._cityBreakdown?.[0]?.supplierId) || '',
-          quantity: stock.quantity || 1,
-          reason: reason || '',
-          cost_per_unit: stock.cost || product.cost || 0,
-          product_name: product.name,
-          city: cityName || (stock._cityBreakdown?.[0]?.supplierName) || ''
-        });
+        // Если выбран конкретный город — списываем как раньше одной записью.
+        // Если "Все города" и строка агрегированная — списываем по каждому городу отдельно,
+        // иначе можно попытаться списать общий объём в одном городе и получить ошибку.
+        if (supplierId || !Array.isArray(stock._cityBreakdown) || stock._cityBreakdown.length === 0) {
+          await createWriteOff({
+            product: product.id,
+            supplier: supplierId || (stock._cityBreakdown?.[0]?.supplierId) || '',
+            quantity: stock.quantity || 1,
+            reason: reason || '',
+            cost_per_unit: stock.cost || product.cost || 0,
+            product_name: product.name,
+            city: cityName || (stock._cityBreakdown?.[0]?.supplierName) || ''
+          });
+        } else {
+          for (const cityPart of stock._cityBreakdown) {
+            const qty = Number(cityPart.quantity) || 0;
+            if (qty <= 0) continue;
+            await createWriteOff({
+              product: product.id,
+              supplier: cityPart.supplierId || '',
+              quantity: qty,
+              reason: reason || '',
+              cost_per_unit: stock.cost || product.cost || 0,
+              product_name: product.name,
+              city: cityPart.supplierName || ''
+            });
+          }
+        }
         ok++;
       } catch { fail++; }
     }
