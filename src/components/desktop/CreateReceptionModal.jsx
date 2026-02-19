@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { X, Plus, Minus, Trash2, Search, Star, ChevronLeft, ChevronRight, PlusCircle } from 'lucide-react';
+import { X, Plus, Minus, Trash2, Search, Star, ChevronLeft, ChevronRight, PlusCircle, Check } from 'lucide-react';
 import { getFavorites, addToFavorites, removeFromFavorites, createProduct } from '../../lib/pocketbase';
 import { CATEGORY_ORDER, ALL_SUBCATEGORIES, detectSubcategory } from '../../lib/subcategories';
 import { invalidate } from '../../lib/cache';
@@ -299,8 +299,8 @@ export default function CreateReceptionModal({
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4" onClick={onClose}>
-      <div className="bg-white rounded-lg w-full max-w-6xl h-[95vh] overflow-hidden flex flex-col" onClick={e => e.stopPropagation()}>
+    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+      <div className="bg-white rounded-lg w-full max-w-6xl h-[95vh] overflow-hidden flex flex-col">
         {/* Заголовок */}
         <div className="flex items-center justify-between px-4 py-3 border-b border-gray-200">
           <h2 className="text-lg font-semibold text-gray-900">Создать новую приёмку</h2>
@@ -437,6 +437,7 @@ export default function CreateReceptionModal({
               <table className="w-full text-xs">
                 <thead className="bg-gray-50 border-b border-gray-200 sticky top-0">
                   <tr>
+                    <th className="w-8 px-2 py-2 text-center"></th>
                     <th className="w-8 px-2 py-2"></th>
                     <th className="text-left px-2 py-2 font-medium text-gray-600">Наименование</th>
                     <th className="text-center px-2 py-2 font-medium text-gray-600 w-28">Количество</th>
@@ -446,15 +447,35 @@ export default function CreateReceptionModal({
                 <tbody>
                   {paginatedProducts.length === 0 ? (
                     <tr>
-                      <td colSpan={4} className="px-4 py-8 text-center text-gray-400 text-xs">
+                      <td colSpan={5} className="px-4 py-8 text-center text-gray-400 text-xs">
                         {activeCategory === 'Избранное' ? 'Нет избранных товаров' : 'Нет товаров в категории'}
                       </td>
                     </tr>
                   ) : paginatedProducts.map(product => {
                     const qty = getItemQuantity(product.id);
                     const isFav = favoriteIds.has(product.id);
+                    const isSelected = qty > 0;
                     return (
-                      <tr key={product.id} className={`border-b border-gray-100 hover:bg-gray-50 ${qty > 0 ? 'bg-blue-50/40' : ''}`}>
+                      <tr
+                        key={product.id}
+                        className={`border-b border-gray-100 hover:bg-gray-50 ${
+                          isSelected
+                            ? 'bg-blue-100/80 shadow-[inset_3px_0_0_0_rgba(37,99,235,0.9)]'
+                            : ''
+                        }`}
+                      >
+                        <td className="px-2 py-1.5 text-center">
+                          <span
+                            className={`inline-flex h-4 w-4 items-center justify-center rounded border ${
+                              isSelected
+                                ? 'border-blue-600 bg-blue-600 text-white'
+                                : 'border-gray-300 bg-white text-transparent'
+                            }`}
+                            title={isSelected ? 'Уже в корзине' : 'Не выбран'}
+                          >
+                            <Check size={11} />
+                          </span>
+                        </td>
                         <td className="px-2 py-1.5 text-center">
                           <button
                             onClick={() => handleToggleFavorite(product.id)}
@@ -464,7 +485,7 @@ export default function CreateReceptionModal({
                             <Star size={13} fill={isFav ? 'currentColor' : 'none'} />
                           </button>
                         </td>
-                        <td className="px-2 py-1.5 text-gray-900">{product.name}</td>
+                        <td className={`px-2 py-1.5 ${isSelected ? 'text-blue-900 font-semibold' : 'text-gray-900'}`}>{product.name}</td>
                         <td className="px-2 py-1.5">
                           <div className="flex items-center justify-center gap-1">
                             <button

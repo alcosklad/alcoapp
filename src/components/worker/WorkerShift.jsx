@@ -310,7 +310,7 @@ export default function WorkerShift({ user }) {
 
       {/* Shift Detail Modal */}
       {showDetailModal && selectedShift && (
-        <div className="fixed inset-0 bg-black/50 z-50 flex items-end justify-center" onClick={() => setShowDetailModal(false)}>
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-end justify-center">
           <div className="bg-white rounded-t-3xl w-full max-h-[85vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
             <div className="sticky top-0 bg-white px-5 pt-5 pb-3 border-b border-gray-100">
               <div className="flex items-center justify-between">

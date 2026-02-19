@@ -430,7 +430,7 @@ export default function SalesDesktop() {
 
       {/* Detail Modal */}
       {selectedOrder && (
-        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50" onClick={() => { setSelectedOrder(null); setRefundConfirm(false); setEditingOrder(null); }}>
+        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
           <div className="bg-white rounded-xl max-w-2xl w-full mx-4 max-h-[85vh] flex flex-col" onClick={e => e.stopPropagation()}>
             <div className="shrink-0 border-b px-6 py-4 flex justify-between items-start">
               <div>

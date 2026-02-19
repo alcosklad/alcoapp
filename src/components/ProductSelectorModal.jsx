@@ -61,7 +61,7 @@ export default function ProductSelectorModal({ isOpen, onClose, onAdd }) {
   return (
     <>
       {/* Overlay */}
-      <div className="fixed inset-0 bg-black/50 z-50" onClick={onClose} />
+      <div className="fixed inset-0 bg-black/50 z-50" />
       
       {/* Modal */}
       <div className="fixed inset-0 z-50 flex flex-col">
@@ -200,7 +200,7 @@ function QuantityModal({ isOpen, onClose, onConfirm, product }) {
   return (
     <>
       {/* Overlay */}
-      <div className="fixed inset-0 bg-black/50 z-[60]" onClick={onClose} />
+      <div className="fixed inset-0 bg-black/50 z-[60]" />
       
       {/* Modal */}
       <div className="fixed inset-0 z-[60] flex items-end">

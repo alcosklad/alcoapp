@@ -486,7 +486,7 @@ export default function ShiftsDesktop() {
 
       {/* Detail Modal */}
       {selectedShift && (
-        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50" onClick={() => { setSelectedShift(null); setEditingShift(null); }}>
+        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
           <div className="bg-white rounded-xl max-w-2xl w-full mx-4 max-h-[85vh] flex flex-col" onClick={e => e.stopPropagation()}>
             {/* Header */}
             <div className="shrink-0 border-b px-6 py-4 flex justify-between items-start">

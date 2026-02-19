@@ -75,7 +75,7 @@ export default function AddProductModal({ isOpen, onClose, onAdd }) {
   return (
     <>
       {/* Overlay */}
-      <div className="fixed inset-0 bg-black/50 z-50" onClick={onClose} />
+      <div className="fixed inset-0 bg-black/50 z-50" />
       
       {/* Modal */}
       <div className="fixed inset-0 z-50 flex items-end">

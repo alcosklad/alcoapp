@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { getDashboardStats, getSuppliers, getAllOrders, getReceptions } from '../../lib/pocketbase';
 import { getOrFetch } from '../../lib/cache';
-import { Package, TrendingUp, ShoppingCart, AlertTriangle, FileText, Calendar, Clock, BarChart3, X } from 'lucide-react';
+import { Package, TrendingUp, ShoppingCart, AlertTriangle, FileText, Calendar, Clock, BarChart3, X, RotateCcw } from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, LineChart, Line, Legend } from 'recharts';
 import pb from '../../lib/pocketbase';
 
@@ -28,6 +28,10 @@ export default function DashboardDesktop({ user }) {
   const [salesData, setSalesData] = useState([]);
   const [receptionsData, setReceptionsData] = useState([]);
   const [chartView, setChartView] = useState('purchases'); // 'purchases' or 'cities'
+  const [filterPeriod, setFilterPeriod] = useState('month');
+  const [filterDateFrom, setFilterDateFrom] = useState('');
+  const [filterDateTo, setFilterDateTo] = useState('');
+  const [chartRange, setChartRange] = useState('month'); // week | month | quarter | halfyear | all
   
   const userRole = pb.authStore.model?.role;
   const isAdmin = userRole === 'admin';
@@ -43,6 +47,22 @@ export default function DashboardDesktop({ user }) {
       loadData();
     }
   }, [selectedSupplier]);
+
+  useEffect(() => {
+    const now = new Date();
+    let from = new Date();
+    const toLocal = (d) => `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+    switch (filterPeriod) {
+      case 'today': from.setHours(0, 0, 0, 0); break;
+      case 'week': from.setDate(now.getDate() - 7); break;
+      case 'month': from.setMonth(now.getMonth() - 1); break;
+      case 'all': from = new Date('2026-02-16T00:00:00'); break;
+      case 'custom': return;
+      default: from.setMonth(now.getMonth() - 1);
+    }
+    setFilterDateFrom(toLocal(from));
+    setFilterDateTo(toLocal(now));
+  }, [filterPeriod]);
 
   const loadSuppliers = async () => {
     try {
@@ -87,45 +107,158 @@ export default function DashboardDesktop({ user }) {
     }
   };
 
-  // Данные для линейного графика закупок по городам (последние 14 дней)
-  const { cityPurchaseChart, cityNames } = useMemo(() => {
-    const days = [];
-    for (let i = 13; i >= 0; i--) {
-      const d = new Date();
-      d.setDate(d.getDate() - i);
-      d.setHours(0, 0, 0, 0);
-      days.push({
-        date: d,
-        label: d.toLocaleDateString('ru-RU', { day: '2-digit', month: '2-digit' }),
+  const selectedCityName = useMemo(
+    () => suppliers.find((s) => s.id === selectedSupplier)?.name || '',
+    [suppliers, selectedSupplier]
+  );
+
+  const filteredOrders = useMemo(() => {
+    let result = [...salesData];
+    if (selectedSupplier) {
+      result = result.filter((o) => {
+        const bySupplier = o.expand?.user?.supplier === selectedSupplier;
+        const byCity = selectedCityName ? (o.city || '') === selectedCityName : false;
+        return bySupplier || byCity;
       });
     }
+    if (filterDateFrom) {
+      const from = new Date(filterDateFrom);
+      from.setHours(0, 0, 0, 0);
+      result = result.filter((o) => new Date(o.created_date || o.created) >= from);
+    }
+    if (filterDateTo) {
+      const to = new Date(filterDateTo);
+      to.setHours(23, 59, 59, 999);
+      result = result.filter((o) => new Date(o.created_date || o.created) <= to);
+    }
+    return result;
+  }, [salesData, selectedSupplier, selectedCityName, filterDateFrom, filterDateTo]);
+
+  const filteredReceptions = useMemo(() => {
+    let result = [...receptionsData];
+    if (selectedSupplier) {
+      result = result.filter((r) => r.supplier === selectedSupplier);
+    }
+    if (filterDateFrom) {
+      const from = new Date(filterDateFrom);
+      from.setHours(0, 0, 0, 0);
+      result = result.filter((r) => new Date(r.date || r.created) >= from);
+    }
+    if (filterDateTo) {
+      const to = new Date(filterDateTo);
+      to.setHours(23, 59, 59, 999);
+      result = result.filter((r) => new Date(r.date || r.created) <= to);
+    }
+    return result;
+  }, [receptionsData, selectedSupplier, filterDateFrom, filterDateTo]);
+
+  const periodLabel = useMemo(() => ({
+    today: 'день',
+    week: 'неделю',
+    month: 'месяц',
+    all: 'всё время',
+    custom: 'период',
+  }[filterPeriod] || 'период'), [filterPeriod]);
+
+  const metrics = useMemo(() => {
+    const activeOrders = filteredOrders.filter((o) => o.status !== 'refund');
+    const refundOrders = filteredOrders.filter((o) => o.status === 'refund');
+
+    const totalSaleValue = activeOrders.reduce((sum, order) => sum + (order.total || 0), 0);
+    const totalPurchaseValue = filteredReceptions.reduce((sum, rec) => {
+      const items = Array.isArray(rec.items) ? rec.items : [];
+      return sum + items.reduce((itemsSum, item) => {
+        const cost = Number(item.cost ?? item.purchase_price ?? 0) || 0;
+        const qty = Number(item.quantity) || 0;
+        return itemsSum + (cost * qty);
+      }, 0);
+    }, 0);
+
+    return {
+      totalSaleValue,
+      totalPurchaseValue,
+      receptionsCount: filteredReceptions.length,
+      salesCount: activeOrders.length,
+      refundsCount: refundOrders.length,
+    };
+  }, [filteredOrders, filteredReceptions]);
+
+  // Линейный график динамики остатков (кумулятив по приёмкам, шт)
+  const { stockTrendData, trendCityNames } = useMemo(() => {
+    const normalizeDay = (rawDate) => {
+      const d = new Date(rawDate);
+      if (Number.isNaN(d.getTime())) return null;
+      d.setHours(0, 0, 0, 0);
+      return d;
+    };
+
+    const now = new Date();
+    now.setHours(0, 0, 0, 0);
+
+    const start = new Date(now);
+    if (chartRange === 'week') start.setDate(now.getDate() - 6);
+    else if (chartRange === 'month') start.setDate(now.getDate() - 29);
+    else if (chartRange === 'quarter') start.setDate(now.getDate() - 89);
+    else if (chartRange === 'halfyear') start.setDate(now.getDate() - 179);
+    else if (chartRange === 'all') {
+      start.setTime(new Date('2026-02-16T00:00:00').getTime());
+    }
+
+    const relevantReceptions = receptionsData.filter((rec) => !selectedSupplier || rec.supplier === selectedSupplier);
+
     const citySet = new Set();
-    receptionsData.forEach(rec => {
-      const cityName = rec.expand?.supplier?.name || '';
+    relevantReceptions.forEach((rec) => {
+      const cityName = rec.expand?.supplier?.name || suppliers.find((s) => s.id === rec.supplier)?.name || 'Неизвестно';
       if (cityName) citySet.add(cityName);
     });
-    const names = Array.from(citySet).sort();
-    // Init each day with 0 for each city
-    days.forEach(day => {
-      names.forEach(name => { day[name] = 0; });
-    });
-    receptionsData.forEach(rec => {
-      const recDate = new Date(rec.date || rec.created);
-      recDate.setHours(0, 0, 0, 0);
-      const day = days.find(d => d.date.getTime() === recDate.getTime());
-      const cityName = rec.expand?.supplier?.name || '';
-      if (day && cityName && rec.items) {
-        const items = Array.isArray(rec.items) ? rec.items : [];
-        const sum = items.reduce((s, item) => {
-          const cost = item.cost ?? item.purchase_price ?? 0;
-          const qty = item.quantity || 0;
-          return s + (cost * qty);
-        }, 0);
-        day[cityName] += sum;
+    if (selectedSupplier && selectedCityName) citySet.add(selectedCityName);
+
+    const cities = Array.from(citySet).sort();
+    if (cities.length === 0) return { stockTrendData: [], trendCityNames: [] };
+
+    const increments = new Map(); // key: city|dayTs => qty
+    const baseline = Object.fromEntries(cities.map((city) => [city, 0]));
+
+    relevantReceptions.forEach((rec) => {
+      const day = normalizeDay(rec.date || rec.created);
+      if (!day) return;
+      const cityName = rec.expand?.supplier?.name || suppliers.find((s) => s.id === rec.supplier)?.name || 'Неизвестно';
+      if (!cities.includes(cityName)) return;
+      const qty = (Array.isArray(rec.items) ? rec.items : []).reduce(
+        (sum, item) => sum + (Number(item.quantity) || 0),
+        0
+      );
+      if (!qty) return;
+
+      if (day < start) {
+        baseline[cityName] = (baseline[cityName] || 0) + qty;
+      } else if (day <= now) {
+        const key = `${cityName}|${day.getTime()}`;
+        increments.set(key, (increments.get(key) || 0) + qty);
       }
     });
-    return { cityPurchaseChart: days, cityNames: names };
-  }, [receptionsData]);
+
+    const running = { ...baseline };
+    const rows = [];
+
+    for (let d = new Date(start); d <= now; d.setDate(d.getDate() + 1)) {
+      const dayTs = d.getTime();
+      const row = {
+        label: d.toLocaleDateString('ru-RU', { day: '2-digit', month: '2-digit' }),
+        fullDate: d.toLocaleDateString('ru-RU', { day: '2-digit', month: '2-digit', year: 'numeric' }),
+      };
+
+      cities.forEach((cityName) => {
+        const key = `${cityName}|${dayTs}`;
+        running[cityName] = (running[cityName] || 0) + (increments.get(key) || 0);
+        row[cityName] = running[cityName];
+      });
+
+      rows.push(row);
+    }
+
+    return { stockTrendData: rows, trendCityNames: cities };
+  }, [receptionsData, chartRange, selectedSupplier, selectedCityName, suppliers]);
 
   const CITY_COLORS = ['#3b82f6', '#22c55e', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899', '#14b8a6', '#f97316'];
 
@@ -136,7 +269,7 @@ export default function DashboardDesktop({ user }) {
     const paymentMap = { cash: 0, transfer: 0, prepaid: 0 };
     const paymentLabels = { cash: 'Наличные', transfer: 'Перевод', prepaid: 'Предоплата' };
     
-    salesData.forEach(order => {
+    filteredOrders.forEach(order => {
       if (order.status === 'refund') return;
       const method = order.payment_method || 'cash';
       const normalizedMethod = method === '0' ? 'cash' : method === '1' ? 'transfer' : method === '2' ? 'prepaid' : method;
@@ -153,23 +286,23 @@ export default function DashboardDesktop({ user }) {
         percentage: 0 // will calculate after
       }))
       .sort((a, b) => b.value - a.value);
-  }, [salesData]);
+  }, [filteredOrders]);
 
   // Данные для круговой диаграммы продаж по городам
   const citySalesData = useMemo(() => {
     const cityMap = {};
-    salesData.forEach(order => {
+    filteredOrders.forEach(order => {
       if (order.status === 'refund') return;
-      const cityName = order.expand?.user?.expand?.supplier?.name || 'Неизвестно';
+      const cityName = order.city || order.expand?.user?.expand?.supplier?.name || 'Неизвестно';
       cityMap[cityName] = (cityMap[cityName] || 0) + (order.total || 0);
     });
     
     return Object.entries(cityMap)
       .map(([name, value]) => ({ name, value }))
       .sort((a, b) => b.value - a.value);
-  }, [salesData]);
+  }, [filteredOrders]);
 
-  const margin = stats.totalSaleValue - stats.totalPurchaseValue;
+  const margin = metrics.totalSaleValue - metrics.totalPurchaseValue;
 
   if (loading) {
     return (
@@ -190,31 +323,64 @@ export default function DashboardDesktop({ user }) {
 
   return (
     <div className="space-y-4">
-      {/* Фильтр по городу */}
-      <div className="flex items-center gap-3">
-        <label className="text-sm text-gray-600">Город:</label>
-        <select
-          value={selectedSupplier}
-          onChange={(e) => setSelectedSupplier(e.target.value)}
-          className="px-3 py-1.5 border border-gray-300 rounded text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-        >
-          <option value="">Все города</option>
-          {suppliers.map(supplier => (
-            <option key={supplier.id} value={supplier.id}>
-              {supplier.name}
-            </option>
-          ))}
-        </select>
+      {/* Фильтры */}
+      <div className="bg-white rounded-xl shadow-sm p-4 space-y-3">
+        <div className="flex items-center gap-3 flex-wrap">
+          <label className="text-sm text-gray-600">Город:</label>
+          <select
+            value={selectedSupplier}
+            onChange={(e) => setSelectedSupplier(e.target.value)}
+            className="px-3 py-1.5 border border-gray-300 rounded text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+          >
+            <option value="">Все города</option>
+            {suppliers.map(supplier => (
+              <option key={supplier.id} value={supplier.id}>
+                {supplier.name}
+              </option>
+            ))}
+          </select>
+        </div>
+
+        <div className="flex items-center gap-3 flex-wrap">
+          <div className="flex bg-gray-100 rounded-lg p-0.5">
+            {['today', 'week', 'month', 'all', 'custom'].map(id => (
+              <button
+                key={id}
+                onClick={() => setFilterPeriod(id)}
+                className={`px-3 py-1.5 text-sm rounded-md transition-colors ${filterPeriod === id ? 'bg-white text-blue-600 shadow-sm font-medium' : 'text-gray-600 hover:text-gray-800'}`}
+              >
+                {{ today: 'День', week: 'Неделя', month: 'Месяц', all: 'Всё', custom: 'Период' }[id]}
+              </button>
+            ))}
+          </div>
+          {filterPeriod === 'custom' && (
+            <>
+              <input
+                type="date"
+                value={filterDateFrom}
+                onChange={(e) => setFilterDateFrom(e.target.value)}
+                className="border rounded-lg px-3 py-1.5 text-sm"
+              />
+              <span className="text-gray-400">—</span>
+              <input
+                type="date"
+                value={filterDateTo}
+                onChange={(e) => setFilterDateTo(e.target.value)}
+                className="border rounded-lg px-3 py-1.5 text-sm"
+              />
+            </>
+          )}
+        </div>
       </div>
 
       {/* Карточки статистики */}
       {isAdmin ? (
         <div className="grid grid-cols-2 lg:grid-cols-6 gap-3">
           <StatCard icon={Package} label="Товаров на складе" value={`${stats.totalProducts.toLocaleString('ru-RU')} шт`} color="blue" clickable onClick={() => setShowStockBreakdown(true)} />
-          <StatCard icon={ShoppingCart} label="Сумма продажи" value={stats.totalSaleValue.toLocaleString('ru-RU')} color="green" />
-          <StatCard icon={TrendingUp} label="Сумма закупа" value={stats.totalPurchaseValue.toLocaleString('ru-RU')} color="purple" />
-          <StatCard icon={BarChart3} label="Маржа склада" value={margin.toLocaleString('ru-RU')} color={margin > 0 ? 'green' : 'orange'} />
-          <StatCard icon={FileText} label="Приёмок за месяц" value={stats.receptionsCount} color="indigo" />
+          <StatCard icon={ShoppingCart} label={`Сумма продажи за ${periodLabel}`} value={metrics.totalSaleValue.toLocaleString('ru-RU')} color="green" />
+          <StatCard icon={TrendingUp} label={`Сумма закупа за ${periodLabel}`} value={metrics.totalPurchaseValue.toLocaleString('ru-RU')} color="purple" />
+          <StatCard icon={BarChart3} label={`Маржа за ${periodLabel}`} value={margin.toLocaleString('ru-RU')} color={margin > 0 ? 'green' : 'orange'} />
+          <StatCard icon={FileText} label={`Приёмок за ${periodLabel}`} value={metrics.receptionsCount} color="indigo" />
           <StatCard
             icon={AlertTriangle}
             label="Неликвид (>30 дн)"
@@ -227,29 +393,31 @@ export default function DashboardDesktop({ user }) {
       ) : (
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
           <StatCard icon={Package} label="Товаров на складе" value={`${stats.totalProducts.toLocaleString('ru-RU')} шт`} color="blue" clickable onClick={() => setShowStockBreakdown(true)} />
-          <StatCard icon={Clock} label="Продаж за день" value={stats.salesDay.count} color="indigo" />
-          <StatCard icon={Calendar} label="Продаж за неделю" value={stats.salesWeek.count} color="purple" />
-          <StatCard icon={Calendar} label="Продаж за месяц" value={stats.salesMonth.count} color="orange" />
+          <StatCard icon={Clock} label={`Продаж за ${periodLabel}`} value={metrics.salesCount} color="indigo" />
+          <StatCard icon={RotateCcw} label={`Возвратов за ${periodLabel}`} value={metrics.refundsCount} color="orange" />
+          <StatCard icon={Calendar} label={`Сумма продаж за ${periodLabel}`} value={metrics.totalSaleValue.toLocaleString('ru-RU')} color="green" />
         </div>
       )}
 
       {/* Компактные графики: линейный график слева, круговая диаграмма справа */}
       {isAdmin && (
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-          {/* Линейный график закупок */}
+          {/* Линейный график остатков */}
           <div className="bg-white rounded-lg border border-gray-200 p-4">
-            <h3 className="text-sm font-semibold text-gray-700 mb-3">Закупки за 7 дней</h3>
-            {cityNames.length > 0 ? (
+            <h3 className="text-sm font-semibold text-gray-700 mb-3">Динамика остатков (шт) по городам</h3>
+            {trendCityNames.length > 0 ? (
               <ResponsiveContainer width="100%" height={240}>
-                <LineChart data={cityPurchaseChart.slice(-7)} margin={{ top: 5, right: 10, left: 0, bottom: 5 }}>
+                <LineChart data={stockTrendData} margin={{ top: 5, right: 10, left: 0, bottom: 5 }}>
                   <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
                   <XAxis dataKey="label" tick={{ fontSize: 10, fill: '#9ca3af' }} />
                   <YAxis tick={{ fontSize: 10, fill: '#9ca3af' }} width={50} />
                   <Tooltip
-                    formatter={(value) => value.toLocaleString('ru-RU') + ' ₽'}
+                    formatter={(value) => `${Number(value || 0).toLocaleString('ru-RU')} шт`}
+                    labelFormatter={(_, payload) => payload?.[0]?.payload?.fullDate || ''}
                     contentStyle={{ fontSize: 11, borderRadius: 8 }}
                   />
-                  {cityNames.map((name, i) => (
+                  <Legend wrapperStyle={{ fontSize: 11 }} />
+                  {trendCityNames.map((name, i) => (
                     <Line
                       key={name}
                       type="monotone"
@@ -265,6 +433,23 @@ export default function DashboardDesktop({ user }) {
             ) : (
               <div className="flex items-center justify-center h-[240px] text-gray-400 text-sm">Нет данных</div>
             )}
+            <div className="mt-3 flex items-center justify-center gap-2 flex-wrap">
+              {[
+                { id: 'week', label: 'Неделя' },
+                { id: 'month', label: 'Месяц' },
+                { id: 'quarter', label: '3 месяца' },
+                { id: 'halfyear', label: 'Полгода' },
+                { id: 'all', label: 'Всё время' },
+              ].map((opt) => (
+                <button
+                  key={opt.id}
+                  onClick={() => setChartRange(opt.id)}
+                  className={`px-2.5 py-1 text-xs rounded-lg border transition-colors ${chartRange === opt.id ? 'bg-blue-50 border-blue-300 text-blue-700 font-medium' : 'bg-white border-gray-200 text-gray-600 hover:border-gray-300'}`}
+                >
+                  {opt.label}
+                </button>
+              ))}
+            </div>
           </div>
 
           {/* Круговая диаграмма с переключателем */}
@@ -312,7 +497,7 @@ export default function DashboardDesktop({ user }) {
 
       {/* Модалка разбивки по складам */}
       {showStockBreakdown && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50" onClick={() => setShowStockBreakdown(false)}>
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
           <div className="bg-white rounded-2xl max-w-6xl w-full mx-6 shadow-2xl" onClick={(e) => e.stopPropagation()}>
             <div className="flex items-center justify-between px-8 py-5 border-b border-gray-100">
               <div>
@@ -367,7 +552,7 @@ export default function DashboardDesktop({ user }) {
 
       {/* Модалка с неликвидом */}
       {showStaleProducts && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50" onClick={() => setShowStaleProducts(false)}>
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
           <div className="bg-white rounded-lg p-6 max-w-2xl w-full mx-4 max-h-[80vh] overflow-auto" onClick={(e) => e.stopPropagation()}>
             <div className="flex items-center justify-between mb-4">
               <h3 className="text-lg font-semibold text-gray-900">Товары без продаж более 30 дней</h3>

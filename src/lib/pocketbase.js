@@ -1294,7 +1294,7 @@ export const getWriteOffs = async (supplierId = null) => {
     const filter = supplierId ? `supplier = "${supplierId}"` : '';
     return await pb.collection('write_offs').getFullList({
       filter,
-      sort: '-writeoff_date',
+      sort: '-created',
       expand: 'product,supplier,user,reception_id'
     });
   } catch (error) {
@@ -1305,34 +1305,32 @@ export const getWriteOffs = async (supplierId = null) => {
 
 export const createWriteOff = async (data) => {
   try {
-    // Сначала уменьшаем остаток товара
-    if (data.product && data.quantity) {
-      const supplierId = data.supplier || '';
-      const filterParts = [`product = "${data.product}"`];
-      if (supplierId) filterParts.push(`supplier = "${supplierId}"`);
-      filterParts.push('quantity > 0');
-      
-      const stocks = await pb.collection('stocks').getFullList({
-        filter: filterParts.join(' && '),
-        sort: '+reception_date,+created'
-      });
-      
-      let remaining = data.quantity;
-      for (const stock of stocks) {
-        if (remaining <= 0) break;
-        const deduct = Math.min(stock.quantity, remaining);
-        await pb.collection('stocks').update(stock.id, {
-          quantity: stock.quantity - deduct
-        });
-        remaining -= deduct;
-      }
+    const productId = data.product;
+    const quantity = Number(data.quantity) || 0;
+    const supplierId = data.supplier || '';
+
+    if (!productId) throw new Error('Не выбран товар для списания');
+    if (quantity <= 0) throw new Error('Количество списания должно быть больше 0');
+
+    // Сначала проверяем достаточность остатка, только потом создаём запись и списываем
+    const filterParts = [`product = "${productId}"`, 'quantity > 0'];
+    if (supplierId) filterParts.push(`supplier = "${supplierId}"`);
+
+    const stocks = await pb.collection('stocks').getFullList({
+      filter: filterParts.join(' && '),
+      sort: '+reception_date,+created'
+    });
+
+    const availableQty = stocks.reduce((sum, s) => sum + (Number(s.quantity) || 0), 0);
+    if (availableQty < quantity) {
+      throw new Error(`Недостаточно остатка для списания: доступно ${availableQty}, нужно ${quantity}`);
     }
 
-    // Пробуем создать запись списания
+    // Создаём запись списания (без silent fallback к локальному объекту)
     const writeOffData = {
-      product: data.product || '',
-      supplier: data.supplier || '',
-      quantity: data.quantity || 0,
+      product: productId,
+      supplier: supplierId || '',
+      quantity,
       reason: data.reason || '',
       cost_per_unit: data.cost_per_unit || 0,
       product_name: data.product_name || '',
@@ -1341,48 +1339,160 @@ export const createWriteOff = async (data) => {
       user: pb.authStore.model?.id || ''
     };
 
+    const created = await pb.collection('write_offs').create(writeOffData);
+
     try {
-      return await pb.collection('write_offs').create(writeOffData);
-    } catch (collectionError) {
-      // Коллекция не существует или неверная схема — пробуем с минимальными полями
-      console.warn('write_offs create failed, trying minimal fields:', collectionError);
-      try {
-        return await pb.collection('write_offs').create({
-          product_name: data.product_name || '',
-          quantity: data.quantity || 0,
-          reason: data.reason || '',
-          city: data.city || '',
-          status: 'active'
-        });
-      } catch (minimalError) {
-        // Коллекция не существует — создаём её
-        console.warn('write_offs collection may not exist, attempting to create it');
-        try {
-          await pb.collections.create({
-            name: 'write_offs',
-            type: 'base',
-            schema: [
-              { name: 'product', type: 'relation', options: { collectionId: '_pbc_products', maxSelect: 1 } },
-              { name: 'supplier', type: 'relation', options: { collectionId: '_pbc_suppliers', maxSelect: 1 } },
-              { name: 'quantity', type: 'number' },
-              { name: 'reason', type: 'text' },
-              { name: 'cost_per_unit', type: 'number' },
-              { name: 'product_name', type: 'text' },
-              { name: 'city', type: 'text' },
-              { name: 'status', type: 'text' },
-              { name: 'user', type: 'relation', options: { collectionId: '_pb_users_auth_', maxSelect: 1 } }
-            ]
-          });
-          return await pb.collection('write_offs').create(writeOffData);
-        } catch (createCollErr) {
-          console.error('Could not create write_offs collection:', createCollErr);
-          // Остаток уже уменьшен — сообщаем что списание произошло, но запись не создана
-          return { id: 'local-' + Date.now(), ...writeOffData, created: new Date().toISOString() };
-        }
+      // После успешного создания записи списываем остатки по FIFO
+      let remaining = quantity;
+      const touched = [];
+      const toDeleteIds = [];
+      for (const stock of stocks) {
+        if (remaining <= 0) break;
+        const currentQty = Number(stock.quantity) || 0;
+        const deduct = Math.min(currentQty, remaining);
+        const nextQty = currentQty - deduct;
+        touched.push({ stockId: stock.id, prevQty: currentQty });
+        await pb.collection('stocks').update(stock.id, { quantity: nextQty });
+        if (nextQty <= 0) toDeleteIds.push(stock.id);
+        remaining -= deduct;
       }
+
+      // Чистка нулевых остатков (best-effort; не ломаем успешное списание, если удаление не прошло)
+      for (const stockId of toDeleteIds) {
+        await pb.collection('stocks').delete(stockId).catch(() => {});
+      }
+    } catch (stockErr) {
+      // Пробуем откатить измененные остатки
+      try {
+        const restored = [];
+        for (const stock of stocks) {
+          const existing = await pb.collection('stocks').getOne(stock.id).catch(() => null);
+          if (existing) {
+            await pb.collection('stocks').update(stock.id, { quantity: Number(stock.quantity) || 0 });
+            restored.push(stock.id);
+          }
+        }
+        void restored;
+      } catch (_) {
+        // ignore rollback errors
+      }
+      // Роллбэк: если не удалось корректно обновить остатки — удаляем запись списания
+      await pb.collection('write_offs').delete(created.id).catch(() => {});
+      throw stockErr;
     }
+
+    return created;
   } catch (error) {
     console.error('PocketBase: Error creating write-off:', error);
+    throw error;
+  }
+};
+
+const addBackToStock = async ({ productId, supplierId, quantity, costPerUnit = 0 }) => {
+  if (!productId || !quantity) return;
+  const filterParts = [`product = "${productId}"`];
+  if (supplierId) filterParts.push(`supplier = "${supplierId}"`);
+  const existing = await pb.collection('stocks').getFirstListItem(filterParts.join(' && ')).catch(() => null);
+  if (existing) {
+    await pb.collection('stocks').update(existing.id, {
+      quantity: (Number(existing.quantity) || 0) + Number(quantity),
+    });
+  } else {
+    await pb.collection('stocks').create({
+      product: productId,
+      supplier: supplierId || '',
+      quantity: Number(quantity),
+      cost: Number(costPerUnit) || 0,
+      cost_per_unit: Number(costPerUnit) || 0,
+    });
+  }
+};
+
+const deductFromStock = async ({ productId, supplierId, quantity }) => {
+  if (!productId || !quantity) return;
+  const filterParts = [`product = "${productId}"`, 'quantity > 0'];
+  if (supplierId) filterParts.push(`supplier = "${supplierId}"`);
+
+  const stocks = await pb.collection('stocks').getFullList({
+    filter: filterParts.join(' && '),
+    sort: '+reception_date,+created',
+  });
+
+  const available = stocks.reduce((sum, s) => sum + (Number(s.quantity) || 0), 0);
+  if (available < quantity) {
+    throw new Error(`Недостаточно остатка: доступно ${available}, нужно ${quantity}`);
+  }
+
+  let remaining = Number(quantity);
+  const toDeleteIds = [];
+  for (const stock of stocks) {
+    if (remaining <= 0) break;
+    const currentQty = Number(stock.quantity) || 0;
+    const deduct = Math.min(currentQty, remaining);
+    const nextQty = currentQty - deduct;
+    await pb.collection('stocks').update(stock.id, { quantity: nextQty });
+    if (nextQty <= 0) toDeleteIds.push(stock.id);
+    remaining -= deduct;
+  }
+
+  for (const stockId of toDeleteIds) {
+    await pb.collection('stocks').delete(stockId).catch(() => {});
+  }
+};
+
+export const cancelWriteOff = async (writeOffId) => {
+  try {
+    const writeOff = await pb.collection('write_offs').getOne(writeOffId);
+    if (!writeOff) throw new Error('Списание не найдено');
+    if (writeOff.status === 'cancelled') return writeOff;
+
+    await addBackToStock({
+      productId: writeOff.product,
+      supplierId: writeOff.supplier,
+      quantity: Number(writeOff.quantity) || 0,
+      costPerUnit: Number(writeOff.cost_per_unit) || 0,
+    });
+
+    return await pb.collection('write_offs').update(writeOffId, {
+      status: 'cancelled',
+    });
+  } catch (error) {
+    console.error('PocketBase: Error cancelling write-off:', error);
+    throw error;
+  }
+};
+
+export const updateWriteOff = async (writeOffId, { quantity, reason }) => {
+  try {
+    const writeOff = await pb.collection('write_offs').getOne(writeOffId);
+    if (!writeOff) throw new Error('Списание не найдено');
+    if (writeOff.status === 'cancelled') throw new Error('Нельзя редактировать отменённое списание');
+
+    const oldQty = Number(writeOff.quantity) || 0;
+    const newQty = Math.max(1, Number(quantity) || oldQty);
+    const diff = newQty - oldQty;
+
+    if (diff > 0) {
+      await deductFromStock({
+        productId: writeOff.product,
+        supplierId: writeOff.supplier,
+        quantity: diff,
+      });
+    } else if (diff < 0) {
+      await addBackToStock({
+        productId: writeOff.product,
+        supplierId: writeOff.supplier,
+        quantity: Math.abs(diff),
+        costPerUnit: Number(writeOff.cost_per_unit) || 0,
+      });
+    }
+
+    return await pb.collection('write_offs').update(writeOffId, {
+      quantity: newQty,
+      reason: reason ?? writeOff.reason,
+    });
+  } catch (error) {
+    console.error('PocketBase: Error updating write-off:', error);
     throw error;
   }
 };
@@ -1407,15 +1517,45 @@ export const getProductBatches = async (productId, supplierId = null) => {
 // === Получение истории приемок для товара ===
 export const getReceptionHistoryForProduct = async (productId, supplierId = null) => {
   try {
-    // Получаем все партии (stock records) для этого товара
+    // 1) Источник-истина: сами приёмки и их items (кол-во не зависит от последующих продаж/списаний)
+    const receptionsFilter = supplierId ? `supplier = "${supplierId}"` : '';
+    const receptions = await pb.collection('receptions').getFullList({
+      filter: receptionsFilter,
+      sort: '-created',
+      expand: 'supplier',
+    }).catch(() => []);
+
+    const historyFromReceptions = [];
+    receptions.forEach((rec) => {
+      const items = Array.isArray(rec.items) ? rec.items : [];
+      const cityName = rec.expand?.supplier?.name || '';
+      items.forEach((item) => {
+        const itemProductId = typeof item.product === 'object' ? item.product?.id : item.product;
+        if (itemProductId === productId) {
+          historyFromReceptions.push({
+            date: rec.created || rec.date || '',
+            city: cityName,
+            quantity: Number(item.quantity) || 0,
+            cost: Number(item.cost ?? item.purchase_price ?? 0) || 0,
+            receptionId: rec.id,
+            batchNumber: rec.batch_number || '',
+            receptionName: rec.batch_number || rec.id?.slice(-6) || '',
+          });
+        }
+      });
+    });
+
+    if (historyFromReceptions.length > 0) {
+      historyFromReceptions.sort((a, b) => new Date(b.date || 0) - new Date(a.date || 0));
+      return historyFromReceptions;
+    }
+
+    // 2) Фолбэк для старых данных: партии в stocks
     const batches = await getProductBatches(productId, supplierId);
-    
     if (batches.length === 0) return [];
-    
-    // Преобразуем в формат {date, city, quantity, cost, receptionId, batchNumber}
+
     const history = batches.map(batch => {
       const cityName = batch.expand?.supplier?.name || '';
-      // Используем created (полный ISO timestamp от PocketBase) как основной источник даты
       const fullDate = batch.created || batch.reception_date || '';
       return {
         date: fullDate,
@@ -1427,10 +1567,8 @@ export const getReceptionHistoryForProduct = async (productId, supplierId = null
         receptionName: batch.expand?.reception_id?.batch_number || batch.batch_number || ''
       };
     });
-    
-    // Сортируем по дате (новые сверху)
+
     history.sort((a, b) => new Date(b.date || 0) - new Date(a.date || 0));
-    
     return history;
   } catch (error) {
     console.error('PocketBase: Error loading reception history:', error);

@@ -1,10 +1,11 @@
-import React, { useState, useEffect } from 'react';
-import { Search, ChevronUp, ChevronDown, ChevronRight, RefreshCw, Plus, Eye, X, Trash2, Minus } from 'lucide-react';
-import { getReceptions, getSuppliers, getProducts, createReception, updateReception, deleteReception } from '../../lib/pocketbase';
+import React, { useState, useEffect, useMemo } from 'react';
+import { Search, ChevronUp, ChevronDown, ChevronRight, RefreshCw, Plus, Eye, X, Trash2, Minus, PlusCircle } from 'lucide-react';
+import { getReceptions, getSuppliers, getProducts, createReception, updateReception, deleteReception, createProduct } from '../../lib/pocketbase';
 import pb from '../../lib/pocketbase';
 import { getOrFetch, invalidate } from '../../lib/cache';
 import { formatLocalDate } from '../../lib/dateUtils';
 import CreateReceptionModal from './CreateReceptionModal';
+import { detectSubcategory, CATEGORY_ORDER } from '../../lib/subcategories';
 
 export default function ReceptionDesktop() {
   const [receptions, setReceptions] = useState([]);
@@ -20,6 +21,15 @@ export default function ReceptionDesktop() {
   const [editedItems, setEditedItems] = useState([]);
   const [hasChanges, setHasChanges] = useState(false);
   const [expandedStores, setExpandedStores] = useState({});
+  const [showAddItemPanel, setShowAddItemPanel] = useState(false);
+  const [addItemQuery, setAddItemQuery] = useState('');
+  const [selectedAddProductId, setSelectedAddProductId] = useState('');
+  const [addItemQuantity, setAddItemQuantity] = useState(1);
+  const [addItemCost, setAddItemCost] = useState('');
+  const [showCreateProductPanel, setShowCreateProductPanel] = useState(false);
+  const [createProductForm, setCreateProductForm] = useState({ name: '', category: '', cost: 0, price: 0 });
+  const [createProductSaving, setCreateProductSaving] = useState(false);
+  const [createProductError, setCreateProductError] = useState('');
   
   const userRole = pb.authStore.model?.role;
   const isAdmin = userRole === 'admin';
@@ -139,16 +149,40 @@ export default function ReceptionDesktop() {
     }
   };
 
+  const normalizeReceptionItems = (items = []) => {
+    return items.map((item) => {
+      const productId = typeof item.product === 'object' ? item.product?.id : item.product;
+      const product = products.find((p) => p.id === productId);
+      return {
+        ...item,
+        product: productId,
+        name: item.name || product?.name || 'Товар',
+        quantity: Number(item.quantity) || 1,
+        cost: Number(item.cost ?? item.purchase_price ?? product?.cost ?? 0) || 0,
+      };
+    });
+  };
+
   const handleOpenReception = (reception) => {
     setSelectedReception(reception);
-    setEditedItems(JSON.parse(JSON.stringify(reception.items || [])));
+    setEditedItems(normalizeReceptionItems(JSON.parse(JSON.stringify(reception.items || []))));
     setHasChanges(false);
+    setShowAddItemPanel(false);
+    setAddItemQuery('');
+    setSelectedAddProductId('');
+    setAddItemQuantity(1);
+    setAddItemCost('');
+    setShowCreateProductPanel(false);
+    setCreateProductError('');
   };
 
   const handleCloseDetails = () => {
     setSelectedReception(null);
     setEditedItems([]);
     setHasChanges(false);
+    setShowAddItemPanel(false);
+    setShowCreateProductPanel(false);
+    setCreateProductError('');
   };
 
   const handleQuantityChange = (itemIndex, delta) => {
@@ -159,17 +193,101 @@ export default function ReceptionDesktop() {
   };
 
   const handleRemoveItem = (itemIndex) => {
-    if (editedItems.length <= 1) {
-      alert('Нельзя удалить последний товар из приёмки');
-      return;
-    }
     const newItems = editedItems.filter((_, idx) => idx !== itemIndex);
     setEditedItems(newItems);
     setHasChanges(true);
   };
 
+  const handleCostChange = (itemIndex, value) => {
+    const newItems = [...editedItems];
+    newItems[itemIndex].cost = Number(value) || 0;
+    setEditedItems(newItems);
+    setHasChanges(true);
+  };
+
+  const filteredAddProducts = useMemo(() => {
+    const q = addItemQuery.trim().toLowerCase();
+    const usedIds = new Set(editedItems.map((i) => (typeof i.product === 'object' ? i.product?.id : i.product)));
+    const available = products.filter((p) => !usedIds.has(p.id));
+    if (!q) return available.slice(0, 40);
+    return available
+      .filter((p) => (p.name || '').toLowerCase().includes(q))
+      .slice(0, 40);
+  }, [products, editedItems, addItemQuery]);
+
+  const handleAddItemToReception = () => {
+    const product = products.find((p) => p.id === selectedAddProductId);
+    if (!product) {
+      alert('Выберите товар из списка');
+      return;
+    }
+    const qty = Math.max(1, Number(addItemQuantity) || 1);
+    const cost = Number(addItemCost === '' ? (product.cost || 0) : addItemCost) || 0;
+    setEditedItems((prev) => [
+      ...prev,
+      {
+        product: product.id,
+        name: product.name,
+        quantity: qty,
+        cost,
+      },
+    ]);
+    setHasChanges(true);
+    setSelectedAddProductId('');
+    setAddItemQuantity(1);
+    setAddItemCost('');
+    setAddItemQuery('');
+  };
+
+  const handleCreateProductFromReception = async () => {
+    if (!createProductForm.name.trim()) {
+      setCreateProductError('Введите название товара');
+      return;
+    }
+    if (!createProductForm.category) {
+      setCreateProductError('Выберите категорию');
+      return;
+    }
+    try {
+      setCreateProductSaving(true);
+      setCreateProductError('');
+      const newProduct = await createProduct({
+        name: createProductForm.name.trim(),
+        category: [createProductForm.category],
+        subcategory: detectSubcategory(createProductForm.name),
+        cost: Number(createProductForm.cost) || 0,
+        price: Number(createProductForm.price) || 0,
+      });
+
+      setProducts((prev) => [newProduct, ...prev]);
+      invalidate('products');
+
+      setEditedItems((prev) => [
+        ...prev,
+        {
+          product: newProduct.id,
+          name: newProduct.name,
+          quantity: 1,
+          cost: Number(createProductForm.cost) || 0,
+        },
+      ]);
+      setHasChanges(true);
+
+      setCreateProductForm({ name: '', category: '', cost: 0, price: 0 });
+      setShowCreateProductPanel(false);
+    } catch (error) {
+      setCreateProductError('Ошибка создания товара: ' + (error?.message || ''));
+    } finally {
+      setCreateProductSaving(false);
+    }
+  };
+
   const handleSaveChanges = async () => {
     try {
+      if (editedItems.length === 0) {
+        alert('Добавьте хотя бы один товар в приёмку');
+        return;
+      }
       setLoading(true);
       const totalAmount = editedItems.reduce((sum, item) => 
         sum + (item.cost * item.quantity), 0
@@ -430,8 +548,8 @@ export default function ReceptionDesktop() {
 
       {/* Модалка с деталями приёмки */}
       {selectedReception && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4" onClick={handleCloseDetails}>
-          <div className="bg-white rounded-lg w-full max-w-4xl max-h-[90vh] overflow-hidden flex flex-col" onClick={(e) => e.stopPropagation()}>
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-lg w-full max-w-4xl max-h-[90vh] overflow-hidden flex flex-col">
             {/* Заголовок */}
             <div className="flex items-center justify-between p-4 border-b border-gray-200">
               <div>
@@ -443,6 +561,24 @@ export default function ReceptionDesktop() {
                 </p>
               </div>
               <div className="flex items-center gap-2">
+                {isAdmin && (
+                  <button
+                    onClick={() => setShowAddItemPanel((v) => !v)}
+                    className={`inline-flex items-center gap-1 px-2 py-1 rounded text-xs ${showAddItemPanel ? 'bg-blue-100 text-blue-700' : 'text-blue-600 hover:bg-blue-50'}`}
+                    title="Добавить товар"
+                  >
+                    <Plus size={14} /> Товар
+                  </button>
+                )}
+                {isAdmin && (
+                  <button
+                    onClick={() => setShowCreateProductPanel((v) => !v)}
+                    className={`inline-flex items-center gap-1 px-2 py-1 rounded text-xs ${showCreateProductPanel ? 'bg-green-100 text-green-700' : 'text-green-600 hover:bg-green-50'}`}
+                    title="Создать новый товар"
+                  >
+                    <PlusCircle size={14} /> Создать
+                  </button>
+                )}
                 {isAdmin && (
                   <button
                     onClick={() => handleDeleteReception(selectedReception.id)}
@@ -498,6 +634,115 @@ export default function ReceptionDesktop() {
                 </div>
               </div>
 
+              {/* Панель добавления товара */}
+              {isAdmin && showAddItemPanel && (
+                <div className="p-4 border border-blue-200 bg-blue-50/40 rounded-lg space-y-3">
+                  <h4 className="text-sm font-medium text-gray-800">Добавить товар в приёмку</h4>
+                  <div className="relative">
+                    <Search size={14} className="absolute left-2 top-1/2 -translate-y-1/2 text-gray-400" />
+                    <input
+                      type="text"
+                      value={addItemQuery}
+                      onChange={(e) => setAddItemQuery(e.target.value)}
+                      placeholder="Поиск товара по названию..."
+                      className="w-full pl-7 pr-2 py-1.5 border border-gray-300 rounded text-xs focus:outline-none focus:ring-1 focus:ring-blue-500"
+                    />
+                  </div>
+                  <div className="max-h-36 overflow-y-auto border border-gray-200 rounded bg-white">
+                    {filteredAddProducts.length === 0 ? (
+                      <p className="text-xs text-gray-400 py-3 text-center">Нет доступных товаров</p>
+                    ) : filteredAddProducts.map((p) => (
+                      <button
+                        key={p.id}
+                        onClick={() => {
+                          setSelectedAddProductId(p.id);
+                          setAddItemCost(String(p.cost || 0));
+                        }}
+                        className={`w-full text-left px-3 py-2 text-xs border-b border-gray-100 hover:bg-gray-50 ${selectedAddProductId === p.id ? 'bg-blue-100' : ''}`}
+                      >
+                        <span className="font-medium text-gray-900">{p.name}</span>
+                      </button>
+                    ))}
+                  </div>
+                  <div className="grid grid-cols-3 gap-2 items-end">
+                    <div>
+                      <label className="block text-[11px] text-gray-500 mb-1">Кол-во</label>
+                      <input
+                        type="number"
+                        min="1"
+                        value={addItemQuantity}
+                        onChange={(e) => setAddItemQuantity(Math.max(1, Number(e.target.value) || 1))}
+                        className="w-full px-2 py-1.5 border border-gray-300 rounded text-xs"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-[11px] text-gray-500 mb-1">Закуп</label>
+                      <input
+                        type="number"
+                        min="0"
+                        value={addItemCost}
+                        onChange={(e) => setAddItemCost(e.target.value)}
+                        className="w-full px-2 py-1.5 border border-gray-300 rounded text-xs"
+                      />
+                    </div>
+                    <button
+                      onClick={handleAddItemToReception}
+                      className="px-3 py-1.5 bg-blue-600 text-white text-xs rounded hover:bg-blue-700"
+                    >
+                      Добавить
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {/* Панель создания товара */}
+              {isAdmin && showCreateProductPanel && (
+                <div className="p-4 border border-green-200 bg-green-50/40 rounded-lg space-y-3">
+                  <h4 className="text-sm font-medium text-gray-800">Создать новый товар</h4>
+                  <div className="grid grid-cols-2 gap-2">
+                    <input
+                      type="text"
+                      value={createProductForm.name}
+                      onChange={(e) => setCreateProductForm((f) => ({ ...f, name: e.target.value }))}
+                      placeholder="Название *"
+                      className="col-span-2 px-2 py-1.5 border border-gray-300 rounded text-xs"
+                    />
+                    <select
+                      value={createProductForm.category}
+                      onChange={(e) => setCreateProductForm((f) => ({ ...f, category: e.target.value }))}
+                      className="px-2 py-1.5 border border-gray-300 rounded text-xs"
+                    >
+                      <option value="">Категория *</option>
+                      {CATEGORY_ORDER.map((cat) => (
+                        <option key={cat} value={cat}>{cat}</option>
+                      ))}
+                    </select>
+                    <input
+                      type="number"
+                      value={createProductForm.cost}
+                      onChange={(e) => setCreateProductForm((f) => ({ ...f, cost: e.target.value }))}
+                      placeholder="Закуп"
+                      className="px-2 py-1.5 border border-gray-300 rounded text-xs"
+                    />
+                    <input
+                      type="number"
+                      value={createProductForm.price}
+                      onChange={(e) => setCreateProductForm((f) => ({ ...f, price: e.target.value }))}
+                      placeholder="Продажа"
+                      className="px-2 py-1.5 border border-gray-300 rounded text-xs"
+                    />
+                    <button
+                      onClick={handleCreateProductFromReception}
+                      disabled={createProductSaving}
+                      className="px-3 py-1.5 bg-green-600 text-white text-xs rounded hover:bg-green-700 disabled:opacity-50"
+                    >
+                      {createProductSaving ? 'Создание...' : 'Создать и добавить'}
+                    </button>
+                  </div>
+                  {createProductError && <p className="text-xs text-red-600">{createProductError}</p>}
+                </div>
+              )}
+
               {/* Список товаров */}
               <div>
                 <h4 className="text-sm font-medium text-gray-700 mb-2">Товары в приёмке:</h4>
@@ -543,7 +788,20 @@ export default function ReceptionDesktop() {
                                   <div className="text-center">{quantity} шт</div>
                                 )}
                               </td>
-                              <td className="px-3 py-2 text-right">{cost.toLocaleString('ru-RU')}</td>
+                              <td className="px-3 py-2 text-right">
+                                {isAdmin ? (
+                                  <input
+                                    type="number"
+                                    min="0"
+                                    step="0.01"
+                                    value={cost}
+                                    onChange={(e) => handleCostChange(idx, e.target.value)}
+                                    className="w-24 px-2 py-1 border border-gray-300 rounded text-right text-xs"
+                                  />
+                                ) : (
+                                  cost.toLocaleString('ru-RU')
+                                )}
+                              </td>
                               <td className="px-3 py-2 text-right font-medium">{total.toLocaleString('ru-RU')}</td>
                               {isAdmin && (
                                 <td className="px-3 py-2">

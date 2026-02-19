@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { Search, ChevronUp, ChevronDown, RefreshCw, MapPin, X, Plus, Trash2, Check, Calendar, Clock, FileX, RotateCcw, CheckSquare, Square, Merge } from 'lucide-react';
-import { getStocksAggregated, getSuppliers, getProducts, updateProduct, createStockRecord, deleteStockRecord, updateStockRecord, getReceptionHistoryForProduct, getWriteOffs, createWriteOff } from '../../lib/pocketbase';
+import { Search, ChevronUp, ChevronDown, RefreshCw, MapPin, X, Plus, Trash2, Check, Calendar, Clock, FileX, RotateCcw, CheckSquare, Square, Merge, Pencil } from 'lucide-react';
+import { getStocksAggregated, getSuppliers, getProducts, updateProduct, createStockRecord, deleteStockRecord, updateStockRecord, getReceptionHistoryForProduct, getWriteOffs, createWriteOff, cancelWriteOff, updateWriteOff } from '../../lib/pocketbase';
 import { detectSubcategory, ALL_SUBCATEGORIES, CATEGORY_ORDER } from '../../lib/subcategories';
 import pb from '../../lib/pocketbase';
 import { getOrFetch, invalidate } from '../../lib/cache';
@@ -27,6 +27,8 @@ export default function StockDesktop() {
   const [editError, setEditError] = useState('');
   const [receptionHistory, setReceptionHistory] = useState([]);
   const [historyLoading, setHistoryLoading] = useState(false);
+  const [writeOffHistory, setWriteOffHistory] = useState([]);
+  const [writeOffHistoryLoading, setWriteOffHistoryLoading] = useState(false);
 
   // Модалка создания остатка
   const [showCreateModal, setShowCreateModal] = useState(false);
@@ -42,8 +44,11 @@ export default function StockDesktop() {
   const [writeOffs, setWriteOffs] = useState([]);
   const [writeOffsLoading, setWriteOffsLoading] = useState(false);
   const [showWriteOffModal, setShowWriteOffModal] = useState(false);
-  const [writeOffForm, setWriteOffForm] = useState({ quantity: 1, reason: '' });
+  const [writeOffForm, setWriteOffForm] = useState({ quantity: 1, reason: '', supplierId: '' });
   const [writeOffSaving, setWriteOffSaving] = useState(false);
+  const [editingWriteOff, setEditingWriteOff] = useState(null);
+  const [writeOffEditForm, setWriteOffEditForm] = useState({ quantity: 1, reason: '' });
+  const [writeOffEditSaving, setWriteOffEditSaving] = useState(false);
 
   // Мультивыбор
   const [selectMode, setSelectMode] = useState(false);
@@ -105,7 +110,7 @@ export default function StockDesktop() {
     if (!editStock || !editProduct) return;
     try {
       setWriteOffSaving(true);
-      const supplierId = selectedSupplier || (editCities[0]?.supplierId) || '';
+      const supplierId = writeOffForm.supplierId || selectedSupplier || (editCities[0]?.supplierId) || '';
       await createWriteOff({
         product: editProduct.id,
         supplier: supplierId,
@@ -120,7 +125,7 @@ export default function StockDesktop() {
       invalidate('dashboard');
       setShowWriteOffModal(false);
       setShowEditModal(false);
-      setWriteOffForm({ quantity: 1, reason: '' });
+      setWriteOffForm({ quantity: 1, reason: '', supplierId: '' });
       loadStocks();
       if (activeTab === 'writeoffs') loadWriteOffs();
       alert('Товар списан');
@@ -134,13 +139,43 @@ export default function StockDesktop() {
   const handleCancelWriteOff = async (writeOff) => {
     if (!window.confirm(`Отменить списание "${writeOff.product_name || 'товар'}" (${writeOff.quantity} шт)?`)) return;
     try {
-      await pb.collection('write_offs').update(writeOff.id, { status: 'cancelled' });
+      await cancelWriteOff(writeOff.id);
       invalidate('writeoffs');
       invalidate('stocks');
+      invalidate('dashboard');
       loadWriteOffs();
       loadStocks();
     } catch (err) {
       alert('Ошибка отмены: ' + (err.message || ''));
+    }
+  };
+
+  const handleOpenWriteOffEdit = (writeOff) => {
+    setEditingWriteOff(writeOff);
+    setWriteOffEditForm({
+      quantity: Number(writeOff.quantity) || 1,
+      reason: writeOff.reason || '',
+    });
+  };
+
+  const handleSaveWriteOffEdit = async () => {
+    if (!editingWriteOff) return;
+    try {
+      setWriteOffEditSaving(true);
+      await updateWriteOff(editingWriteOff.id, {
+        quantity: writeOffEditForm.quantity,
+        reason: writeOffEditForm.reason,
+      });
+      setEditingWriteOff(null);
+      invalidate('writeoffs');
+      invalidate('stocks');
+      invalidate('dashboard');
+      loadWriteOffs();
+      loadStocks();
+    } catch (err) {
+      alert('Ошибка редактирования списания: ' + (err.message || ''));
+    } finally {
+      setWriteOffEditSaving(false);
     }
   };
 
@@ -218,6 +253,7 @@ export default function StockDesktop() {
     }
     setEditError('');
     setReceptionHistory([]);
+    setWriteOffHistory([]);
     setShowEditModal(true);
     // Загружаем историю приёмок
     if (product?.id) {
@@ -229,6 +265,21 @@ export default function StockDesktop() {
         console.error('Error loading history:', e);
       } finally {
         setHistoryLoading(false);
+      }
+    }
+    // Загружаем историю списаний/возвратов
+    if (product?.id) {
+      setWriteOffHistoryLoading(true);
+      try {
+        const writeOffRows = await pb.collection('write_offs').getFullList({
+          filter: `product = "${product.id}"`,
+          sort: '-created',
+        }).catch(() => []);
+        setWriteOffHistory(writeOffRows || []);
+      } catch (e) {
+        console.error('Error loading write-off history:', e);
+      } finally {
+        setWriteOffHistoryLoading(false);
       }
     }
   };
@@ -943,7 +994,7 @@ export default function StockDesktop() {
               ) : writeOffs.map((wo, idx) => {
                 const isCancelled = wo.status === 'cancelled';
                 return (
-                  <tr key={wo.id} className={`border-b border-gray-100 ${isCancelled ? 'opacity-50 bg-gray-50' : 'hover:bg-gray-50'}`}>
+                  <tr key={wo.id} className={`border-b border-gray-100 ${isCancelled ? 'opacity-70 bg-gray-50' : 'hover:bg-gray-50'}`}>
                     <td className="px-3 py-2 font-mono text-gray-500">{writeOffs.length - idx}</td>
                     <td className="px-3 py-2">
                       <div className="text-gray-900">{new Date(wo.created).toLocaleDateString('ru-RU', {day:'2-digit',month:'2-digit',year:'2-digit'})}</div>
@@ -955,15 +1006,20 @@ export default function StockDesktop() {
                     <td className="px-3 py-2 text-gray-600">{wo.city || '—'}</td>
                     <td className="px-3 py-2 text-center">
                       {isCancelled 
-                        ? <span className="px-1.5 py-0.5 text-[10px] bg-gray-100 text-gray-500 rounded">Отменено</span>
+                        ? <span className="px-1.5 py-0.5 text-[10px] bg-emerald-50 text-emerald-600 rounded">Возвращено</span>
                         : <span className="px-1.5 py-0.5 text-[10px] bg-red-50 text-red-600 rounded">Списано</span>
                       }
                     </td>
                     <td className="px-3 py-2 text-center">
                       {!isCancelled && isAdmin && (
-                        <button onClick={() => handleCancelWriteOff(wo)} className="p-1 hover:bg-blue-50 rounded text-gray-400 hover:text-blue-600" title="Отменить списание">
-                          <RotateCcw size={13} />
-                        </button>
+                        <div className="flex items-center justify-center gap-1">
+                          <button onClick={() => handleOpenWriteOffEdit(wo)} className="p-1 hover:bg-gray-50 rounded text-gray-400 hover:text-gray-700" title="Редактировать">
+                            <Pencil size={13} />
+                          </button>
+                          <button onClick={() => handleCancelWriteOff(wo)} className="p-1 hover:bg-blue-50 rounded text-gray-400 hover:text-blue-600" title="Отменить списание">
+                            <RotateCcw size={13} />
+                          </button>
+                        </div>
                       )}
                     </td>
                   </tr>
@@ -983,7 +1039,7 @@ export default function StockDesktop() {
 
       {/* Модалка: разбивка по городам */}
       {cityModal && (
-        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50" onClick={() => setCityModal(null)}>
+        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
           <div className="bg-white rounded-xl max-w-md w-full mx-4 max-h-[70vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
             <div className="sticky top-0 bg-white border-b px-5 py-4 flex justify-between items-center">
               <div>
@@ -1013,14 +1069,18 @@ export default function StockDesktop() {
 
       {/* Модалка: редактирование товара + остатки по городам */}
       {showEditModal && editProduct && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50" onClick={closeEditModal}>
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
           <div className="bg-white rounded-xl max-w-lg w-full mx-4 max-h-[90vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
             <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200">
               <h3 className="text-lg font-semibold text-gray-900">Редактировать товар</h3>
               <div className="flex items-center gap-2">
                 {isAdmin && (
                   <button
-                    onClick={() => { setWriteOffForm({ quantity: 1, reason: '' }); setShowWriteOffModal(true); }}
+                    onClick={() => {
+                      const defaultSupplier = selectedSupplier || (editCities[0]?.supplierId) || '';
+                      setWriteOffForm({ quantity: 1, reason: '', supplierId: defaultSupplier });
+                      setShowWriteOffModal(true);
+                    }}
                     className="flex items-center gap-1.5 px-3 py-1.5 text-xs bg-red-50 text-red-600 hover:bg-red-100 rounded-lg transition-colors"
                   >
                     <FileX size={14} />
@@ -1156,6 +1216,41 @@ export default function StockDesktop() {
                   </div>
                 )}
               </div>
+
+              {/* История списаний/возвратов */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  <FileX size={14} className="inline mr-1" />
+                  История списаний
+                </label>
+                {writeOffHistoryLoading ? (
+                  <div className="text-center py-3 text-xs text-gray-400">
+                    <RefreshCw size={14} className="inline animate-spin mr-1" /> Загрузка...
+                  </div>
+                ) : writeOffHistory.length === 0 ? (
+                  <p className="text-xs text-gray-400 py-2">Списаний нет</p>
+                ) : (
+                  <div className="space-y-1.5 max-h-40 overflow-y-auto">
+                    {writeOffHistory.map((w) => {
+                      const d = w.created ? new Date(w.created) : null;
+                      const dateStr = d && !isNaN(d) ? d.toLocaleDateString('ru-RU', { day: 'numeric', month: 'short', year: 'numeric' }) : '—';
+                      const timeStr = d && !isNaN(d) ? d.toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' }) : '';
+                      const isReturned = w.status === 'cancelled';
+                      return (
+                        <div key={w.id} className="flex items-center gap-2 bg-gray-50 rounded-lg px-3 py-2 text-xs">
+                          <Clock size={12} className="text-gray-400 shrink-0" />
+                          <span className="text-gray-500 w-32 shrink-0">{dateStr}{timeStr ? `, ${timeStr}` : ''}</span>
+                          <span className={`px-1.5 py-0.5 rounded text-[10px] font-medium shrink-0 ${isReturned ? 'bg-emerald-100 text-emerald-700' : 'bg-red-100 text-red-700'}`}>
+                            {isReturned ? 'Возвращено' : 'Списано'}
+                          </span>
+                          <span className="text-gray-700 flex-1 truncate">{w.reason || '—'}</span>
+                          <span className={`font-medium shrink-0 ${isReturned ? 'text-emerald-700' : 'text-red-700'}`}>{w.quantity} шт</span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
             </div>
             <div className="flex items-center justify-end gap-3 px-6 py-4 border-t border-gray-200 bg-gray-50 rounded-b-xl">
               <button onClick={closeEditModal} className="px-4 py-2 text-sm text-gray-600 hover:bg-gray-100 rounded-lg">Отмена</button>
@@ -1171,7 +1266,7 @@ export default function StockDesktop() {
 
       {/* Модалка: добавить товар на склад */}
       {showCreateModal && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50" onClick={closeCreateModal}>
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
           <div className="bg-white rounded-2xl max-w-2xl w-full mx-4 shadow-2xl" onClick={e => e.stopPropagation()}>
             <div className="flex items-center justify-between px-8 py-5 border-b border-gray-100">
               <div>
@@ -1291,7 +1386,7 @@ export default function StockDesktop() {
 
       {/* Модалка: списание товара */}
       {showWriteOffModal && editProduct && (
-        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-[60]" onClick={() => setShowWriteOffModal(false)}>
+        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-[60]">
           <div className="bg-white rounded-xl max-w-sm w-full mx-4" onClick={e => e.stopPropagation()}>
             <div className="flex items-center justify-between px-5 py-4 border-b border-gray-200">
               <div className="flex items-center gap-2">
@@ -1317,6 +1412,21 @@ export default function StockDesktop() {
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-red-500"
                 />
               </div>
+              {editCities.length > 1 && (
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Город</label>
+                  <select
+                    value={writeOffForm.supplierId}
+                    onChange={e => setWriteOffForm({...writeOffForm, supplierId: e.target.value})}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-red-500"
+                  >
+                    <option value="">Выберите город</option>
+                    {editCities.map((city) => (
+                      <option key={city.supplierId} value={city.supplierId}>{city.supplierName}</option>
+                    ))}
+                  </select>
+                </div>
+              )}
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Причина</label>
                 <select
@@ -1337,11 +1447,63 @@ export default function StockDesktop() {
               <button onClick={() => setShowWriteOffModal(false)} className="px-4 py-2 text-sm text-gray-600 hover:bg-gray-100 rounded-lg">Отмена</button>
               <button
                 onClick={handleWriteOff}
-                disabled={writeOffSaving || !writeOffForm.reason}
+                disabled={writeOffSaving || !writeOffForm.reason || (editCities.length > 1 && !writeOffForm.supplierId)}
                 className="px-4 py-2 text-sm bg-red-600 text-white rounded-lg hover:bg-red-700 disabled:opacity-50 flex items-center gap-1.5"
               >
                 {writeOffSaving ? <div className="animate-spin rounded-full h-3.5 w-3.5 border-b-2 border-white"></div> : <FileX size={14} />}
                 Списать
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Модалка: редактирование списания */}
+      {editingWriteOff && (
+        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-[70]">
+          <div className="bg-white rounded-xl max-w-sm w-full mx-4">
+            <div className="flex items-center justify-between px-5 py-4 border-b border-gray-200">
+              <div className="flex items-center gap-2">
+                <Pencil size={18} className="text-gray-600" />
+                <h3 className="text-base font-semibold text-gray-900">Редактирование списания</h3>
+              </div>
+              <button onClick={() => setEditingWriteOff(null)} className="p-1 hover:bg-gray-100 rounded">
+                <X size={18} className="text-gray-500" />
+              </button>
+            </div>
+            <div className="p-5 space-y-4">
+              <div className="bg-gray-50 rounded-lg px-3 py-2">
+                <p className="text-sm font-medium text-gray-900">{editingWriteOff.product_name || 'Товар'}</p>
+                <p className="text-xs text-gray-500">Город: {editingWriteOff.city || '—'}</p>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Количество</label>
+                <input
+                  type="number"
+                  min="1"
+                  value={writeOffEditForm.quantity}
+                  onChange={e => setWriteOffEditForm({...writeOffEditForm, quantity: Math.max(1, parseInt(e.target.value) || 1)})}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Причина</label>
+                <input
+                  type="text"
+                  value={writeOffEditForm.reason}
+                  onChange={e => setWriteOffEditForm({...writeOffEditForm, reason: e.target.value})}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
+            </div>
+            <div className="flex items-center justify-end gap-2 px-5 py-4 border-t border-gray-200 bg-gray-50 rounded-b-xl">
+              <button onClick={() => setEditingWriteOff(null)} className="px-4 py-2 text-sm text-gray-600 hover:bg-gray-100 rounded-lg">Отмена</button>
+              <button
+                onClick={handleSaveWriteOffEdit}
+                disabled={writeOffEditSaving}
+                className="px-4 py-2 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50"
+              >
+                {writeOffEditSaving ? 'Сохранение...' : 'Сохранить'}
               </button>
             </div>
           </div>
