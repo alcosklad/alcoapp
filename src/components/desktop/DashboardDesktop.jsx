@@ -207,7 +207,7 @@ export default function DashboardDesktop({ user }) {
   }, [filteredOrders, filteredReceptions]);
 
   // Линейный график динамики остатков: база = текущий остаток, +приёмки, −продажи, −списания
-  const { stockTrendData, trendCityNames } = useMemo(() => {
+  const { stockTrendData, trendCityNames, currentTotals } = useMemo(() => {
     const normalizeDay = (rawDate) => {
       const d = new Date(rawDate);
       if (Number.isNaN(d.getTime())) return null;
