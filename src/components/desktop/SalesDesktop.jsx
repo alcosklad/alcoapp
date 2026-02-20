@@ -46,8 +46,8 @@ export default function SalesDesktop({ activeTab }) {
       // Bypass cache entirely — direct API call
       getAllOrders().then(fresh => {
         if (fresh) {
+          console.log('[Sales DEBUG] Fetched orders:', fresh.length, '| newest:', fresh[0]?.created, '| user:', fresh[0]?.user, '| auth:', pb.authStore.model?.id, pb.authStore.model?.role);
           setOrders(fresh);
-          // Update cache for future reads
           invalidate('orders');
           try {
             const entry = { data: fresh, ts: Date.now(), ttl: 60000 };
@@ -244,6 +244,7 @@ export default function SalesDesktop({ activeTab }) {
       }
       return sortDir==='asc' ? aV-bV : bV-aV;
     });
+    console.log('[Sales DEBUG] Filter:', { total: orders.length, afterFilter: result.length, filterDateFrom, filterDateTo, filterStatus, filterPeriod });
     return result;
   }, [orders, search, filterCourier, filterCity, filterDateFrom, filterDateTo, sortField, sortDir, filterStatus]);
 
