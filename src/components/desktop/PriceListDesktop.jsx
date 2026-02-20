@@ -33,6 +33,7 @@ export default function PriceListDesktop() {
   const [duplicates, setDuplicates] = useState([]);
   const [showDuplicates, setShowDuplicates] = useState(false);
   const [merging, setMerging] = useState(false);
+  const [modalCity, setModalCity] = useState('');
 
   // Мультивыбор
   const [selectMode, setSelectMode] = useState(false);
@@ -175,6 +176,7 @@ export default function PriceListDesktop() {
   const openCreateModal = () => {
     setModalProduct(null);
     setModalForm({ name: '', category: '', subcategory: '', cost: 0, price: 0 });
+    setModalCity(selectedSupplier || '');
     setDuplicates([]);
     setShowDuplicates(false);
     setModalError('');
@@ -246,7 +248,22 @@ export default function PriceListDesktop() {
       if (modalProduct) {
         await updateProduct(modalProduct.id, data);
       } else {
-        await createProduct(data);
+        const newProduct = await createProduct(data);
+        // If city selected, create a stock record for that city
+        if (modalCity && newProduct?.id) {
+          try {
+            await pb.collection('stocks').create({
+              product: newProduct.id,
+              supplier: modalCity,
+              quantity: 0,
+              cost: Number(modalForm.cost) || 0,
+              price: Number(modalForm.price) || 0,
+            });
+            invalidate('stocks');
+          } catch (e) {
+            console.warn('Failed to create stock for city:', e);
+          }
+        }
       }
       invalidate('products');
       closeModal();
@@ -371,6 +388,23 @@ export default function PriceListDesktop() {
       return matchesSearch;
     })
     .sort((a, b) => {
+      // When user explicitly sorts by price or category — use that as primary sort
+      if (sortField === 'purchasePrice' || sortField === 'price') {
+        const aVal = sortField === 'purchasePrice' ? (Number(a?.cost) || 0) : (Number(a?.price) || 0);
+        const bVal = sortField === 'purchasePrice' ? (Number(b?.cost) || 0) : (Number(b?.price) || 0);
+        if (aVal !== bVal) return sortDir === 'asc' ? aVal - bVal : bVal - aVal;
+        return (a?.name || '').localeCompare(b?.name || '');
+      }
+
+      if (sortField === 'category') {
+        const catA = (Array.isArray(a?.category) ? a.category[0] : (a?.category || '')) || '';
+        const catB = (Array.isArray(b?.category) ? b.category[0] : (b?.category || '')) || '';
+        const cmp = sortDir === 'asc' ? catA.localeCompare(catB) : catB.localeCompare(catA);
+        if (cmp !== 0) return cmp;
+        return (a?.name || '').localeCompare(b?.name || '');
+      }
+
+      // Default: group by category → subcategory → name
       const catA = (Array.isArray(a?.category) ? a.category[0] : (a?.category || '')) || '';
       const catB = (Array.isArray(b?.category) ? b.category[0] : (b?.category || '')) || '';
       if (catA !== catB) {
@@ -383,18 +417,9 @@ export default function PriceListDesktop() {
       const subB = (b?.subcategory || detectSubcategory(b?.name)) || '';
       if (subA !== subB) return subA.localeCompare(subB);
 
-      let aVal, bVal;
-      switch (sortField) {
-        case 'name': aVal = a?.name || ''; bVal = b?.name || ''; break;
-        case 'purchasePrice': aVal = a?.cost || 0; bVal = b?.cost || 0; break;
-        case 'price': aVal = a?.price || 0; bVal = b?.price || 0; break;
-        default: aVal = a?.name || ''; bVal = b?.name || '';
-      }
-
-      if (typeof aVal === 'string') {
-        return sortDir === 'asc' ? aVal.localeCompare(bVal) : bVal.localeCompare(aVal);
-      }
-      return sortDir === 'asc' ? aVal - bVal : bVal - aVal;
+      const aName = (a?.name || '').toLowerCase();
+      const bName = (b?.name || '').toLowerCase();
+      return sortDir === 'asc' ? aName.localeCompare(bName) : bName.localeCompare(aName);
     });
 
   const SortIcon = ({ field }) => {
@@ -829,6 +854,17 @@ export default function PriceListDesktop() {
                   </select>
                 </div>
               </div>
+
+              {!modalProduct && (
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Город</label>
+                  <select value={modalCity} onChange={e => setModalCity(e.target.value)}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+                    <option value="">Все города (без привязки)</option>
+                    {suppliers.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
+                  </select>
+                </div>
+              )}
 
               <div className="grid grid-cols-2 gap-4">
                 <div>

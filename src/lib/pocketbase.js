@@ -379,36 +379,48 @@ export const getStocksWithDetails = async (supplierId = null) => {
 // Получение всех остатков с агрегацией по product_id (глобальный контекст)
 export const getStocksAggregated = async (supplierId = null) => {
   try {
-    const filter = supplierId ? `supplier = "${supplierId}"` : '';
+    const filterParts = ['quantity > 0'];
+    if (supplierId) filterParts.push(`supplier = "${supplierId}"`);
     const stocks = await pb.collection('stocks').getFullList({
-      filter,
+      filter: filterParts.join(' && '),
       expand: 'product,supplier'
     });
-
-    if (supplierId) {
-      return stocks;
-    }
 
     // Агрегация: SUM(quantity) GROUP BY product_id
     const grouped = {};
     stocks.forEach(stock => {
       const productId = stock.product;
+      const qty = Number(stock.quantity) || 0;
+      if (qty <= 0) return;
+
       if (!grouped[productId]) {
         grouped[productId] = {
           ...stock,
           quantity: 0,
           _cityBreakdown: [],
+          _stockRecordIds: [],
         };
       }
-      grouped[productId].quantity += stock.quantity || 0;
-      grouped[productId]._cityBreakdown.push({
-        supplierName: stock.expand?.supplier?.name || '—',
-        supplierId: stock.supplier,
-        quantity: stock.quantity || 0,
-      });
+      grouped[productId].quantity += qty;
+      grouped[productId]._stockRecordIds.push(stock.id);
+
+      const supplierKey = stock.supplier || '';
+      const existingCity = grouped[productId]._cityBreakdown.find((c) => c.supplierId === supplierKey);
+      if (existingCity) {
+        existingCity.quantity += qty;
+      } else {
+        grouped[productId]._cityBreakdown.push({
+          supplierName: stock.expand?.supplier?.name || '—',
+          supplierId: supplierKey,
+          quantity: qty,
+        });
+      }
     });
 
-    return Object.values(grouped);
+    return Object.values(grouped).map((row) => ({
+      ...row,
+      _cityBreakdown: (row._cityBreakdown || []).sort((a, b) => (Number(b.quantity) || 0) - (Number(a.quantity) || 0)),
+    }));
   } catch (error) {
     console.error('PocketBase: Error loading aggregated stocks:', error);
     return [];
@@ -559,9 +571,9 @@ export const getSalesStats = async (period = 'day', filterId = null) => {
 // Получение статистики для дашборда
 export const getDashboardStats = async (filterId = null) => {
   try {
-    let stocksFilter = '';
+    let stocksFilter = 'quantity > 0';
     if (filterId) {
-      stocksFilter = `supplier = "${filterId}"`;
+      stocksFilter += ` && supplier = "${filterId}"`;
     }
     
     const stocks = await pb.collection('stocks').getFullList({
@@ -767,12 +779,12 @@ export const updateReception = async (id, data) => {
 };
 
 // Удаление приемки (с откатом остатков)
-export const deleteReception = async (id) => {
+export const deleteReception = async (id, options = {}) => {
+  const { deleteStock = true } = options;
   try {
-    // Сначала читаем приёмку, чтобы откатить остатки
     const reception = await pb.collection('receptions').getOne(id);
     
-    if (reception.items && Array.isArray(reception.items) && reception.supplier) {
+    if (deleteStock && reception.items && Array.isArray(reception.items) && reception.supplier) {
       for (const item of reception.items) {
         if (item.product && item.quantity) {
           try {
@@ -990,7 +1002,7 @@ export const getAllOrders = async (filters = {}) => {
   try {
     const records = await pb.collection('orders').getFullList({
       sort: '-local_time',
-      expand: 'user',
+      expand: 'user,user.supplier',
       ...filters
     });
     return records;
@@ -1329,29 +1341,28 @@ export const createWriteOff = async (data) => {
     // Создаём запись списания (без silent fallback к локальному объекту)
     const writeOffData = {
       product: productId,
-      supplier: supplierId || '',
       quantity,
       reason: data.reason || '',
       cost_per_unit: data.cost_per_unit || 0,
       product_name: data.product_name || '',
       city: data.city || '',
       status: 'active',
-      user: pb.authStore.model?.id || ''
     };
+    if (supplierId) writeOffData.supplier = supplierId;
+    const _userId = pb.authStore.model?.id;
+    if (_userId) writeOffData.user = _userId;
 
     const created = await pb.collection('write_offs').create(writeOffData);
 
     try {
       // После успешного создания записи списываем остатки по FIFO
       let remaining = quantity;
-      const touched = [];
       const toDeleteIds = [];
       for (const stock of stocks) {
         if (remaining <= 0) break;
         const currentQty = Number(stock.quantity) || 0;
         const deduct = Math.min(currentQty, remaining);
         const nextQty = currentQty - deduct;
-        touched.push({ stockId: stock.id, prevQty: currentQty });
         await pb.collection('stocks').update(stock.id, { quantity: nextQty });
         if (nextQty <= 0) toDeleteIds.push(stock.id);
         remaining -= deduct;
@@ -1364,15 +1375,12 @@ export const createWriteOff = async (data) => {
     } catch (stockErr) {
       // Пробуем откатить измененные остатки
       try {
-        const restored = [];
         for (const stock of stocks) {
           const existing = await pb.collection('stocks').getOne(stock.id).catch(() => null);
           if (existing) {
             await pb.collection('stocks').update(stock.id, { quantity: Number(stock.quantity) || 0 });
-            restored.push(stock.id);
           }
         }
-        void restored;
       } catch (_) {
         // ignore rollback errors
       }
@@ -1423,20 +1431,32 @@ const deductFromStock = async ({ productId, supplierId, quantity }) => {
     throw new Error(`Недостаточно остатка: доступно ${available}, нужно ${quantity}`);
   }
 
-  let remaining = Number(quantity);
-  const toDeleteIds = [];
-  for (const stock of stocks) {
-    if (remaining <= 0) break;
-    const currentQty = Number(stock.quantity) || 0;
-    const deduct = Math.min(currentQty, remaining);
-    const nextQty = currentQty - deduct;
-    await pb.collection('stocks').update(stock.id, { quantity: nextQty });
-    if (nextQty <= 0) toDeleteIds.push(stock.id);
-    remaining -= deduct;
-  }
+  const original = stocks.map((s) => ({ id: s.id, quantity: Number(s.quantity) || 0 }));
+  try {
+    let remaining = Number(quantity);
+    const toDeleteIds = [];
+    for (const stock of stocks) {
+      if (remaining <= 0) break;
+      const currentQty = Number(stock.quantity) || 0;
+      const deduct = Math.min(currentQty, remaining);
+      const nextQty = currentQty - deduct;
+      await pb.collection('stocks').update(stock.id, { quantity: nextQty });
+      if (nextQty <= 0) toDeleteIds.push(stock.id);
+      remaining -= deduct;
+    }
 
-  for (const stockId of toDeleteIds) {
-    await pb.collection('stocks').delete(stockId).catch(() => {});
+    for (const stockId of toDeleteIds) {
+      await pb.collection('stocks').delete(stockId).catch(() => {});
+    }
+  } catch (err) {
+    // Роллбэк частичных изменений
+    for (const row of original) {
+      const exists = await pb.collection('stocks').getOne(row.id).catch(() => null);
+      if (exists) {
+        await pb.collection('stocks').update(row.id, { quantity: row.quantity }).catch(() => {});
+      }
+    }
+    throw err;
   }
 };
 

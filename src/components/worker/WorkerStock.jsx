@@ -167,7 +167,15 @@ export default function WorkerStock({ user, onCartOpen, cart, setCart }) {
       }
 
       // Get user's city for order number generation
-      const userCity = pb.authStore.model?.expand?.supplier?.name || pb.authStore.model?.city;
+      // Normalize supplier ID — relation field may be string ID or expanded object
+      const _rawSupplier = pb.authStore.model?.supplier;
+      const userSupplierId = (typeof _rawSupplier === 'string' ? _rawSupplier : _rawSupplier?.id) || selectedSupplier;
+      let userCityObj = suppliers.find(s => s.id === userSupplierId);
+      if (!userCityObj && userSupplierId) {
+        // Fallback: fetch directly from PocketBase
+        userCityObj = await pb.collection('suppliers').getOne(userSupplierId).catch(() => null);
+      }
+      const userCity = userCityObj?.name || pb.authStore.model?.city || '';
       
       // Generate order number
       const orderNumber = await generateOrderNumber(userCity);
@@ -210,6 +218,8 @@ export default function WorkerStock({ user, onCartOpen, cart, setCart }) {
         ...orderData,
         items: itemsWithCost,
         order_number: orderNumber,
+        city: userCity,
+        supplier: userSupplierId,
         city_code: orderNumber.charAt(0),
         cost_total: totalCost,
         profit: orderData.total - totalCost

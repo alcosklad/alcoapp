@@ -19,7 +19,7 @@ export default function SettingsDesktop({ onLogout }) {
   const [editingUser, setEditingUser] = useState(null);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
-  const [sortField, setSortField] = useState('name');
+  const [sortField, setSortField] = useState('role');
   const [sortDir, setSortDir] = useState('asc');
 
   const [form, setForm] = useState({
@@ -75,10 +75,12 @@ export default function SettingsDesktop({ onLogout }) {
           aVal = (a.name || '').toLowerCase();
           bVal = (b.name || '').toLowerCase();
           break;
-        case 'role':
-          aVal = a.role || '';
-          bVal = b.role || '';
-          break;
+        case 'role': {
+          const rolePriority = { admin: 0, operator: 1, worker: 2 };
+          aVal = rolePriority[a.role] ?? 9;
+          bVal = rolePriority[b.role] ?? 9;
+          return sortDir === 'asc' ? aVal - bVal : bVal - aVal;
+        }
         case 'city':
           aVal = getSupplierName(a.supplier).toLowerCase();
           bVal = getSupplierName(b.supplier).toLowerCase();

@@ -125,22 +125,24 @@ export default function ReceptionDesktop() {
   };
 
   const handleDeleteReception = async (receptionId) => {
-    console.log('handleDeleteReception вызвана с ID:', receptionId);
-    console.log('selectedReception:', selectedReception);
-    
-    if (!window.confirm('Вы уверены, что хотите удалить эту приёмку? Остатки будут пересчитаны.')) {
+    if (!window.confirm('Вы уверены, что хотите удалить эту приёмку?')) {
       return;
     }
+    const shouldDeleteStock = window.confirm(
+      'Удалить остатки с города вместе с приёмкой?\n\n' +
+      'OK — удалить приёмку и остатки товаров\n' +
+      'Отмена — удалить только приёмку, остатки не трогать'
+    );
 
     try {
       setLoading(true);
-      await deleteReception(receptionId);
+      await deleteReception(receptionId, { deleteStock: shouldDeleteStock });
       invalidate('receptions');
       invalidate('stocks');
       invalidate('dashboard');
       setSelectedReception(null);
       await loadReceptions();
-      alert('Приёмка удалена');
+      alert(shouldDeleteStock ? 'Приёмка и остатки удалены' : 'Приёмка удалена (остатки сохранены)');
     } catch (error) {
       console.error('Error deleting reception:', error);
       alert('Ошибка при удалении приёмки: ' + error.message);

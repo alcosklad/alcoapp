@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { Search, ChevronUp, ChevronDown, RefreshCw, MapPin, X, Plus, Trash2, Check, Calendar, Clock, FileX, RotateCcw, CheckSquare, Square, Merge, Pencil } from 'lucide-react';
-import { getStocksAggregated, getSuppliers, getProducts, updateProduct, createStockRecord, deleteStockRecord, updateStockRecord, getReceptionHistoryForProduct, getWriteOffs, createWriteOff, cancelWriteOff, updateWriteOff } from '../../lib/pocketbase';
+import { getStocksAggregated, getSuppliers, getProducts, updateProduct, createStockRecord, deleteStockRecord, updateStockRecord, getReceptionHistoryForProduct, getWriteOffs, createWriteOff, cancelWriteOff, updateWriteOff, deleteProduct } from '../../lib/pocketbase';
 import { detectSubcategory, ALL_SUBCATEGORIES, CATEGORY_ORDER } from '../../lib/subcategories';
 import pb from '../../lib/pocketbase';
 import { getOrFetch, invalidate } from '../../lib/cache';
@@ -24,6 +24,7 @@ export default function StockDesktop() {
   const [editForm, setEditForm] = useState({ name: '', category: '', subcategory: '', cost: 0, price: 0 });
   const [editCities, setEditCities] = useState([]); // [{stockId, supplierId, supplierName, quantity}]
   const [editSaving, setEditSaving] = useState(false);
+  const [deleteProductSaving, setDeleteProductSaving] = useState(false);
   const [editError, setEditError] = useState('');
   const [receptionHistory, setReceptionHistory] = useState([]);
   const [historyLoading, setHistoryLoading] = useState(false);
@@ -77,6 +78,39 @@ export default function StockDesktop() {
     }
   };
 
+  const handleDeleteProductAndStocks = async () => {
+    const productId = editProduct?.id;
+    if (!productId) return;
+
+    if (!window.confirm(`Удалить товар "${editProduct?.name || 'Товар'}" и все его остатки?`)) return;
+
+    setDeleteProductSaving(true);
+    setEditError('');
+    try {
+      const allStockRows = await pb.collection('stocks').getFullList({
+        filter: `product = "${productId}"`,
+      }).catch(() => []);
+
+      for (const row of allStockRows) {
+        await deleteStockRecord(row.id).catch(() => {});
+      }
+
+      await deleteProduct(productId);
+
+      closeEditModal();
+      invalidate('stocks');
+      invalidate('products');
+      invalidate('dashboard');
+      loadStocks();
+      loadAllProducts();
+    } catch (err) {
+      console.error('Error deleting product and stocks:', err);
+      setEditError('Ошибка удаления товара: ' + (err?.message || ''));
+    } finally {
+      setDeleteProductSaving(false);
+    }
+  };
+
   const loadStocks = async () => {
     try {
       setLoading(true);
@@ -110,7 +144,16 @@ export default function StockDesktop() {
     if (!editStock || !editProduct) return;
     try {
       setWriteOffSaving(true);
-      const supplierId = writeOffForm.supplierId || selectedSupplier || (editCities[0]?.supplierId) || '';
+      const preferredCity = [...editCities]
+        .filter((c) => (Number(c.quantity) || 0) > 0)
+        .sort((a, b) => (Number(b.quantity) || 0) - (Number(a.quantity) || 0))[0];
+      const supplierId = writeOffForm.supplierId || selectedSupplier || preferredCity?.supplierId || '';
+      const selectedCity = editCities.find((c) => c.supplierId === supplierId);
+
+      if (selectedCity && (Number(selectedCity.quantity) || 0) <= 0) {
+        throw new Error(`В городе "${selectedCity.supplierName || '—'}" нет остатка для списания`);
+      }
+
       await createWriteOff({
         product: editProduct.id,
         supplier: supplierId,
@@ -118,7 +161,7 @@ export default function StockDesktop() {
         reason: writeOffForm.reason,
         cost_per_unit: editForm.cost || 0,
         product_name: editProduct.name,
-        city: suppliers.find(s => s.id === supplierId)?.name || ''
+        city: selectedCity?.supplierName || suppliers.find(s => s.id === supplierId)?.name || ''
       });
       invalidate('stocks');
       invalidate('writeoffs');
@@ -198,7 +241,18 @@ export default function StockDesktop() {
   };
 
   // Хелпер для получения данных продукта
-  const getProduct = (stock) => stock?.expand?.product || stock?.product || {};
+  const getProduct = (stock) => {
+    const expanded = stock?.expand?.product;
+    if (expanded && typeof expanded === 'object') return expanded;
+
+    if (stock?.product && typeof stock.product === 'object') return stock.product;
+
+    if (typeof stock?.product === 'string') {
+      return allProducts.find((p) => p.id === stock.product) || { id: stock.product };
+    }
+
+    return {};
+  };
 
   // Категории для фильтра
   const allCategories = useMemo(() => {
@@ -241,7 +295,7 @@ export default function StockDesktop() {
         stockId: null,
         supplierId: c.supplierId,
         supplierName: c.supplierName,
-        quantity: c.quantity,
+        quantity: Number(c.quantity) || 0,
       })));
     } else {
       setEditCities([{
@@ -259,27 +313,12 @@ export default function StockDesktop() {
     if (product?.id) {
       setHistoryLoading(true);
       try {
-        const history = await getReceptionHistoryForProduct(product.id);
+        const history = await getReceptionHistoryForProduct(product.id, selectedSupplier || null);
         setReceptionHistory(history);
       } catch (e) {
         console.error('Error loading history:', e);
       } finally {
         setHistoryLoading(false);
-      }
-    }
-    // Загружаем историю списаний/возвратов
-    if (product?.id) {
-      setWriteOffHistoryLoading(true);
-      try {
-        const writeOffRows = await pb.collection('write_offs').getFullList({
-          filter: `product = "${product.id}"`,
-          sort: '-created',
-        }).catch(() => []);
-        setWriteOffHistory(writeOffRows || []);
-      } catch (e) {
-        console.error('Error loading write-off history:', e);
-      } finally {
-        setWriteOffHistoryLoading(false);
       }
     }
   };
@@ -311,6 +350,7 @@ export default function StockDesktop() {
         });
       }
       closeEditModal();
+      invalidate('stocks');
       loadStocks();
       loadAllProducts();
     } catch (err) {
@@ -321,25 +361,33 @@ export default function StockDesktop() {
     }
   };
 
+  const getCityStockRecords = async (productId, supplierId) => {
+    if (!productId || !supplierId) return [];
+    return await pb.collection('stocks').getFullList({
+      filter: `product = "${productId}" && supplier = "${supplierId}"`,
+      sort: '+reception_date,+created'
+    }).catch(() => []);
+  };
+
   const handleDeleteCity = async (cityEntry) => {
     // Найти stock record по product + supplier и удалить
     const productId = editProduct?.id;
     if (!productId) return;
     if (!window.confirm(`Удалить остаток в "${cityEntry.supplierName}"?`)) return;
     try {
-      // Ищем точный stock record
-      const stockRecord = await pb.collection('stocks').getFirstListItem(
-        `product = "${productId}" && supplier = "${cityEntry.supplierId}"`
-      ).catch(() => null);
-      if (stockRecord) {
-        await deleteStockRecord(stockRecord.id);
-        setEditCities(prev => prev.filter(c => c.supplierId !== cityEntry.supplierId));
-        // Если больше нет городов — закрываем модалку
-        if (editCities.length <= 1) {
-          closeEditModal();
-        }
-        loadStocks();
+      const rows = await getCityStockRecords(productId, cityEntry.supplierId);
+      for (const row of rows) {
+        await deleteStockRecord(row.id).catch(() => {});
       }
+
+      const nextCities = editCities.filter(c => c.supplierId !== cityEntry.supplierId);
+      setEditCities(nextCities);
+      if (nextCities.length === 0) {
+        closeEditModal();
+      }
+
+      invalidate('stocks');
+      loadStocks();
     } catch (err) {
       console.error('Error deleting stock:', err);
       setEditError('Ошибка удаления: ' + (err?.message || ''));
@@ -349,19 +397,53 @@ export default function StockDesktop() {
   const handleUpdateCityQty = async (cityEntry, newQty) => {
     const productId = editProduct?.id;
     if (!productId) return;
+
+    const targetQty = Math.max(0, Number(newQty) || 0);
+
     try {
-      const stockRecord = await pb.collection('stocks').getFirstListItem(
-        `product = "${productId}" && supplier = "${cityEntry.supplierId}"`
-      ).catch(() => null);
-      if (stockRecord) {
-        await updateStockRecord(stockRecord.id, { quantity: Number(newQty) || 0 });
+      const rows = await getCityStockRecords(productId, cityEntry.supplierId);
+
+      if (targetQty <= 0) {
+        for (const row of rows) {
+          await deleteStockRecord(row.id).catch(() => {});
+        }
+        const nextCities = editCities.filter(c => c.supplierId !== cityEntry.supplierId);
+        setEditCities(nextCities);
+        if (nextCities.length === 0) {
+          closeEditModal();
+        }
+      } else if (rows.length === 0) {
+        await createStockRecord({
+          product: productId,
+          supplier: cityEntry.supplierId,
+          quantity: targetQty,
+        });
         setEditCities(prev => prev.map(c =>
-          c.supplierId === cityEntry.supplierId ? { ...c, quantity: Number(newQty) || 0 } : c
+          c.supplierId === cityEntry.supplierId ? { ...c, quantity: targetQty } : c
+        ));
+      } else {
+        // Нормализуем в одну запись на город, чтобы +/- и удаление работали стабильно
+        const [head, ...tail] = rows;
+        await updateStockRecord(head.id, { quantity: targetQty });
+        for (const row of tail) {
+          await deleteStockRecord(row.id).catch(() => {});
+        }
+        setEditCities(prev => prev.map(c =>
+          c.supplierId === cityEntry.supplierId ? { ...c, quantity: targetQty } : c
         ));
       }
+
+      invalidate('stocks');
+      loadStocks();
     } catch (err) {
       console.error('Error updating stock qty:', err);
+      setEditError('Ошибка обновления количества: ' + (err?.message || ''));
     }
+  };
+
+  const handleAdjustCityQty = async (cityEntry, delta) => {
+    const baseQty = Number(cityEntry.quantity) || 0;
+    await handleUpdateCityQty(cityEntry, Math.max(0, baseQty + delta));
   };
 
   const handleAddCity = async (supplierId) => {
@@ -696,7 +778,7 @@ export default function StockDesktop() {
           <label className="text-xs text-gray-600">Город:</label>
           <select
             value={selectedSupplier}
-            onChange={(e) => setSelectedSupplier(e.target.value)}
+            onChange={(e) => { invalidate('stocks'); setSelectedSupplier(e.target.value); }}
             className="px-2 py-1 border border-gray-300 rounded text-xs focus:outline-none focus:ring-2 focus:ring-blue-500"
           >
             <option value="">Все города</option>
@@ -1096,7 +1178,10 @@ export default function StockDesktop() {
                 {isAdmin && (
                   <button
                     onClick={() => {
-                      const defaultSupplier = selectedSupplier || (editCities[0]?.supplierId) || '';
+                      const cityWithStock = [...editCities]
+                        .filter((c) => (Number(c.quantity) || 0) > 0)
+                        .sort((a, b) => (Number(b.quantity) || 0) - (Number(a.quantity) || 0))[0];
+                      const defaultSupplier = selectedSupplier || cityWithStock?.supplierId || '';
                       setWriteOffForm({ quantity: 1, reason: '', supplierId: defaultSupplier });
                       setShowWriteOffModal(true);
                     }}
@@ -1104,6 +1189,16 @@ export default function StockDesktop() {
                   >
                     <FileX size={14} />
                     Списать
+                  </button>
+                )}
+                {isAdmin && (
+                  <button
+                    onClick={handleDeleteProductAndStocks}
+                    disabled={deleteProductSaving}
+                    className="flex items-center gap-1.5 px-3 py-1.5 text-xs bg-red-600 text-white hover:bg-red-700 rounded-lg transition-colors disabled:opacity-50"
+                  >
+                    <Trash2 size={14} />
+                    {deleteProductSaving ? 'Удаление...' : 'Удалить товар'}
                   </button>
                 )}
                 <button onClick={closeEditModal} className="p-1 hover:bg-gray-100 rounded">
@@ -1158,6 +1253,13 @@ export default function StockDesktop() {
                     <div key={idx} className="flex items-center gap-2 bg-gray-50 rounded-lg px-3 py-2">
                       <MapPin size={14} className="text-gray-400 shrink-0" />
                       <span className="text-sm text-gray-700 flex-1">{city.supplierName}</span>
+                      <button
+                        onClick={() => handleAdjustCityQty(city, -1)}
+                        className="px-2 py-1 text-blue-600 hover:bg-blue-100 rounded"
+                        title="Уменьшить"
+                      >
+                        —
+                      </button>
                       <input
                         type="number"
                         value={city.quantity}
@@ -1168,6 +1270,13 @@ export default function StockDesktop() {
                         onBlur={e => handleUpdateCityQty(city, e.target.value)}
                         className="w-20 px-2 py-1 border border-gray-300 rounded text-sm text-right"
                       />
+                      <button
+                        onClick={() => handleAdjustCityQty(city, 1)}
+                        className="px-2 py-1 text-blue-600 hover:bg-blue-100 rounded"
+                        title="Увеличить"
+                      >
+                        +
+                      </button>
                       <span className="text-xs text-gray-500">шт</span>
                       <button onClick={() => handleDeleteCity(city)} className="p-1 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded" title="Удалить остаток">
                         <Trash2 size={14} />
@@ -1214,9 +1323,9 @@ export default function StockDesktop() {
                 ) : (
                   <div className="space-y-1.5 max-h-48 overflow-y-auto">
                     {receptionHistory.map((h, idx) => {
-                      const d = h.date ? new Date(h.date.includes('T') ? h.date : h.date + 'T00:00:00') : null;
-                      const dateStr = d && !isNaN(d) ? d.toLocaleDateString('ru-RU', { day: 'numeric', month: 'short', year: 'numeric' }) : '—';
-                      const timeStr = d && !isNaN(d) ? d.toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' }) : '';
+                      const d = h.date ? new Date(h.date) : null;
+                      const dateStr = d && !isNaN(d.getTime()) ? d.toLocaleDateString('ru-RU', { day: '2-digit', month: '2-digit', year: '2-digit' }) : '—';
+                      const timeStr = '';
                       const receptionLabel = h.receptionName || h.batchNumber || '';
                       return (
                         <div key={idx} className="flex items-center gap-2 bg-gray-50 rounded-lg px-3 py-2 text-xs">
@@ -1236,44 +1345,10 @@ export default function StockDesktop() {
                 )}
               </div>
 
-              {/* История списаний/возвратов */}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  <FileX size={14} className="inline mr-1" />
-                  История списаний
-                </label>
-                {writeOffHistoryLoading ? (
-                  <div className="text-center py-3 text-xs text-gray-400">
-                    <RefreshCw size={14} className="inline animate-spin mr-1" /> Загрузка...
-                  </div>
-                ) : writeOffHistory.length === 0 ? (
-                  <p className="text-xs text-gray-400 py-2">Списаний нет</p>
-                ) : (
-                  <div className="space-y-1.5 max-h-40 overflow-y-auto">
-                    {writeOffHistory.map((w) => {
-                      const d = w.created ? new Date(w.created) : null;
-                      const dateStr = d && !isNaN(d) ? d.toLocaleDateString('ru-RU', { day: 'numeric', month: 'short', year: 'numeric' }) : '—';
-                      const timeStr = d && !isNaN(d) ? d.toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' }) : '';
-                      const isReturned = w.status === 'cancelled';
-                      return (
-                        <div key={w.id} className="flex items-center gap-2 bg-gray-50 rounded-lg px-3 py-2 text-xs">
-                          <Clock size={12} className="text-gray-400 shrink-0" />
-                          <span className="text-gray-500 w-32 shrink-0">{dateStr}{timeStr ? `, ${timeStr}` : ''}</span>
-                          <span className={`px-1.5 py-0.5 rounded text-[10px] font-medium shrink-0 ${isReturned ? 'bg-emerald-100 text-emerald-700' : 'bg-red-100 text-red-700'}`}>
-                            {isReturned ? 'Возвращено' : 'Списано'}
-                          </span>
-                          <span className="text-gray-700 flex-1 truncate">{w.reason || '—'}</span>
-                          <span className={`font-medium shrink-0 ${isReturned ? 'text-emerald-700' : 'text-red-700'}`}>{w.quantity} шт</span>
-                        </div>
-                      );
-                    })}
-                  </div>
-                )}
-              </div>
             </div>
             <div className="flex items-center justify-end gap-3 px-6 py-4 border-t border-gray-200 bg-gray-50 rounded-b-xl">
               <button onClick={closeEditModal} className="px-4 py-2 text-sm text-gray-600 hover:bg-gray-100 rounded-lg">Отмена</button>
-              <button onClick={saveEditModal} disabled={editSaving}
+              <button onClick={saveEditModal} disabled={editSaving || deleteProductSaving}
                 className="px-4 py-2 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 flex items-center gap-2">
                 {editSaving ? <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div> : <Check size={16} />}
                 Сохранить

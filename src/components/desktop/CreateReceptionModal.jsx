@@ -38,6 +38,7 @@ export default function CreateReceptionModal({
   const [favorites, setFavorites] = useState([]);
   const [currentPage, setCurrentPage] = useState(1);
   const [errors, setErrors] = useState({});
+  const [submitting, setSubmitting] = useState(false);
 
   // Создание нового товара
   const [showCreateProduct, setShowCreateProduct] = useState(false);
@@ -54,6 +55,7 @@ export default function CreateReceptionModal({
   useEffect(() => {
     setCurrentPage(1);
   }, [activeCategory, searchQuery]);
+
 
   const loadFavorites = async () => {
     try {
@@ -276,21 +278,29 @@ export default function CreateReceptionModal({
     return Object.keys(newErrors).length === 0;
   };
 
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
+    if (submitting) return;
     if (!validateForm()) return;
-    const totalAmount = formData.items.reduce((s, i) => s + (i.cost * i.quantity), 0);
-    onSave({
-      supplier: formData.supplier,
-      stores: formData.selectedStores,
-      items: formData.items.map(i => ({
-        product: i.product,
-        name: i.name,
-        article: i.article,
-        quantity: i.quantity,
-        cost: i.cost
-      })),
-      total_amount: totalAmount
-    });
+    setSubmitting(true);
+    try {
+      const totalAmount = formData.items.reduce((s, i) => s + (i.cost * i.quantity), 0);
+      await onSave({
+        supplier: formData.supplier,
+        stores: formData.selectedStores,
+        items: formData.items.map(i => ({
+          product: i.product,
+          name: i.name,
+          article: i.article,
+          quantity: i.quantity,
+          cost: i.cost
+        })),
+        total_amount: totalAmount
+      });
+    } catch (err) {
+      console.error('Error submitting reception:', err);
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   const totalAmount = formData.items.reduce((s, i) => s + (i.cost * i.quantity), 0);
@@ -437,7 +447,6 @@ export default function CreateReceptionModal({
               <table className="w-full text-xs">
                 <thead className="bg-gray-50 border-b border-gray-200 sticky top-0">
                   <tr>
-                    <th className="w-8 px-2 py-2 text-center"></th>
                     <th className="w-8 px-2 py-2"></th>
                     <th className="text-left px-2 py-2 font-medium text-gray-600">Наименование</th>
                     <th className="text-center px-2 py-2 font-medium text-gray-600 w-28">Количество</th>
@@ -447,7 +456,7 @@ export default function CreateReceptionModal({
                 <tbody>
                   {paginatedProducts.length === 0 ? (
                     <tr>
-                      <td colSpan={5} className="px-4 py-8 text-center text-gray-400 text-xs">
+                      <td colSpan={4} className="px-4 py-8 text-center text-gray-400 text-xs">
                         {activeCategory === 'Избранное' ? 'Нет избранных товаров' : 'Нет товаров в категории'}
                       </td>
                     </tr>
@@ -464,18 +473,6 @@ export default function CreateReceptionModal({
                             : ''
                         }`}
                       >
-                        <td className="px-2 py-1.5 text-center">
-                          <span
-                            className={`inline-flex h-4 w-4 items-center justify-center rounded border ${
-                              isSelected
-                                ? 'border-blue-600 bg-blue-600 text-white'
-                                : 'border-gray-300 bg-white text-transparent'
-                            }`}
-                            title={isSelected ? 'Уже в корзине' : 'Не выбран'}
-                          >
-                            <Check size={11} />
-                          </span>
-                        </td>
                         <td className="px-2 py-1.5 text-center">
                           <button
                             onClick={() => handleToggleFavorite(product.id)}
@@ -562,7 +559,10 @@ export default function CreateReceptionModal({
               </thead>
               <tbody>
                 {formData.items.map(item => (
-                  <tr key={item.product} className="border-b border-blue-100/50 hover:bg-blue-50/50">
+                  <tr
+                    key={item.product}
+                    className="border-b border-blue-100/50 hover:bg-blue-50/50"
+                  >
                     <td className="px-3 py-1 text-gray-900">{item.name}</td>
                     <td className="px-2 py-1">
                       <div className="flex items-center justify-center gap-1">
@@ -607,7 +607,10 @@ export default function CreateReceptionModal({
           </div>
           <div className="flex items-center gap-2">
             <button onClick={onClose} className="px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 rounded">Отмена</button>
-            <button onClick={handleSubmit} className="px-4 py-2 text-sm bg-blue-600 text-white rounded hover:bg-blue-700">Создать приёмку</button>
+            <button onClick={handleSubmit} disabled={submitting} className="px-4 py-2 text-sm bg-blue-600 text-white rounded hover:bg-blue-700 disabled:opacity-50 flex items-center gap-1.5">
+              {submitting && <div className="animate-spin rounded-full h-3.5 w-3.5 border-b-2 border-white"></div>}
+              {submitting ? 'Создание...' : 'Создать приёмку'}
+            </button>
           </div>
         </div>
       </div>

@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { getDashboardStats, getSuppliers, getAllOrders, getReceptions } from '../../lib/pocketbase';
+import { getDashboardStats, getSuppliers, getAllOrders, getReceptions, getStocksAggregated, getWriteOffs } from '../../lib/pocketbase';
 import { getOrFetch } from '../../lib/cache';
 import { Package, TrendingUp, ShoppingCart, AlertTriangle, FileText, Calendar, Clock, BarChart3, X, RotateCcw } from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, LineChart, Line, Legend } from 'recharts';
@@ -27,11 +27,14 @@ export default function DashboardDesktop({ user }) {
   const [showStockBreakdown, setShowStockBreakdown] = useState(false);
   const [salesData, setSalesData] = useState([]);
   const [receptionsData, setReceptionsData] = useState([]);
+  const [stocksData, setStocksData] = useState([]);
+  const [writeOffsChartData, setWriteOffsChartData] = useState([]);
   const [chartView, setChartView] = useState('purchases'); // 'purchases' or 'cities'
   const [filterPeriod, setFilterPeriod] = useState('month');
   const [filterDateFrom, setFilterDateFrom] = useState('');
   const [filterDateTo, setFilterDateTo] = useState('');
-  const [chartRange, setChartRange] = useState('month'); // week | month | quarter | halfyear | all
+  const [chartRange, setChartRange] = useState('week'); // week | month | quarter | halfyear | all
+  const [chartMode, setChartMode] = useState('current'); // 'current' | 'dynamic'
   
   const userRole = pb.authStore.model?.role;
   const isAdmin = userRole === 'admin';
@@ -40,6 +43,8 @@ export default function DashboardDesktop({ user }) {
     loadSuppliers();
     loadSalesForChart();
     loadReceptionsForChart();
+    loadStocksForChart();
+    loadWriteOffsForChart();
   }, []);
 
   useEffect(() => {
@@ -88,6 +93,24 @@ export default function DashboardDesktop({ user }) {
       setReceptionsData(data || []);
     } catch (e) {
       console.error('Error loading receptions for chart:', e);
+    }
+  };
+
+  const loadStocksForChart = async () => {
+    try {
+      const data = await getOrFetch('stocks:agg:all', () => getStocksAggregated(null).catch(() => []), 60000, (fresh) => setStocksData(fresh || []));
+      setStocksData(data || []);
+    } catch (e) {
+      console.error('Error loading stocks for chart:', e);
+    }
+  };
+
+  const loadWriteOffsForChart = async () => {
+    try {
+      const data = await getOrFetch('writeoffs:all', () => getWriteOffs(null).catch(() => []), 120000, (fresh) => setWriteOffsChartData(fresh || []));
+      setWriteOffsChartData(data || []);
+    } catch (e) {
+      console.error('Error loading write-offs for chart:', e);
     }
   };
 
@@ -183,7 +206,7 @@ export default function DashboardDesktop({ user }) {
     };
   }, [filteredOrders, filteredReceptions]);
 
-  // Линейный график динамики остатков (кумулятив по приёмкам, шт)
+  // Линейный график динамики остатков: база = текущий остаток, +приёмки, −продажи, −списания
   const { stockTrendData, trendCityNames } = useMemo(() => {
     const normalizeDay = (rawDate) => {
       const d = new Date(rawDate);
@@ -204,39 +227,114 @@ export default function DashboardDesktop({ user }) {
       start.setTime(new Date('2026-02-16T00:00:00').getTime());
     }
 
+    // 1) Текущий реальный остаток по городам
+    const currentTotals = {};
+    (stocksData || []).forEach((stock) => {
+      const parts = Array.isArray(stock._cityBreakdown) && stock._cityBreakdown.length > 0
+        ? stock._cityBreakdown
+        : [{
+            supplierId: stock.supplier,
+            supplierName: stock.expand?.supplier?.name || suppliers.find((s) => s.id === stock.supplier)?.name || 'Неизвестно',
+            quantity: Number(stock.quantity) || 0,
+          }];
+      parts.forEach((part) => {
+        const qty = Number(part.quantity) || 0;
+        if (qty <= 0) return;
+        const cityName = part.supplierName || suppliers.find((s) => s.id === part.supplierId)?.name || 'Неизвестно';
+        if (!cityName) return;
+        currentTotals[cityName] = (currentTotals[cityName] || 0) + qty;
+      });
+    });
+
     const relevantReceptions = receptionsData.filter((rec) => !selectedSupplier || rec.supplier === selectedSupplier);
+    const relevantOrders = salesData.filter((o) => {
+      if (o.status === 'refund') return false;
+      if (!selectedSupplier) return true;
+      return (o.city || '') === selectedCityName || o.expand?.user?.supplier === selectedSupplier;
+    });
+    const relevantWriteOffs = writeOffsChartData.filter((w) => {
+      if (w.status === 'cancelled') return false;
+      if (!selectedSupplier) return true;
+      return (w.city || '') === selectedCityName || w.supplier === selectedSupplier;
+    });
 
     const citySet = new Set();
+    Object.keys(currentTotals).forEach((city) => citySet.add(city));
     relevantReceptions.forEach((rec) => {
       const cityName = rec.expand?.supplier?.name || suppliers.find((s) => s.id === rec.supplier)?.name || 'Неизвестно';
       if (cityName) citySet.add(cityName);
     });
     if (selectedSupplier && selectedCityName) citySet.add(selectedCityName);
 
-    const cities = Array.from(citySet).sort();
+    let cities = Array.from(citySet).sort();
+    if (selectedSupplier && selectedCityName) {
+      cities = cities.filter((c) => c === selectedCityName);
+    }
     if (cities.length === 0) return { stockTrendData: [], trendCityNames: [] };
 
-    const increments = new Map(); // key: city|dayTs => qty
-    const baseline = Object.fromEntries(cities.map((city) => [city, 0]));
+    const increments = new Map();
+    const decrements = new Map();
+    const addedWithinRange = Object.fromEntries(cities.map((city) => [city, 0]));
+    const removedWithinRange = Object.fromEntries(cities.map((city) => [city, 0]));
 
+    // Приёмки (+)
     relevantReceptions.forEach((rec) => {
       const day = normalizeDay(rec.date || rec.created);
       if (!day) return;
       const cityName = rec.expand?.supplier?.name || suppliers.find((s) => s.id === rec.supplier)?.name || 'Неизвестно';
       if (!cities.includes(cityName)) return;
-      const qty = (Array.isArray(rec.items) ? rec.items : []).reduce(
-        (sum, item) => sum + (Number(item.quantity) || 0),
-        0
-      );
+      const qty = (Array.isArray(rec.items) ? rec.items : []).reduce((sum, item) => sum + (Number(item.quantity) || 0), 0);
       if (!qty) return;
-
-      if (day < start) {
-        baseline[cityName] = (baseline[cityName] || 0) + qty;
-      } else if (day <= now) {
+      if (day >= start && day <= now) {
         const key = `${cityName}|${day.getTime()}`;
         increments.set(key, (increments.get(key) || 0) + qty);
+        addedWithinRange[cityName] = (addedWithinRange[cityName] || 0) + qty;
       }
     });
+
+    // Продажи (−)
+    relevantOrders.forEach((order) => {
+      const day = normalizeDay(order.created_date || order.created);
+      if (!day) return;
+      const orderSupplierId = order.supplier ||
+        (typeof order.expand?.user?.supplier === 'string' ? order.expand.user.supplier : order.expand?.user?.supplier?.id);
+      const cityName = (order.city && order.city !== '') ? order.city
+        : order.expand?.user?.expand?.supplier?.name
+        || suppliers.find(s => s.id === orderSupplierId)?.name
+        || '';
+      if (!cityName) return;
+      if (!cities.includes(cityName)) return;
+      const qty = (Array.isArray(order.items) ? order.items : []).reduce((sum, item) => sum + (Number(item.quantity) || 0), 0);
+      if (!qty) return;
+      if (day >= start && day <= now) {
+        const key = `${cityName}|${day.getTime()}`;
+        decrements.set(key, (decrements.get(key) || 0) + qty);
+        removedWithinRange[cityName] = (removedWithinRange[cityName] || 0) + qty;
+      }
+    });
+
+    // Списания (−) — убираем дублирующий return после обновлённого блока продаж
+    relevantWriteOffs.forEach((w) => {
+      const day = normalizeDay(w.created);
+      if (!day) return;
+      const cityName = w.city || suppliers.find((s) => s.id === w.supplier)?.name || 'Неизвестно';
+      if (!cities.includes(cityName)) return;
+      const qty = Number(w.quantity) || 0;
+      if (!qty) return;
+      if (day >= start && day <= now) {
+        const key = `${cityName}|${day.getTime()}`;
+        decrements.set(key, (decrements.get(key) || 0) + qty);
+        removedWithinRange[cityName] = (removedWithinRange[cityName] || 0) + qty;
+      }
+    });
+
+    // 2) Базовая точка = текущий остаток − приёмки + продажи + списания за период
+    const baseline = Object.fromEntries(
+      cities.map((city) => [
+        city,
+        Math.max(0, (currentTotals[city] || 0) - (addedWithinRange[city] || 0) + (removedWithinRange[city] || 0)),
+      ])
+    );
 
     const running = { ...baseline };
     const rows = [];
@@ -247,20 +345,47 @@ export default function DashboardDesktop({ user }) {
         label: d.toLocaleDateString('ru-RU', { day: '2-digit', month: '2-digit' }),
         fullDate: d.toLocaleDateString('ru-RU', { day: '2-digit', month: '2-digit', year: 'numeric' }),
       };
-
       cities.forEach((cityName) => {
         const key = `${cityName}|${dayTs}`;
-        running[cityName] = (running[cityName] || 0) + (increments.get(key) || 0);
+        running[cityName] = Math.max(0,
+          (running[cityName] || 0) + (increments.get(key) || 0) - (decrements.get(key) || 0)
+        );
         row[cityName] = running[cityName];
       });
-
       rows.push(row);
     }
 
-    return { stockTrendData: rows, trendCityNames: cities };
-  }, [receptionsData, chartRange, selectedSupplier, selectedCityName, suppliers]);
+    return { stockTrendData: rows, trendCityNames: cities, currentTotals };
+  }, [receptionsData, salesData, writeOffsChartData, stocksData, chartRange, selectedSupplier, selectedCityName, suppliers]);
 
-  const CITY_COLORS = ['#3b82f6', '#22c55e', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899', '#14b8a6', '#f97316'];
+  // Flat-line chart for "Текущий" mode: horizontal lines at current stock level
+  const currentStockChartData = useMemo(() => {
+    if (trendCityNames.length === 0) return [];
+    const now = new Date(); now.setHours(0, 0, 0, 0);
+    const start = new Date(now);
+    if (chartRange === 'week') start.setDate(now.getDate() - 6);
+    else if (chartRange === 'month') start.setDate(now.getDate() - 29);
+    else if (chartRange === 'quarter') start.setDate(now.getDate() - 89);
+    else if (chartRange === 'halfyear') start.setDate(now.getDate() - 179);
+    else if (chartRange === 'all') start.setTime(new Date('2026-02-16T00:00:00').getTime());
+    const rows = [];
+    for (let d = new Date(start); d <= now; d.setDate(d.getDate() + 1)) {
+      const row = {
+        label: d.toLocaleDateString('ru-RU', { day: '2-digit', month: '2-digit' }),
+        fullDate: d.toLocaleDateString('ru-RU', { day: '2-digit', month: '2-digit', year: 'numeric' }),
+      };
+      trendCityNames.forEach((city) => { row[city] = currentTotals[city] || 0; });
+      rows.push(row);
+    }
+    return rows;
+  }, [trendCityNames, currentTotals, chartRange]);
+
+  const CITY_COLORS = [
+    '#3b82f6', '#22c55e', '#f59e0b', '#ef4444', '#8b5cf6',
+    '#ec4899', '#14b8a6', '#f97316', '#06b6d4', '#84cc16',
+    '#e11d48', '#7c3aed', '#0891b2', '#d97706', '#4f46e5',
+    '#059669', '#dc2626', '#9333ea',
+  ];
 
   const PIE_COLORS = ['#22c55e', '#3b82f6', '#a855f7'];
 
@@ -399,60 +524,84 @@ export default function DashboardDesktop({ user }) {
         </div>
       )}
 
-      {/* Компактные графики: линейный график слева, круговая диаграмма справа */}
+      {/* График остатков — полная ширина, 500px */}
       {isAdmin && (
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-          {/* Линейный график остатков */}
-          <div className="bg-white rounded-lg border border-gray-200 p-4">
-            <h3 className="text-sm font-semibold text-gray-700 mb-3">Динамика остатков (шт) по городам</h3>
-            {trendCityNames.length > 0 ? (
-              <ResponsiveContainer width="100%" height={240}>
-                <LineChart data={stockTrendData} margin={{ top: 5, right: 10, left: 0, bottom: 5 }}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
-                  <XAxis dataKey="label" tick={{ fontSize: 10, fill: '#9ca3af' }} />
-                  <YAxis tick={{ fontSize: 10, fill: '#9ca3af' }} width={50} />
-                  <Tooltip
-                    formatter={(value) => `${Number(value || 0).toLocaleString('ru-RU')} шт`}
-                    labelFormatter={(_, payload) => payload?.[0]?.payload?.fullDate || ''}
-                    contentStyle={{ fontSize: 11, borderRadius: 8 }}
-                  />
-                  <Legend wrapperStyle={{ fontSize: 11 }} />
-                  {trendCityNames.map((name, i) => (
-                    <Line
-                      key={name}
-                      type="monotone"
-                      dataKey={name}
-                      stroke={CITY_COLORS[i % CITY_COLORS.length]}
-                      strokeWidth={2}
-                      dot={false}
-                      activeDot={{ r: 4 }}
-                    />
-                  ))}
-                </LineChart>
-              </ResponsiveContainer>
-            ) : (
-              <div className="flex items-center justify-center h-[240px] text-gray-400 text-sm">Нет данных</div>
-            )}
-            <div className="mt-3 flex items-center justify-center gap-2 flex-wrap">
-              {[
-                { id: 'week', label: 'Неделя' },
-                { id: 'month', label: 'Месяц' },
-                { id: 'quarter', label: '3 месяца' },
-                { id: 'halfyear', label: 'Полгода' },
-                { id: 'all', label: 'Всё время' },
-              ].map((opt) => (
+        <div className="bg-white rounded-lg border border-gray-200 p-4">
+          <div className="flex items-center justify-between mb-4 flex-wrap gap-2">
+            <h3 className="text-sm font-semibold text-gray-700">Остатки (шт) по городам</h3>
+            <div className="flex items-center gap-3 flex-wrap">
+              {/* Mode tabs */}
+              <div className="flex bg-gray-100 rounded-lg p-0.5">
                 <button
-                  key={opt.id}
-                  onClick={() => setChartRange(opt.id)}
-                  className={`px-2.5 py-1 text-xs rounded-lg border transition-colors ${chartRange === opt.id ? 'bg-blue-50 border-blue-300 text-blue-700 font-medium' : 'bg-white border-gray-200 text-gray-600 hover:border-gray-300'}`}
+                  onClick={() => setChartMode('current')}
+                  className={`px-3 py-1.5 text-xs rounded-md transition-colors ${chartMode === 'current' ? 'bg-white text-blue-600 shadow-sm font-medium' : 'text-gray-600 hover:text-gray-800'}`}
                 >
-                  {opt.label}
+                  Текущий
                 </button>
-              ))}
+                <button
+                  onClick={() => setChartMode('dynamic')}
+                  className={`px-3 py-1.5 text-xs rounded-md transition-colors ${chartMode === 'dynamic' ? 'bg-white text-blue-600 shadow-sm font-medium' : 'text-gray-600 hover:text-gray-800'}`}
+                >
+                  Динамика
+                </button>
+              </div>
+              {/* Period buttons */}
+              <div className="flex bg-gray-100 rounded-lg p-0.5">
+                {[
+                  { id: 'week', label: 'Неделя' },
+                  { id: 'month', label: 'Месяц' },
+                  { id: 'quarter', label: '3 мес' },
+                  { id: 'halfyear', label: 'Полгода' },
+                  { id: 'all', label: 'Всё' },
+                ].map((opt) => (
+                  <button
+                    key={opt.id}
+                    onClick={() => setChartRange(opt.id)}
+                    className={`px-2.5 py-1.5 text-xs rounded-md transition-colors ${chartRange === opt.id ? 'bg-white text-blue-600 shadow-sm font-medium' : 'text-gray-600 hover:text-gray-800'}`}
+                  >
+                    {opt.label}
+                  </button>
+                ))}
+              </div>
             </div>
           </div>
+          {trendCityNames.length > 0 ? (
+            <ResponsiveContainer width="100%" height={500}>
+              <LineChart
+                data={chartMode === 'current' ? currentStockChartData : stockTrendData}
+                margin={{ top: 5, right: 20, left: 0, bottom: 5 }}
+              >
+                <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
+                <XAxis dataKey="label" tick={{ fontSize: 10, fill: '#9ca3af' }} />
+                <YAxis tick={{ fontSize: 10, fill: '#9ca3af' }} width={50} allowDecimals={false} />
+                <Tooltip
+                  formatter={(value, name) => [`${Number(value || 0).toLocaleString('ru-RU')} шт`, name]}
+                  labelFormatter={(_, payload) => payload?.[0]?.payload?.fullDate || ''}
+                  contentStyle={{ fontSize: 12, borderRadius: 8, maxHeight: 320, overflowY: 'auto' }}
+                  itemSorter={(a) => -(a.value || 0)}
+                />
+                {trendCityNames.map((name, i) => (
+                  <Line
+                    key={name}
+                    type={chartMode === 'current' ? 'linear' : 'monotone'}
+                    dataKey={name}
+                    stroke={CITY_COLORS[i % CITY_COLORS.length]}
+                    strokeWidth={2}
+                    dot={false}
+                    activeDot={{ r: 4 }}
+                  />
+                ))}
+              </LineChart>
+            </ResponsiveContainer>
+          ) : (
+            <div className="flex items-center justify-center h-[500px] text-gray-400 text-sm">Нет данных</div>
+          )}
+        </div>
+      )}
 
-          {/* Круговая диаграмма с переключателем */}
+      {/* Круговые диаграммы */}
+      {isAdmin && (
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
           <div className="bg-white rounded-lg border border-gray-200 p-4">
             <div className="flex items-center justify-between mb-3">
               <h3 className="text-sm font-semibold text-gray-700">
