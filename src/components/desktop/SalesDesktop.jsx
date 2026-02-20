@@ -215,16 +215,24 @@ export default function SalesDesktop({ activeTab }) {
     if (filterCity.length > 0) result = result.filter(o => filterCity.includes(o.city));
     if (filterDateFrom) {
       const from = new Date(filterDateFrom); from.setHours(0,0,0,0);
-      result = result.filter(o => new Date(o.created_date || o.created) >= from);
+      result = result.filter(o => {
+        const raw = o.created_date || o.created || '';
+        const d = new Date(raw.replace(' ', 'T'));
+        return !isNaN(d) && d >= from;
+      });
     }
     if (filterDateTo) {
       const to = new Date(filterDateTo); to.setHours(23,59,59,999);
-      result = result.filter(o => new Date(o.created_date || o.created) <= to);
+      result = result.filter(o => {
+        const raw = o.created_date || o.created || '';
+        const d = new Date(raw.replace(' ', 'T'));
+        return !isNaN(d) && d <= to;
+      });
     }
     result.sort((a, b) => {
       let aV, bV;
       switch (sortField) {
-        case 'local_time': aV = new Date(a.created_date||a.created).getTime(); bV = new Date(b.created_date||b.created).getTime(); break;
+        case 'local_time': aV = new Date((a.created_date||a.created||'').replace(' ','T')).getTime()||0; bV = new Date((b.created_date||b.created||'').replace(' ','T')).getTime()||0; break;
         case 'total': aV = a.total||0; bV = b.total||0; break;
         case 'city': return sortDir==='asc' ? (a.city||'').localeCompare(b.city||'') : (b.city||'').localeCompare(a.city||'');
         case 'courier': return sortDir==='asc' ? (a.expand?.user?.name||'').localeCompare(b.expand?.user?.name||'') : (b.expand?.user?.name||'').localeCompare(a.expand?.user?.name||'');
@@ -262,8 +270,9 @@ export default function SalesDesktop({ activeTab }) {
     return sortDir==='asc' ? <ChevronUp size={14} className="text-blue-600" /> : <ChevronDown size={14} className="text-blue-600" />;
   };
 
-  const fmtDate = (s) => s ? new Date(s).toLocaleDateString('ru-RU', {day:'2-digit',month:'2-digit',year:'2-digit'}) : '—';
-  const fmtTime = (s) => s ? new Date(s).toLocaleTimeString('ru-RU', {hour:'2-digit',minute:'2-digit'}) : '';
+  const safeParse = (s) => s ? new Date(String(s).replace(' ', 'T')) : null;
+  const fmtDate = (s) => { const d = safeParse(s); return d && !isNaN(d) ? d.toLocaleDateString('ru-RU', {day:'2-digit',month:'2-digit',year:'2-digit'}) : '—'; };
+  const fmtTime = (s) => { const d = safeParse(s); return d && !isNaN(d) ? d.toLocaleTimeString('ru-RU', {hour:'2-digit',minute:'2-digit'}) : ''; };
   const fmtMoney = (v) => (v||0).toLocaleString('ru-RU');
   const payLabel = {'0':'Наличные','1':'Перевод','2':'Предоплата','cash':'Наличные','transfer':'Перевод','prepaid':'Предоплата'};
 
