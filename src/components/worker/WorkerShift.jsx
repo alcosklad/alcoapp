@@ -5,7 +5,7 @@ import pb from '../../lib/pocketbase';
 import { getOrFetch, invalidate } from '../../lib/cache';
 import { formatLocalDate, formatLocalTime, formatDuration } from '../../lib/dateUtils';
 
-export default function WorkerShift({ user }) {
+export default function WorkerShift({ user, activeTab }) {
   const [activeShift, setActiveShift] = useState(null);
   const [shifts, setShifts] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -18,6 +18,18 @@ export default function WorkerShift({ user }) {
   useEffect(() => {
     loadData();
   }, []);
+
+  // Re-fetch when shift tab becomes active (shift may have been opened via stock tab)
+  useEffect(() => {
+    if (activeTab === 'shift') {
+      const userId = pb.authStore.model?.id;
+      if (!userId) return;
+      // Direct API call bypassing cache
+      getActiveShift(userId).then(fresh => {
+        setActiveShift(fresh);
+      }).catch(err => console.error('Error refreshing shift:', err));
+    }
+  }, [activeTab]);
 
   const loadData = async () => {
     try {

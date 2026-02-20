@@ -43,8 +43,18 @@ export default function SalesDesktop({ activeTab }) {
   // Re-fetch when tab becomes active (orders may have been created on another device)
   useEffect(() => {
     if (activeTab === 'sales') {
-      invalidate('orders');
-      loadData();
+      // Bypass cache entirely — direct API call
+      getAllOrders().then(fresh => {
+        if (fresh) {
+          setOrders(fresh);
+          // Update cache for future reads
+          invalidate('orders');
+          try {
+            const entry = { data: fresh, ts: Date.now(), ttl: 60000 };
+            localStorage.setItem('ns_cache_orders:all', JSON.stringify(entry));
+          } catch {}
+        }
+      }).catch(err => console.error('Error refreshing orders:', err));
     }
   }, [activeTab]);
 

@@ -1338,15 +1338,15 @@ export const createWriteOff = async (data) => {
       throw new Error(`Недостаточно остатка для списания: доступно ${availableQty}, нужно ${quantity}`);
     }
 
-    // Создаём запись списания (без silent fallback к локальному объекту)
+    // Создаём запись списания — поля соответствуют схеме write_offs в PocketBase
+    const costPerUnit = Number(data.cost_per_unit) || Number(data.cost) || 0;
     const writeOffData = {
       product: productId,
       quantity,
+      cost: costPerUnit * quantity,
       reason: data.reason || '',
-      cost_per_unit: data.cost_per_unit || 0,
-      product_name: data.product_name || '',
-      city: data.city || '',
-      status: 'active',
+      comment: data.comment || '',
+      writeoff_date: new Date().toISOString(),
     };
     if (supplierId) writeOffData.supplier = supplierId;
     const _userId = pb.authStore.model?.id;

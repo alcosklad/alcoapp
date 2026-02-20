@@ -66,7 +66,7 @@ export default function WorkerApp({ user, onLogout }) {
           <WorkerStock user={user} onCartOpen={setCartOpen} cart={cart} setCart={setCart} />
         </div>
         <div style={{ display: activeTab === 'shift' ? 'block' : 'none' }}>
-          <WorkerShift user={user} />
+          <WorkerShift user={user} activeTab={activeTab} />
         </div>
         <div style={{ display: activeTab === 'history' ? 'block' : 'none' }}>
           <WorkerOrders user={user} closeTrigger={historyCloseTrigger} />
