@@ -1001,7 +1001,7 @@ export const getAllShifts = async (filters = {}) => {
 export const getAllOrders = async (filters = {}) => {
   try {
     const records = await pb.collection('orders').getFullList({
-      sort: '-local_time',
+      sort: '-created',
       expand: 'user,user.supplier',
       ...filters
     });
@@ -1352,8 +1352,8 @@ export const createWriteOff = async (data) => {
       user: userId,
       quantity,
       cost: totalCost > 0 ? totalCost : 0.01,
-      reason: 'Другое',
-      comment: data.reason || '',
+      reason: data.reason || 'Другое',
+      comment: data.comment || '',
       writeoff_date: new Date().toISOString(),
     };
 
@@ -1472,18 +1472,17 @@ export const cancelWriteOff = async (writeOffId) => {
   try {
     const writeOff = await pb.collection('write_offs').getOne(writeOffId);
     if (!writeOff) throw new Error('Списание не найдено');
-    if (writeOff.status === 'cancelled') return writeOff;
 
     await addBackToStock({
       productId: writeOff.product,
       supplierId: writeOff.supplier,
       quantity: Number(writeOff.quantity) || 0,
-      costPerUnit: Number(writeOff.cost_per_unit) || 0,
+      costPerUnit: Number(writeOff.cost) || 0,
     });
 
-    return await pb.collection('write_offs').update(writeOffId, {
-      status: 'cancelled',
-    });
+    // Удаляем запись списания после возврата в остатки
+    await pb.collection('write_offs').delete(writeOffId);
+    return { ...writeOff, status: 'cancelled' };
   } catch (error) {
     console.error('PocketBase: Error cancelling write-off:', error);
     throw error;

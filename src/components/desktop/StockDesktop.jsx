@@ -1098,13 +1098,13 @@ export default function StockDesktop() {
                   <tr key={wo.id} className={`border-b border-gray-100 ${isCancelled ? 'opacity-70 bg-gray-50' : 'hover:bg-gray-50'}`}>
                     <td className="px-3 py-2 font-mono text-gray-500">{writeOffs.length - idx}</td>
                     <td className="px-3 py-2">
-                      <div className="text-gray-900">{new Date(wo.created).toLocaleDateString('ru-RU', {day:'2-digit',month:'2-digit',year:'2-digit'})}</div>
-                      <div className="text-[10px] text-gray-400">{new Date(wo.created).toLocaleTimeString('ru-RU', {hour:'2-digit',minute:'2-digit'})}</div>
+                      <div className="text-gray-900">{(() => { try { return new Date(String(wo.writeoff_date || wo.created || '').replace(' ','T')).toLocaleDateString('ru-RU', {day:'2-digit',month:'2-digit',year:'2-digit'}); } catch { return '—'; } })()}</div>
+                      <div className="text-[10px] text-gray-400">{(() => { try { return new Date(String(wo.writeoff_date || wo.created || '').replace(' ','T')).toLocaleTimeString('ru-RU', {hour:'2-digit',minute:'2-digit'}); } catch { return ''; } })()}</div>
                     </td>
-                    <td className={`px-3 py-2 ${isCancelled ? 'line-through text-gray-400' : 'text-gray-900'}`}>{wo.product_name || '—'}</td>
+                    <td className={`px-3 py-2 ${isCancelled ? 'line-through text-gray-400' : 'text-gray-900'}`}>{wo.expand?.product?.name || wo.product_name || '—'}</td>
                     <td className={`px-3 py-2 text-right font-medium ${isCancelled ? 'line-through text-gray-400' : 'text-gray-900'}`}>{wo.quantity} шт</td>
-                    <td className="px-3 py-2 text-gray-600">{wo.reason || '—'}</td>
-                    <td className="px-3 py-2 text-gray-600">{wo.city || '—'}</td>
+                    <td className="px-3 py-2 text-gray-600">{wo.comment || wo.reason || '—'}</td>
+                    <td className="px-3 py-2 text-gray-600">{wo.expand?.supplier?.name || wo.city || '—'}</td>
                     <td className="px-3 py-2 text-center">
                       {isCancelled 
                         ? <span className="px-1.5 py-0.5 text-[10px] bg-emerald-50 text-emerald-600 rounded">Возвращено</span>
@@ -1114,11 +1114,12 @@ export default function StockDesktop() {
                     <td className="px-3 py-2 text-center">
                       {!isCancelled && isAdmin && (
                         <div className="flex items-center justify-center gap-1">
-                          <button onClick={() => handleOpenWriteOffEdit(wo)} className="p-1 hover:bg-gray-50 rounded text-gray-400 hover:text-gray-700" title="Редактировать">
+                          <button onClick={() => handleOpenWriteOffEdit(wo)} className="p-1 hover:bg-gray-100 rounded text-gray-400 hover:text-gray-700" title="Редактировать">
                             <Pencil size={13} />
                           </button>
-                          <button onClick={() => handleCancelWriteOff(wo)} className="p-1 hover:bg-blue-50 rounded text-gray-400 hover:text-blue-600" title="Отменить списание">
-                            <RotateCcw size={13} />
+                          <button onClick={() => handleCancelWriteOff(wo)} className="flex items-center gap-1 px-1.5 py-0.5 hover:bg-emerald-50 rounded text-gray-400 hover:text-emerald-600 text-[10px]" title="Вернуть в остатки">
+                            <RotateCcw size={12} />
+                            <span className="hidden sm:inline">Вернуть</span>
                           </button>
                         </div>
                       )}
@@ -1529,10 +1530,9 @@ export default function StockDesktop() {
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-red-500"
                 >
                   <option value="">Выберите причину</option>
-                  <option value="Бой">Бой</option>
-                  <option value="Просрочка">Просрочка</option>
-                  <option value="Недостача">Недостача</option>
-                  <option value="Брак">Брак</option>
+                  <option value="Испорчен">Испорчен</option>
+                  <option value="Потерян">Потерян</option>
+                  <option value="Просрочен">Просрочен</option>
                   <option value="Другое">Другое</option>
                 </select>
               </div>
@@ -1567,8 +1567,8 @@ export default function StockDesktop() {
             </div>
             <div className="p-5 space-y-4">
               <div className="bg-gray-50 rounded-lg px-3 py-2">
-                <p className="text-sm font-medium text-gray-900">{editingWriteOff.product_name || 'Товар'}</p>
-                <p className="text-xs text-gray-500">Город: {editingWriteOff.city || '—'}</p>
+                <p className="text-sm font-medium text-gray-900">{editingWriteOff.expand?.product?.name || editingWriteOff.product_name || 'Товар'}</p>
+                <p className="text-xs text-gray-500">Город: {editingWriteOff.expand?.supplier?.name || editingWriteOff.city || '—'}</p>
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Количество</label>
@@ -1582,12 +1582,17 @@ export default function StockDesktop() {
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Причина</label>
-                <input
-                  type="text"
+                <select
                   value={writeOffEditForm.reason}
                   onChange={e => setWriteOffEditForm({...writeOffEditForm, reason: e.target.value})}
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                />
+                >
+                  <option value="">Выберите причину</option>
+                  <option value="Испорчен">Испорчен</option>
+                  <option value="Потерян">Потерян</option>
+                  <option value="Просрочен">Просрочен</option>
+                  <option value="Другое">Другое</option>
+                </select>
               </div>
             </div>
             <div className="flex items-center justify-end gap-2 px-5 py-4 border-t border-gray-200 bg-gray-50 rounded-b-xl">
