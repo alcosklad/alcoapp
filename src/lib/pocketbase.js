@@ -1000,17 +1000,11 @@ export const getAllShifts = async (filters = {}) => {
 // Получение всех заказов/продаж (для админа) с expand user
 export const getAllOrders = async (filters = {}) => {
   try {
-    console.log('[getAllOrders] Auth:', pb.authStore.isValid, 'User:', pb.authStore.model?.username, 'Role:', pb.authStore.model?.role);
     const records = await pb.collection('orders').getFullList({
       sort: '-local_time',
       expand: 'user,user.supplier',
       ...filters
     });
-    console.log('[getAllOrders] Fetched', records.length, 'orders');
-    if (records.length > 0) {
-      const latest = records[0];
-      console.log('[getAllOrders] Latest order:', latest.id?.slice(-6), latest.created, latest.city);
-    }
     return records;
   } catch (error) {
     if (error.status === 404) return [];
@@ -1358,7 +1352,8 @@ export const createWriteOff = async (data) => {
       user: userId,
       quantity,
       cost: totalCost > 0 ? totalCost : 0.01,
-      reason: data.reason || 'Другое',
+      reason: 'Другое',
+      comment: data.reason || '',
       writeoff_date: new Date().toISOString(),
     };
 

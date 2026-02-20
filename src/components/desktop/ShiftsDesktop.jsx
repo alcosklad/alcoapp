@@ -168,21 +168,21 @@ export default function ShiftsDesktop() {
     if (filterCity.length > 0) result = result.filter(s => filterCity.includes(s.city));
     if (filterDateFrom) {
       const from = new Date(filterDateFrom); from.setHours(0,0,0,0);
-      result = result.filter(s => new Date(s.start) >= from);
+      result = result.filter(s => new Date((s.start||'').replace(' ','T')) >= from);
     }
     if (filterDateTo) {
       const to = new Date(filterDateTo); to.setHours(23,59,59,999);
-      result = result.filter(s => new Date(s.start) <= to);
+      result = result.filter(s => new Date((s.start||'').replace(' ','T')) <= to);
     }
     result.sort((a, b) => {
       let aV, bV;
       switch (sortField) {
-        case 'start': aV = new Date(a.start).getTime(); bV = new Date(b.start).getTime(); break;
+        case 'start': aV = new Date((a.start||'').replace(' ','T')).getTime()||0; bV = new Date((b.start||'').replace(' ','T')).getTime()||0; break;
         case 'totalAmount': aV = a.totalAmount||0; bV = b.totalAmount||0; break;
         case 'totalItems': aV = a.totalItems||0; bV = b.totalItems||0; break;
         case 'duration':
-          aV = a.end ? new Date(a.end)-new Date(a.start) : 0;
-          bV = b.end ? new Date(b.end)-new Date(b.start) : 0; break;
+          aV = a.end ? new Date(a.end.replace(' ','T'))-new Date((a.start||'').replace(' ','T')) : 0;
+          bV = b.end ? new Date(b.end.replace(' ','T'))-new Date((b.start||'').replace(' ','T')) : 0; break;
         case 'city': return sortDir==='asc' ? (a.city||'').localeCompare(b.city||'') : (b.city||'').localeCompare(a.city||'');
         case 'courier': return sortDir==='asc' ? (a.expand?.user?.name||'').localeCompare(b.expand?.user?.name||'') : (b.expand?.user?.name||'').localeCompare(a.expand?.user?.name||'');
         default: aV=0; bV=0;
@@ -224,11 +224,12 @@ export default function ShiftsDesktop() {
     return sortDir === 'asc' ? <ChevronUp size={14} className="text-blue-600" /> : <ChevronDown size={14} className="text-blue-600" />;
   };
 
-  const fmtDate = (s) => s ? new Date(s).toLocaleDateString('ru-RU', { day:'2-digit', month:'2-digit', year:'2-digit' }) : '—';
-  const fmtTime = (s) => s ? new Date(s).toLocaleTimeString('ru-RU', { hour:'2-digit', minute:'2-digit' }) : '';
+  const sp = (s) => s ? new Date(String(s).replace(' ','T')) : null;
+  const fmtDate = (s) => { const d = sp(s); return d && !isNaN(d) ? d.toLocaleDateString('ru-RU', { day:'2-digit', month:'2-digit', year:'2-digit' }) : '—'; };
+  const fmtTime = (s) => { const d = sp(s); return d && !isNaN(d) ? d.toLocaleTimeString('ru-RU', { hour:'2-digit', minute:'2-digit' }) : ''; };
   const fmtDur = (start, end) => {
     if (!start || !end) return '—';
-    const diff = new Date(end) - new Date(start);
+    const diff = new Date(String(end).replace(' ','T')) - new Date(String(start).replace(' ','T'));
     if (diff <= 0) return '0м';
     const h = Math.floor(diff / 3600000);
     const m = Math.floor((diff % 3600000) / 60000);
@@ -584,7 +585,7 @@ export default function ShiftsDesktop() {
                             className="w-full px-4 py-2.5 flex items-center justify-between text-left"
                           >
                             <div className="flex items-center gap-3">
-                              <span className="text-xs text-gray-400 w-12">{sale.created ? new Date(sale.created).toLocaleTimeString('ru-RU', {hour:'2-digit',minute:'2-digit'}) : '—'}</span>
+                              <span className="text-xs text-gray-400 w-12">{sale.created ? new Date(sale.created.replace(' ','T')).toLocaleTimeString('ru-RU', {hour:'2-digit',minute:'2-digit'}) : '—'}</span>
                               <span className="text-sm text-gray-700">{totalQty} шт · {payLabel[sale.payment_method] || '—'}</span>
                               {isRef && <span className="text-[10px] px-1.5 py-0.5 bg-blue-200 text-blue-700 rounded font-medium">Возврат</span>}
                             </div>
