@@ -142,7 +142,7 @@ function App() {
           <PriceListDesktop />
         </div>
         <div style={{ display: activeTab === 'sales' ? 'block' : 'none' }}>
-          <SalesDesktop />
+          <SalesDesktop activeTab={activeTab} />
         </div>
         <div style={{ display: activeTab === 'shifts' ? 'block' : 'none' }}>
           <ShiftsDesktop />

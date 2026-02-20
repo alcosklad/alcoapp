@@ -48,6 +48,14 @@ export default function CreateReceptionModal({
 
   useEffect(() => {
     if (isOpen) {
+      // Reset form on every open
+      setFormData({ supplier: '', selectedStores: [], items: [] });
+      setSearchQuery('');
+      setActiveCategory('Избранное');
+      setCurrentPage(1);
+      setErrors({});
+      setSubmitting(false);
+      setShowCreateProduct(false);
       loadFavorites();
     }
   }, [isOpen]);
@@ -80,10 +88,14 @@ export default function CreateReceptionModal({
     return ['Избранное', ...ordered];
   }, [products]);
 
-  // Товары текущей категории
+  // Товары текущей категории (при поиске — ищем по ВСЕМ категориям)
   const categoryProducts = useMemo(() => {
     let list;
-    if (activeCategory === 'Избранное') {
+    if (searchQuery) {
+      // Search across ALL products
+      const q = searchQuery.toLowerCase();
+      list = products.filter(p => (p.name || '').toLowerCase().includes(q));
+    } else if (activeCategory === 'Избранное') {
       list = products.filter(p => favoriteIds.has(p.id));
     } else {
       list = products.filter(p => {
@@ -92,11 +104,6 @@ export default function CreateReceptionModal({
       });
     }
     list.sort((a, b) => (a.name || '').localeCompare(b.name || ''));
-
-    if (searchQuery) {
-      const q = searchQuery.toLowerCase();
-      list = list.filter(p => (p.name || '').toLowerCase().includes(q));
-    }
     return list;
   }, [products, activeCategory, favoriteIds, searchQuery]);
 

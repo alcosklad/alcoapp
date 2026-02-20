@@ -4,7 +4,7 @@ import { getAllOrders, getUsers, deleteOrder, refundOrder, updateOrder, getProdu
 import pb from '../../lib/pocketbase';
 import { getOrFetch, invalidate } from '../../lib/cache';
 
-export default function SalesDesktop() {
+export default function SalesDesktop({ activeTab }) {
   const [orders, setOrders] = useState([]);
   const [users, setUsers] = useState([]);
   const [products, setProducts] = useState([]);
@@ -39,6 +39,14 @@ export default function SalesDesktop() {
   }, [selectedOrder]);
 
   useEffect(() => { loadData(); }, []);
+
+  // Re-fetch when tab becomes active (orders may have been created on another device)
+  useEffect(() => {
+    if (activeTab === 'sales') {
+      invalidate('orders');
+      loadData();
+    }
+  }, [activeTab]);
 
   useEffect(() => {
     const now = new Date();

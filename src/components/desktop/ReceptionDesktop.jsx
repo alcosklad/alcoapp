@@ -30,6 +30,9 @@ export default function ReceptionDesktop() {
   const [createProductForm, setCreateProductForm] = useState({ name: '', category: '', cost: 0, price: 0 });
   const [createProductSaving, setCreateProductSaving] = useState(false);
   const [createProductError, setCreateProductError] = useState('');
+  const [filterPeriod, setFilterPeriod] = useState('all');
+  const [filterDateFrom, setFilterDateFrom] = useState('');
+  const [filterDateTo, setFilterDateTo] = useState('');
   
   const userRole = pb.authStore.model?.role;
   const isAdmin = userRole === 'admin';
@@ -52,6 +55,22 @@ export default function ReceptionDesktop() {
     loadProducts();
     loadReceptions();
   }, []);
+
+  useEffect(() => {
+    const now = new Date();
+    let from = new Date();
+    const toLocal = (d) => `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+    switch (filterPeriod) {
+      case 'today': from.setHours(0,0,0,0); break;
+      case 'week': from.setDate(now.getDate() - 7); break;
+      case 'month': from.setMonth(now.getMonth() - 1); break;
+      case 'all': setFilterDateFrom(''); setFilterDateTo(''); return;
+      case 'custom': return;
+      default: setFilterDateFrom(''); setFilterDateTo(''); return;
+    }
+    setFilterDateFrom(toLocal(from));
+    setFilterDateTo(toLocal(now));
+  }, [filterPeriod]);
 
   useEffect(() => {
     loadReceptions();
@@ -320,7 +339,17 @@ export default function ReceptionDesktop() {
     .filter(reception => {
       const supplierName = reception?.expand?.supplier?.name || '';
       const query = searchQuery.toLowerCase();
-      return supplierName.toLowerCase().includes(query);
+      if (query && !supplierName.toLowerCase().includes(query)) return false;
+      // Date filter
+      if (filterDateFrom) {
+        const from = new Date(filterDateFrom); from.setHours(0,0,0,0);
+        if (new Date(reception.created) < from) return false;
+      }
+      if (filterDateTo) {
+        const to = new Date(filterDateTo); to.setHours(23,59,59,999);
+        if (new Date(reception.created) > to) return false;
+      }
+      return true;
     })
     .sort((a, b) => {
       let aVal, bVal;
@@ -376,6 +405,38 @@ export default function ReceptionDesktop() {
             ))}
           </select>
         </div>
+
+        <div className="flex items-center gap-1">
+          {[
+            { key: 'today', label: 'Сегодня' },
+            { key: 'week', label: 'Неделя' },
+            { key: 'month', label: 'Месяц' },
+            { key: 'all', label: 'Всё время' },
+            { key: 'custom', label: 'Период' },
+          ].map(({ key, label }) => (
+            <button
+              key={key}
+              onClick={() => setFilterPeriod(key)}
+              className={`px-2 py-1 rounded text-xs transition-colors ${
+                filterPeriod === key
+                  ? 'bg-blue-600 text-white'
+                  : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+              }`}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+
+        {filterPeriod === 'custom' && (
+          <div className="flex items-center gap-1">
+            <input type="date" value={filterDateFrom} onChange={e => setFilterDateFrom(e.target.value)}
+              className="px-2 py-1 border border-gray-300 rounded text-xs" />
+            <span className="text-xs text-gray-400">—</span>
+            <input type="date" value={filterDateTo} onChange={e => setFilterDateTo(e.target.value)}
+              className="px-2 py-1 border border-gray-300 rounded text-xs" />
+          </div>
+        )}
 
         <div className="relative flex-1 max-w-xs">
           <Search size={14} className="absolute left-2 top-1/2 -translate-y-1/2 text-gray-400" />
