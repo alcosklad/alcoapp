@@ -18,6 +18,7 @@ export default function ReceptionDesktop() {
   const [sortDir, setSortDir] = useState('desc');
   const [selectedReception, setSelectedReception] = useState(null);
   const [showCreateModal, setShowCreateModal] = useState(false);
+  const [initialFormData, setInitialFormData] = useState(null);
   const [editedItems, setEditedItems] = useState([]);
   const [hasChanges, setHasChanges] = useState(false);
   const [expandedStores, setExpandedStores] = useState({});
@@ -339,15 +340,19 @@ export default function ReceptionDesktop() {
     .filter(reception => {
       const supplierName = reception?.expand?.supplier?.name || '';
       const query = searchQuery.toLowerCase();
-      if (query && !supplierName.toLowerCase().includes(query)) return false;
+      if (query) {
+        const matchSupplier = supplierName.toLowerCase().includes(query);
+        const matchBatch = (reception.batch_number || '').toLowerCase().includes(query);
+        if (!matchSupplier && !matchBatch) return false;
+      }
       // Date filter
       if (filterDateFrom) {
         const from = new Date(filterDateFrom); from.setHours(0,0,0,0);
-        if (new Date(reception.created) < from) return false;
+        if (new Date((reception.created||'').replace(' ','T')) < from) return false;
       }
       if (filterDateTo) {
         const to = new Date(filterDateTo); to.setHours(23,59,59,999);
-        if (new Date(reception.created) > to) return false;
+        if (new Date((reception.created||'').replace(' ','T')) > to) return false;
       }
       return true;
     })
@@ -356,8 +361,8 @@ export default function ReceptionDesktop() {
       
       switch (sortField) {
         case 'created':
-          aVal = new Date(a.created);
-          bVal = new Date(b.created);
+          aVal = new Date((a.created||'').replace(' ','T'));
+          bVal = new Date((b.created||'').replace(' ','T'));
           break;
         case 'supplier':
           aVal = a?.expand?.supplier?.name || '';
@@ -442,7 +447,7 @@ export default function ReceptionDesktop() {
           <Search size={14} className="absolute left-2 top-1/2 -translate-y-1/2 text-gray-400" />
           <input
             type="text"
-            placeholder="Поиск по городу..."
+            placeholder="Поиск по городу или партии..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             className="w-full pl-7 pr-2 py-1 border border-gray-300 rounded text-xs focus:outline-none focus:ring-2 focus:ring-blue-500"
@@ -486,6 +491,9 @@ export default function ReceptionDesktop() {
                     Дата <SortIcon field="created" />
                   </div>
                 </th>
+                <th className="text-left px-3 py-2 font-medium text-gray-600">
+                  Партия
+                </th>
                 <th 
                   className="text-left px-3 py-2 font-medium text-gray-600 cursor-pointer hover:bg-gray-100"
                   onClick={() => handleSort('supplier')}
@@ -516,7 +524,7 @@ export default function ReceptionDesktop() {
             <tbody>
               {loading ? (
                 <tr>
-                  <td colSpan={6} className="px-3 py-6 text-center text-gray-500">
+                  <td colSpan={7} className="px-3 py-6 text-center text-gray-500">
                     <div className="flex items-center justify-center gap-2">
                       <RefreshCw size={14} className="animate-spin" />
                       Загрузка...
@@ -525,7 +533,7 @@ export default function ReceptionDesktop() {
                 </tr>
               ) : filteredReceptions.length === 0 ? (
                 <tr>
-                  <td colSpan={6} className="px-3 py-6 text-center text-gray-500">
+                  <td colSpan={7} className="px-3 py-6 text-center text-gray-500">
                     {searchQuery ? 'Ничего не найдено' : 'Нет приёмок'}
                   </td>
                 </tr>
@@ -541,6 +549,9 @@ export default function ReceptionDesktop() {
                     >
                       <td className="px-3 py-1.5 text-gray-600">
                         {formatLocalDate(reception.created, 'd MMMM yyyy, HH:mm')}
+                      </td>
+                      <td className="px-3 py-1.5 font-medium text-gray-700">
+                        {reception.batch_number || '—'}
                       </td>
                       <td className="px-3 py-1.5">
                         {reception?.expand?.supplier?.name || '—'}
@@ -602,11 +613,15 @@ export default function ReceptionDesktop() {
       {/* Модальное окно создания приёмки */}
       <CreateReceptionModal
         isOpen={showCreateModal}
-        onClose={() => setShowCreateModal(false)}
+        onClose={() => {
+          setShowCreateModal(false);
+          setInitialFormData(null);
+        }}
         suppliers={suppliers}
         stores={storesList}
         products={products}
         onSave={handleCreateReception}
+        initialFormData={initialFormData}
       />
 
       {/* Модалка с деталями приёмки */}
@@ -617,13 +632,39 @@ export default function ReceptionDesktop() {
             <div className="flex items-center justify-between p-4 border-b border-gray-200">
               <div>
                 <h3 className="text-lg font-semibold text-gray-900">
-                  Приёмка от {formatLocalDate(selectedReception.created, 'd MMMM yyyy')}
+                  Приёмка {selectedReception.batch_number ? `№ ${selectedReception.batch_number}` : ''} от {formatLocalDate(selectedReception.created, 'd MMMM yyyy')}
                 </h3>
                 <p className="text-sm text-gray-500">
                   Город: {selectedReception?.expand?.supplier?.name || '—'}
                 </p>
               </div>
               <div className="flex items-center gap-2">
+                {isAdmin && (
+                  <button
+                    onClick={() => {
+                      const newFormData = {
+                        supplier: selectedReception.supplier,
+                        selectedStores: selectedReception.stores || [],
+                        items: editedItems.map(item => ({
+                          product: item.product,
+                          name: item.name,
+                          article: item.article || '',
+                          quantity: item.quantity,
+                          cost: item.cost
+                        }))
+                      };
+                      handleCloseDetails();
+                      // We need to pass this to CreateReceptionModal somehow, 
+                      // let's add a state for it
+                      setInitialFormData(newFormData);
+                      setShowCreateModal(true);
+                    }}
+                    className="inline-flex items-center gap-1 px-2 py-1 text-purple-600 hover:bg-purple-50 rounded text-xs"
+                    title="Копировать приёмку"
+                  >
+                    Копировать
+                  </button>
+                )}
                 {isAdmin && (
                   <button
                     onClick={() => setShowAddItemPanel((v) => !v)}

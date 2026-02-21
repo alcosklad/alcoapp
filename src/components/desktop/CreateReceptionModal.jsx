@@ -12,7 +12,8 @@ export default function CreateReceptionModal({
   suppliers, 
   stores, 
   products,
-  onSave 
+  onSave,
+  initialFormData = null
 }) {
   const defaultStores = [
     { id: 'lenta', name: 'Лента' },
@@ -48,8 +49,12 @@ export default function CreateReceptionModal({
 
   useEffect(() => {
     if (isOpen) {
-      // Reset form on every open
-      setFormData({ supplier: '', selectedStores: [], items: [] });
+      // Reset form on every open or set from initial
+      if (initialFormData) {
+        setFormData(initialFormData);
+      } else {
+        setFormData({ supplier: '', selectedStores: [], items: [] });
+      }
       setSearchQuery('');
       setActiveCategory('Избранное');
       setCurrentPage(1);
@@ -58,7 +63,7 @@ export default function CreateReceptionModal({
       setShowCreateProduct(false);
       loadFavorites();
     }
-  }, [isOpen]);
+  }, [isOpen, initialFormData]);
 
   useEffect(() => {
     setCurrentPage(1);
@@ -359,6 +364,39 @@ export default function CreateReceptionModal({
             })}
           </div>
           <div className="relative ml-auto flex items-center gap-2">
+            <button
+              onClick={() => {
+                const conf = window.confirm('Очистить текущую корзину и загрузить популярные товары для этого города?');
+                if (conf) {
+                  // Here we could load a template or top items
+                  // For now, let's just add top 5 favorites
+                  const favItems = products
+                    .filter(p => favoriteIds.has(p.id))
+                    .slice(0, 5)
+                    .map(p => ({
+                      product: p.id,
+                      name: p.name,
+                      article: p.article || '',
+                      quantity: 1,
+                      cost: p.cost || 0
+                    }));
+                  
+                  if (favItems.length > 0) {
+                    setFormData(prev => ({
+                      ...prev,
+                      items: favItems
+                    }));
+                    alert(`Добавлено ${favItems.length} товаров из избранного`);
+                  } else {
+                    alert('Нет товаров в избранном');
+                  }
+                }
+              }}
+              className="flex items-center gap-1 px-2 py-1 bg-purple-100 text-purple-700 hover:bg-purple-200 rounded text-xs transition-colors"
+              title="Шаблон: Топ из избранного"
+            >
+              <Star size={13} /> Шаблон
+            </button>
             <div className="relative">
               <Search size={13} className="absolute left-2 top-1/2 -translate-y-1/2 text-gray-400" />
               <input
