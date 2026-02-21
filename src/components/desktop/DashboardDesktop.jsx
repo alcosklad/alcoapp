@@ -444,6 +444,31 @@ export default function DashboardDesktop({ user, onNavigate }) {
       .sort((a, b) => b.value - a.value);
   }, [filteredOrders]);
 
+  // Топ-3 продаваемых товара
+  const topProducts = useMemo(() => {
+    const productMap = {};
+    filteredOrders.forEach(order => {
+      if (order.status === 'refund') return;
+      const items = Array.isArray(order.items) ? order.items : [];
+      items.forEach(item => {
+        const id = item.productId || item.id;
+        const name = item.name || 'Неизвестный товар';
+        const qty = Number(item.quantity) || 0;
+        const total = (Number(item.price) || 0) * qty;
+        
+        if (!productMap[id]) {
+          productMap[id] = { id, name, quantity: 0, total: 0 };
+        }
+        productMap[id].quantity += qty;
+        productMap[id].total += total;
+      });
+    });
+    
+    return Object.values(productMap)
+      .sort((a, b) => b.quantity - a.quantity)
+      .slice(0, 3);
+  }, [filteredOrders]);
+
   const margin = metrics.totalSaleValue - metrics.totalPurchaseValue;
 
   if (loading) {
@@ -632,6 +657,30 @@ export default function DashboardDesktop({ user, onNavigate }) {
           ) : (
             <div className="flex items-center justify-center h-[500px] text-gray-400 text-sm">Нет данных</div>
           )}
+
+          {/* Топ-3 товара под графиком */}
+          {topProducts.length > 0 && (
+            <div className="pt-4 border-t border-gray-100 mt-4">
+              <h4 className="text-xs font-medium text-gray-500 uppercase tracking-wider mb-3">Топ-3 продаваемых товара за период</h4>
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                {topProducts.map((product, idx) => (
+                  <div key={product.id} className="bg-gray-50 rounded-lg p-3 flex items-center gap-3">
+                    <div className={`w-8 h-8 rounded-full flex items-center justify-center font-bold text-sm ${idx === 0 ? 'bg-yellow-100 text-yellow-700' : idx === 1 ? 'bg-gray-200 text-gray-700' : 'bg-orange-100 text-orange-700'}`}>
+                      {idx + 1}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-medium text-gray-900 truncate" title={product.name}>
+                        {product.name}
+                      </p>
+                      <p className="text-xs text-gray-500 mt-0.5">
+                        {product.quantity} шт • {product.total.toLocaleString('ru-RU')} ₽
+                      </p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
       )}
 
@@ -686,23 +735,6 @@ export default function DashboardDesktop({ user, onNavigate }) {
           <div className="bg-white rounded-2xl max-w-6xl w-full mx-6 shadow-2xl" onClick={(e) => e.stopPropagation()}>
             <div className="flex items-center justify-between px-8 py-5 border-b border-gray-100">
               <div>
-                      
-                      onClik={() => {
-                        // Пытаемся найти suppierId по имени
-                        const supplier = suppliers.find(s => s.nme === item.name);
-                        if (upplier && onNavigate) {
-                          // Переход в раздел остатков с фильтрацией (в реальном приложении 
-                          // потребуется передать состояние или через кэш/роутинг, 
-                          // но пока просто перейдем на вкладку)
-                          setShowStockBreakdown(false);
-                          // Чтобы StockDesktop увидел выбранный город, можно 
-                          // сохранить его в localStorage или использовать общий стейт
-                          try { localStorage.setItem('ns_selected_supplier', supplier.id); } catch {}
-                          onNavigate('tock');
-                        }
-                      }}
-                      class cursor-pointer
-                    
                 <h3 className="text-xl font-bold text-gray-900">Товары по складам</h3>
                 <p className="text-sm text-gray-500 mt-0.5">Общее количество: <span className="font-semibold text-gray-700">{stats.totalProducts.toLocaleString('ru-RU')} шт</span></p>
               </div>
@@ -715,25 +747,38 @@ export default function DashboardDesktop({ user, onNavigate }) {
                 <p className="text-gray-500 text-sm text-center py-8">Нет данных</p>
               ) : (
                 <div className="grid grid-cols-2 lg:grid-cols-3 gap-3">
-                  {(stats.stockBreakdown || []).map((item, idx) => (
-                    <div key={idx} className="flex items-center justify-between p-3 bg-gray-50 rounded-xl hover:bg-gray-100 transition-colors">
-                      <div className="flex items-center gap-3 min-w-0 flex-1">
-                        <div className="w-8 h-8 bg-blue-100 rounded-lg flex items-center justify-center shrink-0">
-                          <Package size={16} className="text-blue-600" />
+                  {(stats.stockBreakdown || []).map((item, idx) => {
+                    const supplier = suppliers.find(s => s.name === item.name);
+                    return (
+                      <div 
+                        key={idx} 
+                        onClick={() => {
+                          if (supplier && onNavigate) {
+                            setShowStockBreakdown(false);
+                            try { localStorage.setItem('ns_selected_supplier', supplier.id); } catch {}
+                            onNavigate('stock');
+                          }
+                        }}
+                        className="flex items-center justify-between p-3 bg-gray-50 rounded-xl hover:bg-gray-100 transition-colors cursor-pointer"
+                      >
+                        <div className="flex items-center gap-3 min-w-0 flex-1">
+                          <div className="w-8 h-8 bg-blue-100 rounded-lg flex items-center justify-center shrink-0">
+                            <Package size={16} className="text-blue-600" />
+                          </div>
+                          <div className="min-w-0 flex-1">
+                            <p className="text-sm font-medium text-gray-900 truncate">{item.name}</p>
+                            <p className="text-xs text-gray-500">{item.count.toLocaleString('ru-RU')} шт</p>
+                          </div>
                         </div>
-                        <div className="min-w-0 flex-1">
-                          <p className="text-sm font-medium text-gray-900 truncate">{item.name}</p>
-                          <p className="text-xs text-gray-500">{item.count.toLocaleString('ru-RU')} шт</p>
-                        </div>
+                        {isAdmin && (
+                          <div className="text-right shrink-0 ml-2">
+                            <p className="text-xs font-semibold text-green-600">{item.saleValue.toLocaleString('ru-RU')}</p>
+                            <p className="text-xs text-purple-500">{item.purchaseValue.toLocaleString('ru-RU')}</p>
+                          </div>
+                        )}
                       </div>
-                      {isAdmin && (
-                        <div className="text-right shrink-0 ml-2">
-                          <p className="text-xs font-semibold text-green-600">{item.saleValue.toLocaleString('ru-RU')}</p>
-                          <p className="text-xs text-purple-500">{item.purchaseValue.toLocaleString('ru-RU')}</p>
-                        </div>
-                      )}
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
               )}
             </div>
