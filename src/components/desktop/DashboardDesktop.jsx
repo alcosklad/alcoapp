@@ -48,10 +48,10 @@ export default function DashboardDesktop({ user, onNavigate }) {
   }, []);
 
   useEffect(() => {
-    if (suppliers.length > 0 || selectedSupplier === '') {
+    if (suppliers.length > 0 || selectedCities.length === 0) {
       loadData();
     }
-  }, [selectedSupplier]);
+  }, [selectedCities]);
 
   useEffect(() => {
     const now = new Date();

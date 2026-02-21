@@ -67,6 +67,7 @@ export default function StockDesktop({ onNavigate }) {
 
   const userRole = pb.authStore.model?.role;
   const isAdmin = userRole === 'admin';
+  const isOperator = userRole === 'operator';
 
   useEffect(() => {
     loadSuppliers();
