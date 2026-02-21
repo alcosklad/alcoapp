@@ -1000,7 +1000,7 @@ export default function StockDesktop({ onNavigate }) {
                       return (
                         <React.Fragment key={stock.id}>
                           {showCategoryHeader && category && (
-                            <tr className="bg-slate-800 border-y border-slate-900">
+                            <tr className="bg-[#6C8CD5] border-y border-[#5B7AC1]">
                               <td colSpan={selectMode ? 9 : 8} className="px-4 py-2.5 font-bold text-white text-sm uppercase tracking-wider sticky top-0 z-10 shadow-sm">{category}</td>
                             </tr>
                           )}

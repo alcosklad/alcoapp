@@ -507,7 +507,7 @@ export default function Stock() {
                   return (
                     <React.Fragment key={stock?.id || Math.random()}>
                       {showCategoryHeader && category && (
-                        <div className="bg-slate-800 border-y border-slate-900 sticky top-0 z-10 shadow-sm">
+                        <div className="bg-[#6C8CD5] border-y border-[#5B7AC1] sticky top-0 z-10 shadow-sm">
                           <div className="px-4 py-2.5 font-bold text-white text-sm uppercase tracking-wider">{category}</div>
                         </div>
                       )}
