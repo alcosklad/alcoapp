@@ -594,8 +594,10 @@ export const getDashboardStats = async (filterId = null) => {
     
     stocks.forEach(stock => {
       const quantity = stock.quantity || 0;
-      const salePrice = stock?.expand?.product?.price || 0;
-      const costPrice = stock?.expand?.product?.cost || stock?.cost || 0;
+      const product = stock?.expand?.product || {};
+      const salePrice = product.price || 0;
+      // В PocketBase закупочная цена (cost) хранится либо в товаре, либо в самой записи остатка (например, если она переопределена)
+      const costPrice = stock.cost || product.cost || stock.purchase_price || 0;
       
       totalStockQuantity += quantity;
       totalSaleValue += salePrice * quantity;

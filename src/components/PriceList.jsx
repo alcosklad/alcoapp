@@ -369,8 +369,8 @@ export default function PriceList() {
                     return (
                       <React.Fragment key={product?.id || Math.random()}>
                         {showCategoryHeader && category && (
-                          <div className="bg-[#6C8CD5] border-y border-[#5B7AC1] sticky top-0 z-10 shadow-sm">
-                            <div className="px-6 py-2.5 font-bold text-white text-sm uppercase tracking-wider">{category}</div>
+                          <div className="bg-indigo-100 border-y border-indigo-200 sticky top-0 z-10 shadow-sm">
+                            <div className="px-6 py-2.5 font-bold text-indigo-900 text-sm uppercase tracking-wider">{category}</div>
                           </div>
                         )}
                         {showSubcategoryHeader && subcategory && (
