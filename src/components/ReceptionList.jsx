@@ -126,7 +126,7 @@ export default function ReceptionList({ onCreate }) {
                       {(() => {
                         if (doc?.datetime) {
                           // Показываем дату и время из datetime
-                          const dt = new Date(doc.datetime);
+                          const dt = new Date((doc.datetime||'').replace(' ','T'));
                           return dt.toLocaleString('ru-RU', {
                             day: '2-digit',
                             month: '2-digit',
@@ -137,7 +137,7 @@ export default function ReceptionList({ onCreate }) {
                           });
                         } else {
                           // Если нет datetime, показываем только дату
-                          return new Date(doc?.date || Date.now()).toLocaleDateString('ru-RU');
+                          return new Date((doc?.date || '').replace(' ','T') || Date.now()).toLocaleDateString('ru-RU');
                         }
                       })()}
                     </p>

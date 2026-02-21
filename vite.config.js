@@ -60,6 +60,12 @@ export default defineConfig({
   server: {
     host: '0.0.0.0',
     port: 5173,
+    hmr: {
+      overlay: false
+    },
+    fs: {
+      deny: ['.git']
+    },
     allowedHosts: ['nashsklad.store', 'www.nashsklad.store', 'localhost', '127.0.0.1'],
     watch: {
       ignored: ['**/.git/**'],

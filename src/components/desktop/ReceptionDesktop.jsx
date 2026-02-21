@@ -347,12 +347,16 @@ export default function ReceptionDesktop() {
       }
       // Date filter
       if (filterDateFrom) {
-        const from = new Date(filterDateFrom); from.setHours(0,0,0,0);
-        if (new Date((reception.created||'').replace(' ','T')) < from) return false;
+        const [y, m, d] = filterDateFrom.split('-');
+        const from = new Date(y, m - 1, d, 0, 0, 0, 0);
+        const recDate = new Date((reception.created||'').replace(' ','T'));
+        if (recDate < from) return false;
       }
       if (filterDateTo) {
-        const to = new Date(filterDateTo); to.setHours(23,59,59,999);
-        if (new Date((reception.created||'').replace(' ','T')) > to) return false;
+        const [y, m, d] = filterDateTo.split('-');
+        const to = new Date(y, m - 1, d, 23, 59, 59, 999);
+        const recDate = new Date((reception.created||'').replace(' ','T'));
+        if (recDate > to) return false;
       }
       return true;
     })

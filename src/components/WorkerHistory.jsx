@@ -34,7 +34,7 @@ export default function WorkerHistory() {
         if (a.local_time && b.local_time) {
           return parseLocalTime(b.local_time) - parseLocalTime(a.local_time);
         }
-        return new Date(b.created_date) - new Date(a.created_date);
+        return new Date((b.created_date||'').replace(' ','T')) - new Date((a.created_date||'').replace(' ','T'));
       });
       setOrders(sorted);
     } catch (error) {
@@ -63,7 +63,7 @@ export default function WorkerHistory() {
           });
           return orderDate === filterDate;
         }
-        return new Date(order.created_date).toDateString() === new Date(selectedDate).toDateString();
+        return new Date((order.created_date||'').replace(' ','T')).toDateString() === new Date(selectedDate).toDateString();
       })() : 
       true;
     
@@ -191,12 +191,12 @@ export default function WorkerHistory() {
                 date: order.local_time.split(', ')[0] || '',
                 time: order.local_time.split(', ')[1] || ''
               } : {
-                date: new Date(order.created_date).toLocaleDateString('ru-RU', { 
+                date: new Date((order.created_date||'').replace(' ','T')).toLocaleDateString('ru-RU', { 
                   day: 'numeric', 
                   month: 'long', 
                   year: 'numeric' 
                 }),
-                time: new Date(order.created_date).toLocaleTimeString('ru-RU', { 
+                time: new Date((order.created_date||'').replace(' ','T')).toLocaleTimeString('ru-RU', { 
                   hour: '2-digit', 
                   minute: '2-digit' 
                 })

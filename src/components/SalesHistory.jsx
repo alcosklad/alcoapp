@@ -60,7 +60,7 @@ export default function SalesHistory({ isOpen, onClose }) {
           return dateB - dateA;
         }
         // Иначе используем created_date
-        return new Date(b.created_date) - new Date(a.created_date);
+        return new Date((b.created_date||'').replace(' ','T')) - new Date((a.created_date||'').replace(' ','T'));
       });
       console.log('📊 Отсортированные заказы:', sorted);
       setOrders(sorted);
@@ -92,7 +92,7 @@ export default function SalesHistory({ isOpen, onClose }) {
           return orderDate === filterDate;
         }
         // Иначе используем created_date
-        const orderDate = new Date(order.created_date).toLocaleDateString('ru-RU');
+        const orderDate = new Date((order.created_date||'').replace(' ','T')).toLocaleDateString('ru-RU');
         return orderDate === new Date(dateFilter).toLocaleDateString('ru-RU');
       });
       console.log('📅 После фильтра по дате:', filtered.length);
@@ -138,7 +138,7 @@ export default function SalesHistory({ isOpen, onClose }) {
 
   // Форматирование даты и времени
   const formatDateTime = (dateString) => {
-    const date = new Date(dateString);
+    const date = new Date((dateString||'').replace(' ','T'));
     return {
       date: date.toLocaleDateString('ru-RU', { 
         day: 'numeric', 

@@ -348,6 +348,19 @@ export default function StockDesktop() {
           cost: Number(editForm.cost) || 0,
           price: Number(editForm.price) || 0,
         });
+
+        // Также обновляем цену закупа во всех остатках этого товара, чтобы она применилась везде
+        const allCityRecords = await pb.collection('stocks').getFullList({
+          filter: `product = "${productId}"`
+        }).catch(() => []);
+        
+        for (const record of allCityRecords) {
+          if (record.cost_per_unit !== Number(editForm.cost)) {
+            await updateStockRecord(record.id, {
+              cost_per_unit: Number(editForm.cost)
+            }).catch(() => {});
+          }
+        }
       }
       closeEditModal();
       invalidate('stocks');
@@ -1324,7 +1337,7 @@ export default function StockDesktop() {
                 ) : (
                   <div className="space-y-1.5 max-h-48 overflow-y-auto">
                     {receptionHistory.map((h, idx) => {
-                      const d = h.date ? new Date(h.date) : null;
+                      const d = h.date ? new Date((h.date||'').replace(' ','T')) : null;
                       const dateStr = d && !isNaN(d.getTime()) ? d.toLocaleDateString('ru-RU', { day: '2-digit', month: '2-digit', year: '2-digit' }) : '—';
                       const timeStr = '';
                       const receptionLabel = h.receptionName || h.batchNumber || '';

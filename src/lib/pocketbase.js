@@ -856,7 +856,12 @@ export const createOrder = async (orderData) => {
       payment_method: paymentMethodValue,
       local_time: orderData.localTime,
       created_date: new Date().toISOString(),
-      city: cityName
+      city: orderData.city || cityName,
+      order_number: orderData.order_number || '',
+      supplier: orderData.supplier || '',
+      city_code: orderData.city_code || '',
+      cost_total: orderData.cost_total || 0,
+      profit: orderData.profit || 0,
     };
     
     const result = await pb.collection('orders').create(data);
@@ -1573,7 +1578,7 @@ export const getReceptionHistoryForProduct = async (productId, supplierId = null
     });
 
     if (historyFromReceptions.length > 0) {
-      historyFromReceptions.sort((a, b) => new Date(b.date || 0) - new Date(a.date || 0));
+      historyFromReceptions.sort((a, b) => new Date((b.date || '').replace(' ','T') || 0) - new Date((a.date || '').replace(' ','T') || 0));
       return historyFromReceptions;
     }
 
@@ -1595,7 +1600,7 @@ export const getReceptionHistoryForProduct = async (productId, supplierId = null
       };
     });
 
-    history.sort((a, b) => new Date(b.date || 0) - new Date(a.date || 0));
+    history.sort((a, b) => new Date((b.date || '').replace(' ','T') || 0) - new Date((a.date || '').replace(' ','T') || 0));
     return history;
   } catch (error) {
     console.error('PocketBase: Error loading reception history:', error);

@@ -248,7 +248,7 @@ export default function EditReceptionModal({ isOpen, onClose, reception, onSave,
               <div className="flex items-center gap-4 mt-2 text-sm text-gray-600">
                 <div className="flex items-center gap-1">
                   <Calendar className="w-4 h-4" />
-                  {new Date(reception.created).toLocaleString('ru-RU')}
+                  {new Date((reception.created||'').replace(' ','T')).toLocaleString('ru-RU')}
                 </div>
                 <div className="flex items-center gap-1">
                   <MapPin className="w-4 h-4" />

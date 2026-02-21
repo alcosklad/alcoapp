@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { RussianRuble, TrendingUp, CreditCard, Banknote, Search, ChevronDown, ChevronUp, X, Trash2, RotateCcw, Pencil, Check, Package } from 'lucide-react';
 import { getAllOrders, getUsers, deleteOrder, refundOrder, updateOrder, getProducts } from '../../lib/pocketbase';
 import pb from '../../lib/pocketbase';
@@ -31,6 +31,7 @@ export default function SalesDesktop({ activeTab }) {
 
   const isAdmin = pb.authStore.model?.role === 'admin';
   const isWorker = pb.authStore.model?.role === 'worker';
+  const mountedRef = useRef(false);
 
   useEffect(() => {
     if (selectedOrder) document.body.style.overflow = 'hidden';
@@ -40,19 +41,17 @@ export default function SalesDesktop({ activeTab }) {
 
   useEffect(() => { loadData(); }, []);
 
-  // Re-fetch when tab becomes active (orders may have been created on another device)
+  // Re-fetch when tab becomes active AGAIN (not on mount — loadData handles mount)
   useEffect(() => {
+    if (!mountedRef.current) {
+      mountedRef.current = true;
+      return;
+    }
     if (activeTab === 'sales') {
-      // Bypass cache entirely — direct API call
       getAllOrders().then(fresh => {
         if (fresh) {
-          console.log('[Sales DEBUG] Fetched orders:', fresh.length, '| newest:', fresh[0]?.created, '| user:', fresh[0]?.user, '| auth:', pb.authStore.model?.id, pb.authStore.model?.role);
+          console.log('[Sales] Re-fetch on tab switch:', fresh.length, 'orders');
           setOrders(fresh);
-          invalidate('orders');
-          try {
-            const entry = { data: fresh, ts: Date.now(), ttl: 60000 };
-            localStorage.setItem('ns_cache_orders:all', JSON.stringify(entry));
-          } catch {}
         }
       }).catch(err => console.error('Error refreshing orders:', err));
     }
@@ -78,11 +77,12 @@ export default function SalesDesktop({ activeTab }) {
     try {
       setLoading(true);
       const [ordersData, usersData, productsData] = await Promise.all([
-        getOrFetch('orders:all', () => getAllOrders(), 60000, (fresh) => setOrders(fresh)),
+        getAllOrders(),
         getOrFetch('users:all', () => getUsers(), 300000),
         getOrFetch('products:all', () => getProducts(), 300000, (fresh) => setProducts(fresh))
       ]);
-      setOrders(ordersData);
+      console.log('[Sales] Initial load:', ordersData?.length, 'orders | newest created:', ordersData?.[0]?.created);
+      setOrders(ordersData || []);
       setUsers(usersData);
       setProducts(productsData || []);
     } catch (error) {
@@ -208,25 +208,28 @@ export default function SalesDesktop({ activeTab }) {
         const userName = o.expand?.user?.name || '';
         const city = o.city || '';
         const itemNames = (o.items || []).map(i => i.name || '').join(' ');
-        return userName.toLowerCase().includes(q) || city.toLowerCase().includes(q) || itemNames.toLowerCase().includes(q);
+        const orderNum = o.order_number || '';
+        return userName.toLowerCase().includes(q) || city.toLowerCase().includes(q) || itemNames.toLowerCase().includes(q) || orderNum.toLowerCase().includes(q);
       });
     }
     if (filterCourier) result = result.filter(o => o.user === filterCourier);
     if (filterCity.length > 0) result = result.filter(o => filterCity.includes(o.city));
     if (filterDateFrom) {
-      const from = new Date(filterDateFrom); from.setHours(0,0,0,0);
+      const [y, m, d] = filterDateFrom.split('-');
+      const from = new Date(y, m - 1, d, 0, 0, 0, 0);
       result = result.filter(o => {
         const raw = o.created_date || o.created || '';
-        const d = new Date(raw.replace(' ', 'T'));
-        return !isNaN(d) && d >= from;
+        const d_obj = new Date(raw.replace(' ', 'T'));
+        return !isNaN(d_obj) && d_obj >= from;
       });
     }
     if (filterDateTo) {
-      const to = new Date(filterDateTo); to.setHours(23,59,59,999);
+      const [y, m, d] = filterDateTo.split('-');
+      const to = new Date(y, m - 1, d, 23, 59, 59, 999);
       result = result.filter(o => {
         const raw = o.created_date || o.created || '';
-        const d = new Date(raw.replace(' ', 'T'));
-        return !isNaN(d) && d <= to;
+        const d_obj = new Date(raw.replace(' ', 'T'));
+        return !isNaN(d_obj) && d_obj <= to;
       });
     }
     result.sort((a, b) => {
@@ -244,7 +247,7 @@ export default function SalesDesktop({ activeTab }) {
       }
       return sortDir==='asc' ? aV-bV : bV-aV;
     });
-    console.log('[Sales DEBUG] Filter:', { total: orders.length, afterFilter: result.length, filterDateFrom, filterDateTo, filterStatus, filterPeriod });
+    if (result.length !== orders.length) console.log('[Sales] Filter:', orders.length, '->', result.length, '| period:', filterPeriod, filterDateFrom, '~', filterDateTo);
     return result;
   }, [orders, search, filterCourier, filterCity, filterDateFrom, filterDateTo, sortField, sortDir, filterStatus]);
 
@@ -342,6 +345,12 @@ export default function SalesDesktop({ activeTab }) {
               <span className="text-gray-400">—</span>
               <input type="date" value={filterDateTo} onChange={e => setFilterDateTo(e.target.value)} className="border rounded-lg px-3 py-1.5 text-sm" />
             </>
+          )}
+          {couriers.length > 0 && (
+            <select value={filterCourier} onChange={e => setFilterCourier(e.target.value)} className="border rounded-lg px-3 py-1.5 text-sm bg-white">
+              <option value="">Все курьеры</option>
+              {couriers.map(([id, name]) => <option key={id} value={id}>{name}</option>)}
+            </select>
           )}
           <div className="flex items-center gap-1 shrink-0 max-w-[400px] overflow-hidden">
             <button onClick={() => { const el = document.getElementById('cities-scroll'); if (el) el.scrollBy({left: -100, behavior: 'smooth'}); }}
@@ -470,7 +479,7 @@ export default function SalesDesktop({ activeTab }) {
                   {fmtDate(selectedOrder.created_date || selectedOrder.created)} {fmtTime(selectedOrder.created_date || selectedOrder.created)} — {selectedOrder.expand?.user?.name || '—'} · {selectedOrder.city || '—'}
                 </p>
                 {selectedOrder.edited_at && (
-                  <p className="text-xs text-amber-500 mt-1">✎ Редактировано {new Date(selectedOrder.edited_at).toLocaleString('ru-RU')} — {selectedOrder.edited_by || 'Admin'}</p>
+                  <p className="text-xs text-amber-500 mt-1">✎ Редактировано {safeParse(selectedOrder.edited_at)?.toLocaleString('ru-RU') || '—'} — {selectedOrder.edited_by || 'Admin'}</p>
                 )}
               </div>
               <div className="flex items-center gap-2 shrink-0">

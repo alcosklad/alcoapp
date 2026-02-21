@@ -61,7 +61,7 @@ export default function DashboardDesktop({ user }) {
       case 'today': from.setHours(0, 0, 0, 0); break;
       case 'week': from.setDate(now.getDate() - 7); break;
       case 'month': from.setMonth(now.getMonth() - 1); break;
-      case 'all': from = new Date('2026-02-16T00:00:00'); break;
+      case 'all': from = new Date('2020-01-01T00:00:00'); break;
       case 'custom': return;
       default: from.setMonth(now.getMonth() - 1);
     }
@@ -145,14 +145,22 @@ export default function DashboardDesktop({ user }) {
       });
     }
     if (filterDateFrom) {
-      const from = new Date(filterDateFrom);
-      from.setHours(0, 0, 0, 0);
-      result = result.filter((o) => new Date(o.created_date || o.created) >= from);
+      const [y, m, d] = filterDateFrom.split('-');
+      const from = new Date(y, m - 1, d, 0, 0, 0, 0);
+      result = result.filter((o) => {
+        const raw = o.created_date || o.created || '';
+        const d_obj = new Date(raw.replace(' ', 'T'));
+        return !isNaN(d_obj) && d_obj >= from;
+      });
     }
     if (filterDateTo) {
-      const to = new Date(filterDateTo);
-      to.setHours(23, 59, 59, 999);
-      result = result.filter((o) => new Date(o.created_date || o.created) <= to);
+      const [y, m, d] = filterDateTo.split('-');
+      const to = new Date(y, m - 1, d, 23, 59, 59, 999);
+      result = result.filter((o) => {
+        const raw = o.created_date || o.created || '';
+        const d_obj = new Date(raw.replace(' ', 'T'));
+        return !isNaN(d_obj) && d_obj <= to;
+      });
     }
     return result;
   }, [salesData, selectedSupplier, selectedCityName, filterDateFrom, filterDateTo]);
@@ -163,14 +171,22 @@ export default function DashboardDesktop({ user }) {
       result = result.filter((r) => r.supplier === selectedSupplier);
     }
     if (filterDateFrom) {
-      const from = new Date(filterDateFrom);
-      from.setHours(0, 0, 0, 0);
-      result = result.filter((r) => new Date(r.date || r.created) >= from);
+      const [y, m, d] = filterDateFrom.split('-');
+      const from = new Date(y, m - 1, d, 0, 0, 0, 0);
+      result = result.filter((r) => {
+        const raw = r.date || r.created || '';
+        const d_obj = new Date(raw.replace(' ', 'T'));
+        return !isNaN(d_obj) && d_obj >= from;
+      });
     }
     if (filterDateTo) {
-      const to = new Date(filterDateTo);
-      to.setHours(23, 59, 59, 999);
-      result = result.filter((r) => new Date(r.date || r.created) <= to);
+      const [y, m, d] = filterDateTo.split('-');
+      const to = new Date(y, m - 1, d, 23, 59, 59, 999);
+      result = result.filter((r) => {
+        const raw = r.date || r.created || '';
+        const d_obj = new Date(raw.replace(' ', 'T'));
+        return !isNaN(d_obj) && d_obj <= to;
+      });
     }
     return result;
   }, [receptionsData, selectedSupplier, filterDateFrom, filterDateTo]);
@@ -209,7 +225,7 @@ export default function DashboardDesktop({ user }) {
   // Линейный график динамики остатков: база = текущий остаток, +приёмки, −продажи, −списания
   const { stockTrendData, trendCityNames, currentTotals } = useMemo(() => {
     const normalizeDay = (rawDate) => {
-      const d = new Date(rawDate);
+      const d = new Date((rawDate || '').replace(' ', 'T'));
       if (Number.isNaN(d.getTime())) return null;
       d.setHours(0, 0, 0, 0);
       return d;
@@ -224,7 +240,7 @@ export default function DashboardDesktop({ user }) {
     else if (chartRange === 'quarter') start.setDate(now.getDate() - 89);
     else if (chartRange === 'halfyear') start.setDate(now.getDate() - 179);
     else if (chartRange === 'all') {
-      start.setTime(new Date('2026-02-16T00:00:00').getTime());
+      start.setTime(new Date('2020-01-01T00:00:00').getTime());
     }
 
     // 1) Текущий реальный остаток по городам
@@ -367,7 +383,7 @@ export default function DashboardDesktop({ user }) {
     else if (chartRange === 'month') start.setDate(now.getDate() - 29);
     else if (chartRange === 'quarter') start.setDate(now.getDate() - 89);
     else if (chartRange === 'halfyear') start.setDate(now.getDate() - 179);
-    else if (chartRange === 'all') start.setTime(new Date('2026-02-16T00:00:00').getTime());
+    else if (chartRange === 'all') start.setTime(new Date('2020-01-01T00:00:00').getTime());
     const rows = [];
     for (let d = new Date(start); d <= now; d.setDate(d.getDate() + 1)) {
       const row = {

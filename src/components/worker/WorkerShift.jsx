@@ -66,14 +66,14 @@ export default function WorkerShift({ user, activeTab }) {
         return;
       }
       const currentTime = new Date().toISOString();
-      const shiftStartTime = new Date(activeShift.start);
+      const shiftStartTime = new Date((activeShift.start || '').replace(' ', 'T'));
 
       // Используем getOrders (работает в Истории) и фильтруем по дате смены
       let salesData = [];
       try {
         const allOrders = await getOrders();
         salesData = allOrders.filter(o => {
-          const orderDate = new Date(o.created || o.created_date);
+          const orderDate = new Date((o.created || o.created_date || '').replace(' ', 'T'));
           return orderDate >= shiftStartTime;
         });
       } catch (_) {
@@ -112,15 +112,15 @@ export default function WorkerShift({ user, activeTab }) {
   };
 
   const formatDuration = (start, end) => {
-    const diff = new Date(end) - new Date(start);
+    const diff = new Date((end || '').replace(' ', 'T')) - new Date((start || '').replace(' ', 'T'));
     const h = Math.floor(diff / 3600000);
     const m = Math.floor((diff % 3600000) / 60000);
     return `${h}ч ${m}м`;
   };
 
-  const formatDate = (d) => new Date(d).toLocaleString('ru-RU');
-  const formatShortDate = (d) => new Date(d).toLocaleDateString('ru-RU', { day: 'numeric', month: 'short' });
-  const formatTime = (d) => new Date(d).toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' });
+  const formatDate = (d) => new Date((d || '').replace(' ', 'T')).toLocaleString('ru-RU');
+  const formatShortDate = (d) => new Date((d || '').replace(' ', 'T')).toLocaleDateString('ru-RU', { day: 'numeric', month: 'short' });
+  const formatTime = (d) => new Date((d || '').replace(' ', 'T')).toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' });
 
   const paymentLabels = { '0': 'Наличные', '1': 'Перевод', '2': 'Предоплата', 'cash': 'Наличные', 'transfer': 'Перевод', 'prepaid': 'Предоплата' };
   const getPaymentLabel = (pm) => paymentLabels[pm] || '—';

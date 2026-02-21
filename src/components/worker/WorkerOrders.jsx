@@ -53,14 +53,14 @@ export default function WorkerOrders({ user, closeTrigger }) {
         () => getOrders(),
         60000,
         (fresh) => {
-          const sorted = fresh.sort((a, b) => new Date(b.created || b.created_date || 0) - new Date(a.created || a.created_date || 0));
+          const sorted = fresh.sort((a, b) => new Date((b.created || b.created_date || '').replace(' ', 'T')) - new Date((a.created || a.created_date || '').replace(' ', 'T')));
           setOrders(sorted);
         }
       );
       // Сортируем по created (PocketBase timestamp) — надёжнее чем текстовое local_time
       const sorted = data.sort((a, b) => {
-        const dateA = new Date(a.created || a.created_date || 0);
-        const dateB = new Date(b.created || b.created_date || 0);
+        const dateA = new Date((a.created || a.created_date || '').replace(' ', 'T'));
+        const dateB = new Date((b.created || b.created_date || '').replace(' ', 'T'));
         return dateB - dateA;
       });
       setOrders(sorted);
@@ -71,12 +71,12 @@ export default function WorkerOrders({ user, closeTrigger }) {
         if (userId) {
           const shift = await getActiveShift(userId);
           if (shift) {
-            const shiftStart = new Date(shift.start);
+            const shiftStart = new Date((shift.start || '').replace(' ', 'T'));
             // Match orders created after shift start (active shift has no sales array yet)
             const ids = new Set(
               sorted
                 .filter(o => {
-                  const orderDate = new Date(o.created || o.created_date);
+                  const orderDate = new Date((o.created || o.created_date || '').replace(' ', 'T'));
                   return orderDate >= shiftStart && o.status !== 'refund';
                 })
                 .map(o => o.id)
@@ -102,7 +102,7 @@ export default function WorkerOrders({ user, closeTrigger }) {
     );
     let matchesDate = true;
     if (dateFrom || dateTo) {
-      const orderDate = new Date(order.created || order.created_date || 0);
+      const orderDate = new Date((order.created || order.created_date || '').replace(' ', 'T'));
       orderDate.setHours(0, 0, 0, 0);
       if (dateFrom) {
         const from = new Date(dateFrom);

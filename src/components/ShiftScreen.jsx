@@ -87,9 +87,9 @@ export default function ShiftScreen({ onBack }) {
           });
           
           // Фильтруем вручную
-          const shiftStartTime = new Date(activeShift.start);
+          const shiftStartTime = new Date((activeShift.start||'').replace(' ','T'));
           orders = allOrders.filter(order => {
-            const orderTime = new Date(order.created);
+            const orderTime = new Date((order.created||'').replace(' ','T'));
             const isAfterShift = orderTime >= shiftStartTime;
             console.log(`Заказ ${order.id}: ${order.created} >= ${activeShift.start} = ${isAfterShift}`);
             return isAfterShift;
@@ -153,8 +153,8 @@ export default function ShiftScreen({ onBack }) {
   };
 
   const formatDuration = (start, end) => {
-    const startDate = new Date(start);
-    const endDate = new Date(end);
+    const startDate = new Date((start||'').replace(' ','T'));
+    const endDate = new Date((end||'').replace(' ','T'));
     const diff = endDate - startDate;
     
     const hours = Math.floor(diff / (1000 * 60 * 60));
@@ -164,7 +164,7 @@ export default function ShiftScreen({ onBack }) {
   };
 
   const formatDate = (dateString) => {
-    const date = new Date(dateString);
+    const date = new Date((dateString||'').replace(' ','T'));
     return date.toLocaleString('ru-RU');
   };
 
@@ -234,7 +234,7 @@ export default function ShiftScreen({ onBack }) {
                 <div className="flex justify-between items-start">
                   <div>
                     <p className="font-medium text-gray-900">
-                      Смена от {new Date(shift.start).toLocaleDateString('ru-RU')}
+                      Смена от {new Date((shift.start||'').replace(' ','T')).toLocaleDateString('ru-RU')}
                     </p>
                     <p className="text-sm text-gray-500">
                       {formatDate(shift.start)} - {formatDate(shift.end)}
@@ -317,7 +317,7 @@ export default function ShiftScreen({ onBack }) {
                         <div className="flex justify-between items-start">
                           <div>
                             <p className="text-sm font-medium text-gray-900">
-                              {new Date(sale.created).toLocaleTimeString('ru-RU', {hour: '2-digit', minute: '2-digit'})}
+                              {new Date((sale.created||'').replace(' ','T')).toLocaleTimeString('ru-RU', {hour: '2-digit', minute: '2-digit'})}
                             </p>
                             <p className="text-xs text-gray-500">
                               {sale.items?.length || 0} товаров
@@ -375,7 +375,7 @@ export default function ShiftScreen({ onBack }) {
             <div className="sticky top-0 bg-white border-b p-6">
               <div className="flex justify-between items-center">
                 <h3 className="text-lg font-semibold">
-                  Смена от {new Date(selectedShift.start).toLocaleDateString('ru-RU')}
+                  Смена от {new Date((selectedShift.start||'').replace(' ','T')).toLocaleDateString('ru-RU')}
                 </h3>
                 <button
                   onClick={() => setShowDetailModal(false)}
@@ -427,7 +427,7 @@ export default function ShiftScreen({ onBack }) {
                         <div className="flex justify-between items-start">
                           <div>
                             <p className="text-sm font-medium text-gray-900">
-                              {new Date(sale.created).toLocaleTimeString('ru-RU', {hour: '2-digit', minute: '2-digit'})}
+                              {new Date((sale.created||'').replace(' ','T')).toLocaleTimeString('ru-RU', {hour: '2-digit', minute: '2-digit'})}
                             </p>
                             <p className="text-xs text-gray-500">
                               {sale.items?.length || 0} товаров

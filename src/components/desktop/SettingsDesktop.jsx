@@ -86,8 +86,8 @@ export default function SettingsDesktop({ onLogout }) {
           bVal = getSupplierName(b.supplier).toLowerCase();
           break;
         case 'created':
-          aVal = new Date(a.created || 0);
-          bVal = new Date(b.created || 0);
+          aVal = new Date((a.created || '').replace(' ','T') || 0);
+          bVal = new Date((b.created || '').replace(' ','T') || 0);
           return sortDir === 'asc' ? aVal - bVal : bVal - aVal;
         default:
           aVal = '';
