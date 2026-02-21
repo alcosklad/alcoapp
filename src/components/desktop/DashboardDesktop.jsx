@@ -467,26 +467,24 @@ export default function DashboardDesktop({ user, onNavigate }) {
     <div className="space-y-4">
       {/* Фильтры */}
       <div className="bg-white rounded-xl shadow-sm p-4 space-y-3">
-        <div className="flex items-center gap-3 flex-wrap">
-          <label className="text-sm text-gray-600">Города:</label>
-          <div className="flex items-center gap-1">
+        <div className="flex items-center gap-3">
+          <label className="text-sm text-gray-600 shrink-0">Города:</label>
+          <div className="flex flex-wrap items-center gap-1.5 flex-1">
             <button
               onClick={() => setSelectedCities([])}
               className={`px-3 py-1.5 text-sm rounded-lg border transition-colors whitespace-nowrap ${selectedCities.length === 0 ? 'bg-blue-50 border-blue-300 text-blue-700 font-medium' : 'bg-white border-gray-200 text-gray-600 hover:border-gray-300'}`}
             >
               Все города
             </button>
-            <div className="flex items-center gap-1 overflow-x-auto scrollbar-hide max-w-[400px]" style={{scrollbarWidth:'none', msOverflowStyle:'none'}}>
-              {suppliers.map(s => (
-                <button
-                  key={s.id}
-                  onClick={() => setSelectedCities(prev => prev.includes(s.id) ? prev.filter(id => id !== s.id) : [...prev, s.id])}
-                  className={`px-3 py-1.5 text-sm rounded-lg border transition-colors whitespace-nowrap shrink-0 ${selectedCities.includes(s.id) ? 'bg-blue-50 border-blue-300 text-blue-700 font-medium' : 'bg-white border-gray-200 text-gray-600 hover:border-gray-300'}`}
-                >
-                  {s.name}
-                </button>
-              ))}
-            </div>
+            {suppliers.map(s => (
+              <button
+                key={s.id}
+                onClick={() => setSelectedCities(prev => prev.includes(s.id) ? prev.filter(id => id !== s.id) : [...prev, s.id])}
+                className={`px-3 py-1.5 text-sm rounded-lg border transition-colors whitespace-nowrap ${selectedCities.includes(s.id) ? 'bg-blue-50 border-blue-300 text-blue-700 font-medium' : 'bg-white border-gray-200 text-gray-600 hover:border-gray-300'}`}
+              >
+                {s.name}
+              </button>
+            ))}
           </div>
         </div>
 
