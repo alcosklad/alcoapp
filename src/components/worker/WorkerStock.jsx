@@ -220,7 +220,7 @@ export default function WorkerStock({ user, onCartOpen, cart, setCart }) {
         order_number: orderNumber,
         city: userCity,
         supplier: userSupplierId,
-        city_code: orderNumber.charAt(0),
+        city_code: orderNumber.split('-')[0] || orderNumber.charAt(0),
         cost_total: totalCost,
         profit: orderData.total - totalCost
       };

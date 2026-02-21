@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { ShoppingCart, Search, Filter, Plus, Minus, Package, X, History } from 'lucide-react';
 import { getStocks, updateStock, createOrder, createSale, getActiveShift, startShift, getSuppliers, getStocksWithDetails } from '../lib/pocketbase';
+import { generateOrderNumber } from '../lib/orderNumbers';
 import CartModal from './CartModal';
 import SellModal2 from './SellModal2';
 import SalesHistory from './SalesHistory';
@@ -182,8 +183,31 @@ export default function Stock() {
         console.log('PocketBase: Активная смена уже существует:', activeShift);
       }
       
+      // Получаем город пользователя для генерации номера
+      const userModel = pb.authStore.model;
+      let userCity = 'Неизвестный город';
+      
+      if (userModel?.supplier) {
+        const supplierObj = await pb.collection('suppliers').getOne(userModel.supplier).catch(() => null);
+        if (supplierObj) {
+          userCity = supplierObj.name;
+        }
+      } else if (userModel?.city) {
+        userCity = userModel.city;
+      }
+      
+      // Генерируем номер заказа
+      const orderNumber = await generateOrderNumber(userCity);
+
       // Сначала создаем заказ в базе данных
-      await createOrder(orderData);
+      const enrichedOrderData = {
+        ...orderData,
+        order_number: orderNumber,
+        city: userCity,
+        city_code: orderNumber.split('-')[0] || orderNumber.charAt(0)
+      };
+      
+      await createOrder(enrichedOrderData);
       
       // Обновляем остатки на складе
       for (const item of orderData.items) {
@@ -219,16 +243,39 @@ export default function Stock() {
     }
   };
 
-  const filteredStocks = useMemo(() => stocks.filter(stock => {
-    if (!searchQuery) return true;
-    const searchLower = searchQuery.toLowerCase();
-    const productName = stock?.expand?.product?.name || stock?.product?.name || '';
-    const productArticle = stock?.expand?.product?.article || stock?.product?.article || '';
-    return (
-      productName.toLowerCase().includes(searchLower) ||
-      productArticle.toLowerCase().includes(searchLower)
-    );
-  }), [stocks, searchQuery]);
+  const filteredStocks = useMemo(() => {
+    return stocks
+      .filter(stock => {
+        if (!searchQuery) return true;
+        const searchLower = searchQuery.toLowerCase();
+        const productName = stock?.expand?.product?.name || stock?.product?.name || '';
+        const productArticle = stock?.expand?.product?.article || stock?.product?.article || '';
+        return (
+          productName.toLowerCase().includes(searchLower) ||
+          productArticle.toLowerCase().includes(searchLower)
+        );
+      })
+      .sort((a, b) => {
+        const pA = a?.expand?.product || a?.product || {};
+        const pB = b?.expand?.product || b?.product || {};
+
+        const catA = (Array.isArray(pA?.category) ? pA.category[0] : (pA?.category || '')) || '';
+        const catB = (Array.isArray(pB?.category) ? pB.category[0] : (pB?.category || '')) || '';
+        if (catA !== catB) {
+          const idxA = CATEGORY_ORDER.indexOf(catA);
+          const idxB = CATEGORY_ORDER.indexOf(catB);
+          return (idxA === -1 ? 999 : idxA) - (idxB === -1 ? 999 : idxB);
+        }
+
+        const subA = (pA?.subcategory || detectSubcategory(pA?.name)) || '';
+        const subB = (pB?.subcategory || detectSubcategory(pB?.name)) || '';
+        if (subA !== subB) return subA.localeCompare(subB);
+
+        const aName = (pA?.name || '').toLowerCase();
+        const bName = (pB?.name || '').toLowerCase();
+        return aName.localeCompare(bName);
+      });
+  }, [stocks, searchQuery]);
 
   const totalItems = filteredStocks.length;
   const totalQuantity = filteredStocks.reduce((sum, stock) => sum + (stock?.quantity || 0), 0);
@@ -244,6 +291,8 @@ export default function Stock() {
     const price = stock.expand?.product?.price || 0;
     return sum + (price * (stock?.quantity || 0));
   }, 0);
+
+  const categories = CATEGORY_ORDER;
 
   if (error) {
     return (
@@ -436,62 +485,80 @@ export default function Stock() {
             </div>
           ) : (
             <div className="divide-y divide-gray-100">
-              {filteredStocks.map(stock => {
-                const totalSum = (stock?.quantity || 0) * (stock?.expand?.product?.price || 0);
-                const price = stock?.expand?.product?.price || 0;
-                return (
-                <div 
-                  key={stock?.id || Math.random()} 
-                  className="p-4 transition-colors"
-                >
-                  <div className="flex justify-between items-start">
-                    <div className="flex-1">
-                      <h3 className="font-semibold text-gray-900">
-                        {stock?.product?.name || stock?.expand?.product?.name || 'Товар'}
-                      </h3>
-                      {stock?.warehouse && (
-                        <p className="text-xs text-gray-400 mt-1">{stock.warehouse.name}</p>
+              {(() => {
+                let lastCategory = null;
+                let lastSubcategory = null;
+
+                return filteredStocks.map(stock => {
+                  const product = stock?.expand?.product || stock?.product || {};
+                  const category = Array.isArray(product.category) ? product.category[0] : (product.category || '');
+                  const subcategory = product.subcategory || detectSubcategory(product.name);
+                  
+                  const showCategoryHeader = category !== lastCategory;
+                  const showSubcategoryHeader = subcategory && (showCategoryHeader || subcategory !== lastSubcategory);
+                  
+                  if (showCategoryHeader) lastSubcategory = null;
+                  lastCategory = category;
+                  lastSubcategory = subcategory;
+
+                  const totalSum = (stock?.quantity || 0) * (product.price || 0);
+                  const price = product.price || 0;
+                  
+                  return (
+                    <React.Fragment key={stock?.id || Math.random()}>
+                      {showCategoryHeader && category && (
+                        <div className="bg-slate-800 border-y border-slate-900 sticky top-0 z-10 shadow-sm">
+                          <div className="px-4 py-2.5 font-bold text-white text-sm uppercase tracking-wider">{category}</div>
+                        </div>
                       )}
-                      <p className="text-sm font-medium text-gray-700 mt-2">
-                        Общая сумма: {totalSum.toLocaleString('ru-RU')}                      </p>
-                      <p className="text-sm text-gray-600 mt-1">
-                        Цена за шт: {price.toLocaleString('ru-RU')}                      </p>
-                    </div>
-                    <div className="text-right">
-                      <p className={`text-lg font-bold px-3 py-1 rounded-lg ${
-                        (stock?.quantity || 0) === 0
-                          ? 'text-red-600 bg-red-50'
-                          : (stock?.quantity || 0) <= 3
-                          ? 'text-red-600 bg-red-50'
-                          : 'text-green-600 bg-green-50'
-                      }`}>
-                        {stock?.quantity || 0} шт
-                      </p>
-                      {(stock?.quantity || 0) < 2 && (
-                        <p className="text-xs text-red-500 mt-1">Заканчивается!</p>
+                      {showSubcategoryHeader && subcategory && (
+                        <div className="bg-indigo-50/60 border-y border-indigo-100">
+                          <div className="px-6 py-1.5 font-semibold text-indigo-700 text-xs border-l-[3px] border-indigo-400">{subcategory}</div>
+                        </div>
                       )}
-                      {(stock?.quantity || 0) === 0 && (
-                        <p className="text-xs text-gray-400 mt-2">
-                          Нет в наличии
-                        </p>
-                      )}
-                    </div>
-                  </div>
-                </div>
-                );
-              })}
+                      <div 
+                        className="p-4 transition-colors"
+                      >
+                        <div className="flex justify-between items-start">
+                          <div className="flex-1">
+                            <h3 className="font-semibold text-gray-900">
+                              {product.name || 'Товар'}
+                            </h3>
+                            {stock?.warehouse && (
+                              <p className="text-xs text-gray-400 mt-1">{stock.warehouse.name}</p>
+                            )}
+                            <p className="text-sm font-medium text-gray-700 mt-2">
+                              Общая сумма: {totalSum.toLocaleString('ru-RU')}                      </p>
+                            <p className="text-sm text-gray-600 mt-1">
+                              Цена за шт: {price.toLocaleString('ru-RU')}                      </p>
+                          </div>
+                          <div className="text-right">
+                            <p className={`text-lg font-bold px-3 py-1 rounded-lg ${
+                              (stock?.quantity || 0) === 0
+                                ? 'text-red-600 bg-red-50'
+                                : (stock?.quantity || 0) <= 3
+                                ? 'text-red-600 bg-red-50'
+                                : 'text-green-600 bg-green-50'
+                            }`}>
+                              {stock?.quantity || 0} шт
+                            </p>
+                            {(stock?.quantity || 0) < 2 && (
+                              <p className="text-xs text-red-500 mt-1">Заканчивается!</p>
+                            )}
+                            {(stock?.quantity || 0) === 0 && (
+                              <p className="text-xs text-gray-400 mt-2">Нет в наличии</p>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    </React.Fragment>
+                  );
+                });
+              })()}
             </div>
           )}
         </div>
       </div>
-    
-    {/* Модальное окно продажи */}
-    <SellModal2
-      isOpen={isSellModalOpen}
-      onClose={() => setIsSellModalOpen(false)}
-      product={selectedStock}
-      onSell={handleSellFromModal}
-    />
-  </div>
+    </div>
   );
 }

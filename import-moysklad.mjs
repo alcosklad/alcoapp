@@ -10,8 +10,8 @@ const MOYSKLAD_PASSWORD = process.env.MOYSKLAD_PASSWORD || '323282zzzZ-';
 const MOYSKLAD_API = 'https://api.moysklad.ru/api/remap/1.2';
 
 const POCKETBASE_URL = 'http://146.103.121.96:8090';
-const PB_ADMIN_EMAIL = 'admin@sklad.ru';
-const PB_ADMIN_PASSWORD = '323282sssS';
+const PB_ADMIN_EMAIL = 'admin@nashsklad.store';
+const PB_ADMIN_PASSWORD = 'admin12345';
 
 const DRY_RUN = process.argv.includes('--dry-run');
 
@@ -54,17 +54,51 @@ async function fetchAll(endpoint) {
 
 // Определяем категорию по первому слову названия
 function getCategory(productName) {
-  if (!productName) return 'Прочее';
-  const firstWord = productName.trim().split(/\s+/)[0].toLowerCase();
+  if (!productName) return null;
+  const lowerName = productName.toLowerCase().trim();
+  
+  // Словарное сопоставление (ключевое слово -> значение в PB)
   const categoryMap = {
-    'вино': 'Вино', 'водка': 'Водка', 'виски': 'Виски', 'коньяк': 'Коньяк',
-    'ром': 'Ром', 'текила': 'Текила', 'джин': 'Джин', 'ликер': 'Ликер',
-    'ликёр': 'Ликер', 'брют': 'Брют', 'асти': 'Асти', 'просекко': 'Просекко',
-    'шампанское': 'Шампанское', 'пиво': 'Пиво', 'напиток': 'Напитки',
-    'настойка': 'Настойки', 'бурбон': 'Виски', 'абсент': 'Настойки',
-    'бренди': 'Коньяк', 'кальвадос': 'Коньяк', 'граппа': 'Коньяк'
+    'вино': 'Вино', 
+    'водка': 'Водка', 
+    'виски': 'Виски', 
+    'бурбон': 'Виски',
+    'коньяк': 'Коньяк',
+    'бренди': 'Коньяк', 
+    'кальвадос': 'Коньяк', 
+    'граппа': 'Коньяк',
+    'ром': 'Ром', 
+    'текила': 'Текила', 
+    'джин': 'Джин', 
+    'ликер': 'Ликер',
+    'ликёр': 'Ликер', 
+    'брют': 'Игристое', 
+    'асти': 'Игристое', 
+    'просекко': 'Игристое',
+    'игристое': 'Игристое',
+    'шампанское': 'Шампанское', 
+    'пиво': 'Пиво', 
+    'напиток': 'Напитки',
+    'настойка': 'Настойки', 
+    'абсент': 'Настойки',
+    'вермут': 'Вермут',
+    'портвейн': 'Портвейн',
+    'сигареты': 'Сигареты и Стики',
+    'стики': 'Сигареты и Стики',
+    'снэк': 'Снэки и Закуски',
+    'закуска': 'Снэки и Закуски',
+    'шоколад': 'Шоколад',
+    'электронка': 'Электронки'
   };
-  return categoryMap[firstWord] || 'Прочее';
+
+  // Ищем совпадение по первым словам
+  for (const key of Object.keys(categoryMap)) {
+      if (lowerName.includes(key)) {
+          return categoryMap[key];
+      }
+  }
+  
+  return null; // Если не нашли, возвращаем null (поле не обязательное)
 }
 
 // Маппинг: название склада в МойСклад → название города в PocketBase (suppliers)
@@ -109,7 +143,8 @@ async function main() {
   const productMap = new Map();
   for (const item of stockAll) {
     const href = item.meta?.href;
-    if (href && item.stock > 0) {
+    // Allow 0 or negative stocks to be processed
+    if (href) {
       productMap.set(href, {
         name: item.name,
         totalStock: item.stock,
@@ -119,7 +154,7 @@ async function main() {
       });
     }
   }
-  console.log(`  ✅ Товаров с остатком > 0: ${productMap.size}\n`);
+  console.log(`  ✅ Товаров в отчете: ${productMap.size}\n`);
 
   // 2. Собираем остатки по складам (товар → склад → кол-во)
   const stockEntries = []; // { name, storeName, city, quantity, buyPrice, salePrice }
@@ -130,12 +165,13 @@ async function main() {
     if (!productInfo) continue;
 
     for (const store of (item.stockByStore || [])) {
-      if (store.stock <= 0) continue;
+      // Remove check for stock <= 0 to allow full sync
+      // if (store.stock <= 0) continue;
 
       const storeName = store.name;
       const city = STORE_CITY_MAP[storeName];
       if (!city) {
-        console.log(`  ⚠️  Неизвестный склад: "${storeName}", пропускаем`);
+        // console.log(`  ⚠️  Неизвестный склад: "${storeName}", пропускаем`);
         continue;
       }
 
@@ -228,6 +264,8 @@ async function main() {
   let skippedNoProduct = 0;
   let skippedNoSupplier = 0;
   let errors = 0;
+  
+  const processedStockIds = new Set();
 
   for (let i = 0; i < stockEntries.length; i++) {
     const entry = stockEntries[i];
@@ -277,21 +315,25 @@ async function main() {
     try {
       if (existing) {
         // Обновляем количество
-        await pb.collection('stocks').update(existing.id, {
-          quantity: entry.quantity
-        });
-        updated++;
+        if (existing.quantity !== entry.quantity) {
+             await pb.collection('stocks').update(existing.id, {
+               quantity: entry.quantity
+             });
+             updated++;
+        }
+        processedStockIds.add(existing.id);
       } else {
         // Создаём новый остаток
-        await pb.collection('stocks').create({
+        const newStock = await pb.collection('stocks').create({
           product: product.id,
           supplier: supplierId,
           quantity: entry.quantity
         });
         created++;
+        processedStockIds.add(newStock.id);
       }
 
-      if ((created + updated) % 20 === 0) {
+      if ((created + updated) % 100 === 0) {
         console.log(`  ✅ Обработано ${created + updated} из ${stockEntries.length}...`);
       }
     } catch (error) {
@@ -301,6 +343,21 @@ async function main() {
       }
     }
   }
+
+  // 7.1 Обнуляем остатки, которых нет в отчете МойСклад
+  console.log('\n🧹 Обнуляем устаревшие остатки...');
+  let zeroed = 0;
+  for (const stock of existingStocks) {
+      if (!processedStockIds.has(stock.id) && stock.quantity !== 0) {
+          try {
+              await pb.collection('stocks').update(stock.id, { quantity: 0 });
+              zeroed++;
+          } catch (e) {
+              console.error(`  ❌ Ошибка обнуления stock ${stock.id}: ${e.message}`);
+          }
+      }
+  }
+  console.log(`  ✅ Обнулено позиций: ${zeroed}`);
 
   // 8. Обновляем цены (cost) у товаров из МойСклад
   console.log('\n💰 Обновляем цены закупа из МойСклад...');

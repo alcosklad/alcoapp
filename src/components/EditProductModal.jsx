@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { X, Save } from 'lucide-react';
 import { updateProduct } from '../lib/pocketbase';
+import { CATEGORY_ORDER } from '../lib/subcategories';
 
 export default function EditProductModal({ product, onClose, onSave }) {
   const [formData, setFormData] = useState({
@@ -102,17 +103,9 @@ export default function EditProductModal({ product, onClose, onSave }) {
                 className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:bg-white transition-colors"
               >
                 <option value="">Выберите категорию</option>
-                <option value="Водка">Водка</option>
-                <option value="Виски">Виски</option>
-                <option value="Вино">Вино</option>
-                <option value="Коньяк">Коньяк</option>
-                <option value="Ром">Ром</option>
-                <option value="Текила">Текила</option>
-                <option value="Джин">Джин</option>
-                <option value="Ликер">Ликер</option>
-                <option value="Шампанское">Шампанское</option>
-                <option value="Пиво">Пиво</option>
-                <option value="Другое">Другое</option>
+                {CATEGORY_ORDER.map(cat => (
+                  <option key={cat} value={cat}>{cat}</option>
+                ))}
               </select>
             </div>
 

@@ -264,15 +264,27 @@ export default function StockDesktop({ onNavigate }) {
     return {};
   };
 
-  // Категории для фильтра
+  // Категории для фильтра (и для модалки редактирования)
   const allCategories = useMemo(() => {
-    const cats = new Set();
+    const cats = new Set(CATEGORY_ORDER); // Start with predefined order
     stocks.forEach(s => {
       const p = getProduct(s);
       const c = Array.isArray(p?.category) ? p.category[0] : p?.category;
       if (c) cats.add(c);
     });
-    return [...cats].sort();
+    // Convert to array, filtering out any empty strings if they got in
+    return [...cats].filter(Boolean);
+    // Note: We don't sort alphabetically because we want to preserve CATEGORY_ORDER precedence if possible,
+    // but Set iteration order matches insertion order, so CATEGORY_ORDER comes first.
+    // If we want exact CATEGORY_ORDER then others, we can sort:
+    // return [...cats].sort((a, b) => {
+    //   const idxA = CATEGORY_ORDER.indexOf(a);
+    //   const idxB = CATEGORY_ORDER.indexOf(b);
+    //   if (idxA !== -1 && idxB !== -1) return idxA - idxB;
+    //   if (idxA !== -1) return -1;
+    //   if (idxB !== -1) return 1;
+    //   return a.localeCompare(b);
+    // });
   }, [stocks]);
 
   // Подкатегории для select
@@ -548,10 +560,7 @@ export default function StockDesktop({ onNavigate }) {
   };
 
   // Получаем уникальные категории (category — массив в PocketBase)
-  const categories = [...new Set(stocks.map(stock => {
-    const cat = stock?.expand?.product?.category || stock?.product?.category || '';
-    return Array.isArray(cat) ? cat[0] : cat;
-  }).filter(Boolean))].sort();
+  const categories = CATEGORY_ORDER;
 
   // Фильтрация и сортировка данных
   const filteredStocks = useMemo(() => {
@@ -991,13 +1000,13 @@ export default function StockDesktop({ onNavigate }) {
                       return (
                         <React.Fragment key={stock.id}>
                           {showCategoryHeader && category && (
-                            <tr className="bg-blue-50 border-y border-blue-200">
-                              <td colSpan={colCount} className="px-3 py-1.5 font-semibold text-blue-800 text-xs sticky top-0">{category}</td>
+                            <tr className="bg-slate-800 border-y border-slate-900">
+                              <td colSpan={selectMode ? 9 : 8} className="px-4 py-2.5 font-bold text-white text-sm uppercase tracking-wider sticky top-0 z-10 shadow-sm">{category}</td>
                             </tr>
                           )}
                           {showSubcategoryHeader && subcategory && (
                             <tr className="bg-indigo-50/60 border-y border-indigo-100">
-                              <td colSpan={colCount} className="px-6 py-1.5 font-semibold text-indigo-700 text-xs border-l-[3px] border-indigo-400">{subcategory}</td>
+                              <td colSpan={selectMode ? 9 : 8} className="px-6 py-1.5 font-semibold text-indigo-700 text-xs border-l-[3px] border-indigo-400">{subcategory}</td>
                             </tr>
                           )}
                           <tr

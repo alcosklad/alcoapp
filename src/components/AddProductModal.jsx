@@ -1,6 +1,7 @@
-import React, { useState } from 'react';
-import { X, Package, Plus } from 'lucide-react';
-import { createProduct } from '../lib/pocketbase';
+import React, { useState, useEffect } from 'react';
+import { Search, X, Loader2, Plus, Box, LayoutGrid } from 'lucide-react';
+import { getProducts, createProduct } from '../lib/pocketbase';
+import { detectSubcategory, CATEGORY_ORDER } from '../lib/subcategories';
 
 export default function AddProductModal({ isOpen, onClose, onAdd }) {
   const [formData, setFormData] = useState({

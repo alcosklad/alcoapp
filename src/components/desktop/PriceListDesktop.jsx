@@ -735,8 +735,8 @@ export default function PriceListDesktop() {
                   return (
                     <React.Fragment key={product.id}>
                       {showCategoryHeader && category && (
-                        <tr className="bg-blue-50 border-y border-blue-200">
-                          <td colSpan={selectMode ? 6 : 5} className="px-3 py-1.5 font-semibold text-blue-800 text-xs sticky top-0">{category}</td>
+                        <tr className="bg-slate-800 border-y border-slate-900">
+                          <td colSpan={selectMode ? 6 : 5} className="px-4 py-2.5 font-bold text-white text-sm uppercase tracking-wider sticky top-0 z-10 shadow-sm">{category}</td>
                         </tr>
                       )}
                       {showSubcategoryHeader && subcategory && (

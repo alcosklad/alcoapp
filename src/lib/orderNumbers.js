@@ -1,6 +1,6 @@
 /**
  * Генерация уникальных номеров продаж по городам
- * Формат: {CITY_CODE}{NNNNN} (например: S00001, V00042, K00123)
+ * Формат: {CITY_CODE}-{NNNN} (например: PM-0001, EK-0042)
  */
 
 import pb from './pocketbase.js';
@@ -9,7 +9,7 @@ import { getCityCode } from './cityCodes.js';
 /**
  * Генерировать следующий номер продажи для города
  * @param {string} cityName - Название города
- * @returns {Promise<string>} - Номер продажи (например: S00001)
+ * @returns {Promise<string>} - Номер продажи (например: PM-0001)
  */
 export async function generateOrderNumber(cityName) {
   const cityCode = getCityCode(cityName);
@@ -31,21 +31,32 @@ export async function generateOrderNumber(cityName) {
     let nextNumber = 1;
 
     if (lastOrder && lastOrder.order_number) {
-      // Извлекаем число из номера (например: S00042 -> 42)
-      const numberPart = lastOrder.order_number.substring(1);
-      const currentNumber = parseInt(numberPart, 10);
-      nextNumber = currentNumber + 1;
+      // Извлекаем число из номера (например: PM-0042 -> 42)
+      // Разделяем по дефису или извлекаем все цифры
+      const parts = lastOrder.order_number.split('-');
+      if (parts.length === 2) {
+        const currentNumber = parseInt(parts[1], 10);
+        if (!isNaN(currentNumber)) {
+           nextNumber = currentNumber + 1;
+        }
+      } else {
+         // Fallback для старых форматов (например P00001)
+         const match = lastOrder.order_number.match(/\d+$/);
+         if (match) {
+            nextNumber = parseInt(match[0], 10) + 1;
+         }
+      }
     }
 
-    // Форматируем номер: код + 5 цифр с ведущими нулями
-    const orderNumber = `${cityCode}${String(nextNumber).padStart(5, '0')}`;
+    // Форматируем номер: код + 4 цифры с ведущими нулями (как просил юзер PM-0001)
+    const orderNumber = `${cityCode}-${String(nextNumber).padStart(4, '0')}`;
     
     return orderNumber;
   } catch (error) {
     console.error('Error generating order number:', error);
     // В случае ошибки генерируем номер на основе timestamp
-    const timestamp = Date.now().toString().slice(-5);
-    return `${cityCode}${timestamp}`;
+    const timestamp = Date.now().toString().slice(-4);
+    return `${cityCode}-${timestamp}`;
   }
 }
 
@@ -69,19 +80,26 @@ export async function isOrderNumberUnique(orderNumber) {
 
 /**
  * Парсинг номера продажи
- * @param {string} orderNumber - Номер продажи (например: S00042)
+ * @param {string} orderNumber - Номер продажи (например: PM-0042)
  * @returns {{cityCode: string, number: number}} - Разобранный номер
  */
 export function parseOrderNumber(orderNumber) {
-  if (!orderNumber || orderNumber.length < 2) {
+  if (!orderNumber) {
     return { cityCode: null, number: null };
   }
 
-  const cityCode = orderNumber.charAt(0);
-  const numberPart = orderNumber.substring(1);
-  const number = parseInt(numberPart, 10);
+  const parts = orderNumber.split('-');
+  if (parts.length === 2) {
+      return { cityCode: parts[0], number: parseInt(parts[1], 10) };
+  }
 
-  return { cityCode, number };
+  // Fallback для старых номеров (e.g. P00001)
+  const match = orderNumber.match(/^([A-Z]+)(\d+)$/);
+  if (match) {
+      return { cityCode: match[1], number: parseInt(match[2], 10) };
+  }
+
+  return { cityCode: null, number: null };
 }
 
 /**
@@ -90,9 +108,12 @@ export function parseOrderNumber(orderNumber) {
  * @returns {boolean} - true если формат корректен
  */
 export function isValidOrderNumber(orderNumber) {
-  // Формат: одна буква + 5 цифр
-  const pattern = /^[A-Z]\d{5}$/;
-  return pattern.test(orderNumber);
+  // Формат: две буквы + дефис + 4 цифры
+  const pattern = /^[A-Z]{2}-\d{4,}$/;
+  if (pattern.test(orderNumber)) return true;
+  // Разрешаем старый формат для обратной совместимости
+  const oldPattern = /^[A-Z]\d{5}$/;
+  return oldPattern.test(orderNumber);
 }
 
 /**

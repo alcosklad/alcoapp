@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Search, Filter, Edit2, X, ChevronLeft, ChevronRight, Plus, ChevronUp, ChevronDown } from 'lucide-react';
 import { getProducts, updateProduct } from '../lib/pocketbase';
+import { detectSubcategory, CATEGORY_ORDER } from '../lib/subcategories';
 import pb from '../lib/pocketbase';
 import EditProductModal from './EditProductModal';
 import CreateProductModal from './CreateProductModal';
@@ -128,22 +129,38 @@ export default function PriceList() {
     
     // Сортировка
     filtered.sort((a, b) => {
-      let aValue = a[sortField] || '';
-      let bValue = b[sortField] || '';
-      
-      if (sortField === 'price' || sortField === 'cost') {
-        aValue = parseFloat(aValue) || 0;
-        bValue = parseFloat(bValue) || 0;
-      } else {
-        aValue = aValue.toString().toLowerCase();
-        bValue = bValue.toString().toLowerCase();
+      // When user explicitly sorts by price or category — use that as primary sort
+      if (sortField === 'cost' || sortField === 'price') {
+        const aVal = sortField === 'cost' ? (Number(a?.cost) || 0) : (Number(a?.price) || 0);
+        const bVal = sortField === 'cost' ? (Number(b?.cost) || 0) : (Number(b?.price) || 0);
+        if (aVal !== bVal) return sortDirection === 'asc' ? aVal - bVal : bVal - aVal;
+        return (a?.name || '').localeCompare(b?.name || '');
       }
-      
-      if (sortDirection === 'asc') {
-        return aValue > bValue ? 1 : -1;
-      } else {
-        return aValue < bValue ? 1 : -1;
+
+      if (sortField === 'category') {
+        const catA = (Array.isArray(a?.category) ? a.category[0] : (a?.category || '')) || '';
+        const catB = (Array.isArray(b?.category) ? b.category[0] : (b?.category || '')) || '';
+        const cmp = sortDirection === 'asc' ? catA.localeCompare(catB) : catB.localeCompare(catA);
+        if (cmp !== 0) return cmp;
+        return (a?.name || '').localeCompare(b?.name || '');
       }
+
+      // Default: group by category → subcategory → name
+      const catA = (Array.isArray(a?.category) ? a.category[0] : (a?.category || '')) || '';
+      const catB = (Array.isArray(b?.category) ? b.category[0] : (b?.category || '')) || '';
+      if (catA !== catB) {
+        const idxA = CATEGORY_ORDER.indexOf(catA);
+        const idxB = CATEGORY_ORDER.indexOf(catB);
+        return (idxA === -1 ? 999 : idxA) - (idxB === -1 ? 999 : idxB);
+      }
+
+      const subA = (a?.subcategory || detectSubcategory(a?.name)) || '';
+      const subB = (b?.subcategory || detectSubcategory(b?.name)) || '';
+      if (subA !== subB) return subA.localeCompare(subB);
+
+      const aName = (a?.name || '').toLowerCase();
+      const bName = (b?.name || '').toLowerCase();
+      return sortDirection === 'asc' ? aName.localeCompare(bName) : bName.localeCompare(aName);
     });
     
     setFilteredProducts(filtered);
@@ -193,7 +210,7 @@ export default function PriceList() {
   }));
   console.log('Products with categories:', allCategories.slice(0, 5)); // Показываем первые 5
   
-  const categories = [...new Set(
+  const categories = products.length > 0 ? [...new Set(
     products.flatMap(p => {
       // Если категория - массив, берем все элементы
       if (Array.isArray(p?.category)) {
@@ -201,19 +218,7 @@ export default function PriceList() {
       }
       return p?.category ? [p.category] : [];
     })
-  )].length > 0 ? [...new Set(
-    products.flatMap(p => {
-      // Если категория - массив, берем все элементы
-      if (Array.isArray(p?.category)) {
-        return p.category.filter(Boolean);
-      }
-      return p?.category ? [p.category] : [];
-    })
-  )] : [
-    'Вино', 'Водка', 'Настойки', 'Виски', 'Коньяк', 'Ром', 'Текила', 'Джин', 'Ликер', 
-    'Брют', 'Асти', 'Просекко', 'Шампанское', 'Пиво', 'Пиво Разливное', 'Напитки', 
-    'Сигареты и Стики', 'Электронки', 'Снэки и Закуски', 'Шоколад'
-  ];
+  )] : CATEGORY_ORDER;
   console.log('Categories found:', categories); // Отладка
 
   if (error) {
@@ -347,35 +352,62 @@ export default function PriceList() {
 
               {/* Строки таблицы */}
               <div className="divide-y divide-gray-100">
-                {currentProducts.map((product) => (
-                  <div
-                    key={product?.id || Math.random()}
-                    className="grid grid-cols-12 gap-4 px-6 py-3 hover:bg-gray-50 transition-colors items-center"
-                  >
-                    <div className="col-span-8 flex items-center gap-2">
-                      {userRole === 'admin' && (
-                        <button
-                          onClick={() => handleEditProduct(product)}
-                          className="p-1.5 hover:bg-gray-100 rounded-lg transition-colors flex-shrink-0"
-                          title="Редактировать"
+                {(() => {
+                  let lastCategory = null;
+                  let lastSubcategory = null;
+                  
+                  return currentProducts.map((product) => {
+                    const category = Array.isArray(product.category) ? product.category[0] : (product.category || '');
+                    const subcategory = product.subcategory || detectSubcategory(product.name);
+                    const showCategoryHeader = category !== lastCategory;
+                    const showSubcategoryHeader = subcategory && (showCategoryHeader || subcategory !== lastSubcategory);
+                    
+                    if (showCategoryHeader) lastSubcategory = null;
+                    lastCategory = category;
+                    lastSubcategory = subcategory;
+
+                    return (
+                      <React.Fragment key={product?.id || Math.random()}>
+                        {showCategoryHeader && category && (
+                          <div className="bg-slate-800 border-y border-slate-900 sticky top-0 z-10 shadow-sm">
+                            <div className="px-6 py-2.5 font-bold text-white text-sm uppercase tracking-wider">{category}</div>
+                          </div>
+                        )}
+                        {showSubcategoryHeader && subcategory && (
+                          <div className="bg-indigo-50/60 border-y border-indigo-100">
+                            <div className="px-6 py-1.5 font-semibold text-indigo-700 text-xs border-l-[3px] border-indigo-400">{subcategory}</div>
+                          </div>
+                        )}
+                        <div
+                          className="grid grid-cols-12 gap-4 px-6 py-3 hover:bg-gray-50 transition-colors items-center border-b border-gray-100"
                         >
-                          <Edit2 size={16} className="text-gray-500" />
-                        </button>
-                      )}
-                      <p className="font-medium text-gray-900">{product?.name || '—'}</p>
-                    </div>
-                    <div className="col-span-2 text-right pr-6">
-                      <p className="text-gray-600">
-                        {product?.cost ? `${product.cost.toLocaleString('ru-RU')}` : '—'}
-                      </p>
-                    </div>
-                    <div className="col-span-2 text-right pr-6">
-                      <p className="font-semibold text-gray-900">
-                        {product?.price ? `${product.price.toLocaleString('ru-RU')}` : '—'}
-                      </p>
-                    </div>
-                  </div>
-                ))}
+                          <div className="col-span-8 flex items-center gap-2">
+                            {userRole === 'admin' && (
+                              <button
+                                onClick={() => handleEditProduct(product)}
+                                className="p-1.5 hover:bg-gray-100 rounded-lg transition-colors flex-shrink-0"
+                                title="Редактировать"
+                              >
+                                <Edit2 size={16} className="text-gray-500" />
+                              </button>
+                            )}
+                            <p className="font-medium text-gray-900">{product?.name || '—'}</p>
+                          </div>
+                          <div className="col-span-2 text-right pr-6">
+                            <p className="text-gray-600">
+                              {product?.cost ? `${product.cost.toLocaleString('ru-RU')}` : '—'}
+                            </p>
+                          </div>
+                          <div className="col-span-2 text-right pr-6">
+                            <p className="font-semibold text-gray-900">
+                              {product?.price ? `${product.price.toLocaleString('ru-RU')}` : '—'}
+                            </p>
+                          </div>
+                        </div>
+                      </React.Fragment>
+                    );
+                  });
+                })()}
               </div>
 
               {filteredProducts.length === 0 && (

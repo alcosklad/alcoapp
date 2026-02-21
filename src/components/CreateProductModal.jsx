@@ -1,29 +1,7 @@
 import React, { useState } from 'react';
 import { X } from 'lucide-react';
 import pb from '../lib/pocketbase';
-
-const CATEGORIES = [
-  'Вино',
-  'Водка',
-  'Виски',
-  'Коньяк',
-  'Ром',
-  'Текила',
-  'Джин',
-  'Ликер',
-  'Шампанское',
-  'Вермут',
-  'Пиво',
-  'Сидр',
-  'Напитки',
-  'Сигареты и Стики',
-  'Электронные сигареты',
-  'Снэки и Закуски',
-  'Шоколад и Конфеты',
-  'Энергетики',
-  'Безалкогольные напитки',
-  'Другое'
-];
+import { CATEGORY_ORDER } from '../lib/subcategories';
 
 const CITIES = [
   'Москва',
@@ -175,7 +153,7 @@ export default function CreateProductModal({ isOpen, onClose, onProductCreated }
               className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
             >
               <option value="">Выберите категорию</option>
-              {CATEGORIES.map(cat => (
+              {CATEGORY_ORDER.map(cat => (
                 <option key={cat} value={cat}>{cat}</option>
               ))}
             </select>
