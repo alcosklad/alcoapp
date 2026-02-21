@@ -759,7 +759,7 @@ export default function PriceListDesktop() {
                       <td className="px-3 py-1.5 text-gray-600">{category || '—'}</td>
                       <td className="px-3 py-1.5 text-right">
                         <span className="text-gray-600">
-                          {(selectedSupplier && cityStocks[product.id]
+                          {(selectedSupplier && cityStocks[product.id] && cityStocks[product.id].cost > 0
                             ? cityStocks[product.id].cost
                             : (product.cost || 0)
                           ).toLocaleString('ru-RU')}

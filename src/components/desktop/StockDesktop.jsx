@@ -5,7 +5,7 @@ import { detectSubcategory, ALL_SUBCATEGORIES, CATEGORY_ORDER } from '../../lib/
 import pb from '../../lib/pocketbase';
 import { getOrFetch, invalidate } from '../../lib/cache';
 
-export default function StockDesktop() {
+export default function StockDesktop({ onNavigate }) {
   const [stocks, setStocks] = useState([]);
   const [suppliers, setSuppliers] = useState([]);
   const [allProducts, setAllProducts] = useState([]);
@@ -783,13 +783,15 @@ export default function StockDesktop() {
         >
           Остатки
         </button>
-        <button
-          onClick={() => setActiveTab('writeoffs')}
-          className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors flex items-center gap-1.5 ${activeTab === 'writeoffs' ? 'border-blue-600 text-blue-600' : 'border-transparent text-gray-500 hover:text-gray-700'}`}
-        >
-          <FileX size={14} />
-          Списание
-        </button>
+        {!isOperator && (
+          <button
+            onClick={() => setActiveTab('writeoffs')}
+            className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors flex items-center gap-1.5 ${activeTab === 'writeoffs' ? 'border-blue-600 text-blue-600' : 'border-transparent text-gray-500 hover:text-gray-700'}`}
+          >
+            <FileX size={14} />
+            Списание
+          </button>
+        )}
       </div>
 
       {activeTab === 'stocks' ? (
@@ -1356,7 +1358,23 @@ export default function StockDesktop() {
                           <span className="text-gray-500 w-32 shrink-0">
                             {dateStr}{timeStr ? `, ${timeStr}` : ''}
                           </span>
-                          {receptionLabel && <span className="px-1.5 py-0.5 bg-blue-100 text-blue-700 rounded text-[10px] font-medium shrink-0">{receptionLabel}</span>}
+                          {receptionLabel && (
+                            <span 
+                              onClick={() => {
+                                if (onNavigate && h.receptionId) {
+                                  closeEditModal();
+                                  onNavigate('reception');
+                                  // In a real app we might pass the reception ID to open it directly,
+                                  // but for now just navigating to the tab is a good start.
+                                  // We can store it in localStorage if we want ReceptionDesktop to pick it up.
+                                  try { localStorage.setItem('ns_open_reception', h.receptionId); } catch {}
+                                }
+                              }}
+                              className="px-1.5 py-0.5 bg-blue-100 text-blue-700 rounded text-[10px] font-medium shrink-0 cursor-pointer hover:bg-blue-200 transition-colors"
+                            >
+                              {receptionLabel}
+                            </span>
+                          )}
                           <MapPin size={12} className="text-blue-400 shrink-0" />
                           <span className="text-gray-700 flex-1 truncate">{h.city || '—'}</span>
                           <span className="font-medium text-gray-900 shrink-0">{h.quantity} шт</span>

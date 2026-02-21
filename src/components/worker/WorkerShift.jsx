@@ -74,7 +74,7 @@ export default function WorkerShift({ user, activeTab }) {
         const allOrders = await getOrders();
         salesData = allOrders.filter(o => {
           const orderDate = new Date((o.created || o.created_date || '').replace(' ', 'T'));
-          return orderDate >= shiftStartTime;
+          return orderDate >= shiftStartTime && o.status !== 'refund';
         });
       } catch (_) {
         console.error('Failed to load orders for shift');
@@ -137,12 +137,6 @@ export default function WorkerShift({ user, activeTab }) {
       <div>
         <div className="flex items-center justify-between mb-2">
           <p className="text-sm font-semibold text-gray-700">Продажи ({sales.length})</p>
-          <div className="flex gap-2 text-[10px] flex-wrap justify-end">
-            {cashCount > 0 && <span className="bg-gray-100 text-gray-500 px-1.5 py-0.5 rounded">Нал: {cashCount}</span>}
-            {transferCount > 0 && <span className="bg-blue-50 text-blue-500 px-1.5 py-0.5 rounded">Перевод: {transferCount}</span>}
-            {prepaidCount > 0 && <span className="bg-purple-50 text-purple-500 px-1.5 py-0.5 rounded">Предоплата: {prepaidCount}</span>}
-            {refundsCount > 0 && <span className="bg-orange-50 text-orange-500 px-1.5 py-0.5 rounded">Возврат: {refundsCount}</span>}
-          </div>
         </div>
         <div className="space-y-2 max-h-[45vh] overflow-y-auto">
           {sales.map((sale, i) => {

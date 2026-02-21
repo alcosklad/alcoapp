@@ -20,7 +20,7 @@ export default function DashboardDesktop({ user, onNavigate }) {
     salesHalfYear: { count: 0, totalAmount: 0 }
   });
   const [suppliers, setSuppliers] = useState([]);
-  const [selectedSupplier, setSelectedSupplier] = useState('');
+  const [selectedCities, setSelectedCities] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [showStaleProducts, setShowStaleProducts] = useState(false);
@@ -119,8 +119,9 @@ export default function DashboardDesktop({ user, onNavigate }) {
       setLoading(true);
       setError(null);
       
-      const cacheKey = 'dashboard:stats:' + (selectedSupplier || 'all');
-      const statsData = await getOrFetch(cacheKey, () => getDashboardStats(selectedSupplier || null), 60000, (fresh) => { setStats(fresh); setLoading(false); });
+      const filterIdStr = selectedCities.length > 0 ? selectedCities.join(',') : null;
+      const cacheKey = 'dashboard:stats:' + (filterIdStr || 'all');
+      const statsData = await getOrFetch(cacheKey, () => getDashboardStats(filterIdStr), 60000, (fresh) => { setStats(fresh); setLoading(false); });
       setStats(statsData);
     } catch (error) {
       console.error('Error loading dashboard:', error);
@@ -130,17 +131,17 @@ export default function DashboardDesktop({ user, onNavigate }) {
     }
   };
 
-  const selectedCityName = useMemo(
-    () => suppliers.find((s) => s.id === selectedSupplier)?.name || '',
-    [suppliers, selectedSupplier]
+  const selectedCityNames = useMemo(
+    () => suppliers.filter(s => selectedCities.includes(s.id)).map(s => s.name),
+    [suppliers, selectedCities]
   );
 
   const filteredOrders = useMemo(() => {
     let result = [...salesData];
-    if (selectedSupplier) {
+    if (selectedCities.length > 0) {
       result = result.filter((o) => {
-        const bySupplier = o.expand?.user?.supplier === selectedSupplier;
-        const byCity = selectedCityName ? (o.city || '') === selectedCityName : false;
+        const bySupplier = selectedCities.includes(o.expand?.user?.supplier);
+        const byCity = selectedCityNames.includes(o.city || '');
         return bySupplier || byCity;
       });
     }
@@ -163,12 +164,12 @@ export default function DashboardDesktop({ user, onNavigate }) {
       });
     }
     return result;
-  }, [salesData, selectedSupplier, selectedCityName, filterDateFrom, filterDateTo]);
+  }, [salesData, selectedCities, selectedCityNames, filterDateFrom, filterDateTo]);
 
   const filteredReceptions = useMemo(() => {
     let result = [...receptionsData];
-    if (selectedSupplier) {
-      result = result.filter((r) => r.supplier === selectedSupplier);
+    if (selectedCities.length > 0) {
+      result = result.filter((r) => selectedCities.includes(r.supplier));
     }
     if (filterDateFrom) {
       const [y, m, d] = filterDateFrom.split('-');
@@ -189,7 +190,7 @@ export default function DashboardDesktop({ user, onNavigate }) {
       });
     }
     return result;
-  }, [receptionsData, selectedSupplier, filterDateFrom, filterDateTo]);
+  }, [receptionsData, selectedCities, filterDateFrom, filterDateTo]);
 
   const periodLabel = useMemo(() => ({
     today: 'день',
@@ -207,7 +208,7 @@ export default function DashboardDesktop({ user, onNavigate }) {
     const totalPurchaseValue = filteredReceptions.reduce((sum, rec) => {
       const items = Array.isArray(rec.items) ? rec.items : [];
       return sum + items.reduce((itemsSum, item) => {
-        const cost = Number(item.cost ?? item.purchase_price ?? 0) || 0;
+        const cost = Number(item.cost) || 0;
         const qty = Number(item.quantity) || 0;
         return itemsSum + (cost * qty);
       }, 0);
@@ -262,16 +263,16 @@ export default function DashboardDesktop({ user, onNavigate }) {
       });
     });
 
-    const relevantReceptions = receptionsData.filter((rec) => !selectedSupplier || rec.supplier === selectedSupplier);
+    const relevantReceptions = receptionsData.filter((rec) => selectedCities.length === 0 || selectedCities.includes(rec.supplier));
     const relevantOrders = salesData.filter((o) => {
       if (o.status === 'refund') return false;
-      if (!selectedSupplier) return true;
-      return (o.city || '') === selectedCityName || o.expand?.user?.supplier === selectedSupplier;
+      if (selectedCities.length === 0) return true;
+      return selectedCityNames.includes(o.city || '') || selectedCities.includes(o.expand?.user?.supplier);
     });
     const relevantWriteOffs = writeOffsChartData.filter((w) => {
       if (w.status === 'cancelled') return false;
-      if (!selectedSupplier) return true;
-      return (w.city || '') === selectedCityName || w.supplier === selectedSupplier;
+      if (selectedCities.length === 0) return true;
+      return selectedCityNames.includes(w.city || '') || selectedCities.includes(w.supplier);
     });
 
     const citySet = new Set();
@@ -280,11 +281,11 @@ export default function DashboardDesktop({ user, onNavigate }) {
       const cityName = rec.expand?.supplier?.name || suppliers.find((s) => s.id === rec.supplier)?.name || 'Неизвестно';
       if (cityName) citySet.add(cityName);
     });
-    if (selectedSupplier && selectedCityName) citySet.add(selectedCityName);
+    selectedCityNames.forEach(name => citySet.add(name));
 
     let cities = Array.from(citySet).sort();
-    if (selectedSupplier && selectedCityName) {
-      cities = cities.filter((c) => c === selectedCityName);
+    if (selectedCities.length > 0) {
+      cities = cities.filter((c) => selectedCityNames.includes(c));
     }
     if (cities.length === 0) return { stockTrendData: [], trendCityNames: [] };
 
@@ -372,7 +373,7 @@ export default function DashboardDesktop({ user, onNavigate }) {
     }
 
     return { stockTrendData: rows, trendCityNames: cities, currentTotals };
-  }, [receptionsData, salesData, writeOffsChartData, stocksData, chartRange, selectedSupplier, selectedCityName, suppliers]);
+  }, [receptionsData, salesData, writeOffsChartData, stocksData, chartRange, selectedCities, selectedCityNames, suppliers]);
 
   // Flat-line chart for "Текущий" mode: horizontal lines at current stock level
   const currentStockChartData = useMemo(() => {
@@ -467,19 +468,26 @@ export default function DashboardDesktop({ user, onNavigate }) {
       {/* Фильтры */}
       <div className="bg-white rounded-xl shadow-sm p-4 space-y-3">
         <div className="flex items-center gap-3 flex-wrap">
-          <label className="text-sm text-gray-600">Город:</label>
-          <select
-            value={selectedSupplier}
-            onChange={(e) => setSelectedSupplier(e.target.value)}
-            className="px-3 py-1.5 border border-gray-300 rounded text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-          >
-            <option value="">Все города</option>
-            {suppliers.map(supplier => (
-              <option key={supplier.id} value={supplier.id}>
-                {supplier.name}
-              </option>
-            ))}
-          </select>
+          <label className="text-sm text-gray-600">Города:</label>
+          <div className="flex items-center gap-1">
+            <button
+              onClick={() => setSelectedCities([])}
+              className={`px-3 py-1.5 text-sm rounded-lg border transition-colors whitespace-nowrap ${selectedCities.length === 0 ? 'bg-blue-50 border-blue-300 text-blue-700 font-medium' : 'bg-white border-gray-200 text-gray-600 hover:border-gray-300'}`}
+            >
+              Все города
+            </button>
+            <div className="flex items-center gap-1 overflow-x-auto scrollbar-hide max-w-[400px]" style={{scrollbarWidth:'none', msOverflowStyle:'none'}}>
+              {suppliers.map(s => (
+                <button
+                  key={s.id}
+                  onClick={() => setSelectedCities(prev => prev.includes(s.id) ? prev.filter(id => id !== s.id) : [...prev, s.id])}
+                  className={`px-3 py-1.5 text-sm rounded-lg border transition-colors whitespace-nowrap shrink-0 ${selectedCities.includes(s.id) ? 'bg-blue-50 border-blue-300 text-blue-700 font-medium' : 'bg-white border-gray-200 text-gray-600 hover:border-gray-300'}`}
+                >
+                  {s.name}
+                </button>
+              ))}
+            </div>
+          </div>
         </div>
 
         <div className="flex items-center gap-3 flex-wrap">
@@ -596,7 +604,7 @@ export default function DashboardDesktop({ user, onNavigate }) {
             </div>
           </div>
           {trendCityNames.length > 0 ? (
-            <ResponsiveContainer width="100%" height={500}>
+            <ResponsiveContainer width="100%" height={320}>
               <LineChart
                 data={chartMode === 'current' ? currentStockChartData : stockTrendData}
                 margin={{ top: 5, right: 20, left: 0, bottom: 5 }}
