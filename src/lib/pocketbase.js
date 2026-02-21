@@ -550,7 +550,9 @@ export const getSalesStats = async (period = 'day', filterId = null) => {
     
     let filter = `created >= "${startDate.toISOString()}"`;
     if (filterId) {
-      filter += ` && user.supplier = "${filterId}"`;
+      const ids = filterId.split(',');
+      const supplierConditions = ids.map(id => `user.supplier = "${id}"`).join(' || ');
+      filter += ` && (${supplierConditions})`;
     }
     
     const orders = await pb.collection('orders').getFullList({
@@ -573,7 +575,9 @@ export const getDashboardStats = async (filterId = null) => {
   try {
     let stocksFilter = 'quantity > 0';
     if (filterId) {
-      stocksFilter += ` && supplier = "${filterId}"`;
+      const ids = filterId.split(',');
+      const supplierConditions = ids.map(id => `supplier = "${id}"`).join(' || ');
+      stocksFilter += ` && (${supplierConditions})`;
     }
     
     const stocks = await pb.collection('stocks').getFullList({
@@ -612,7 +616,8 @@ export const getDashboardStats = async (filterId = null) => {
     // Получаем приемки для подсчета количества
     let receptionsFilter = '';
     if (filterId) {
-      receptionsFilter = `supplier = "${filterId}"`;
+      const ids = filterId.split(',');
+      receptionsFilter = ids.map(id => `supplier = "${id}"`).join(' || ');
     }
     
     const receptions = await pb.collection('receptions').getFullList({
