@@ -9,7 +9,16 @@ export default function StockDesktop() {
   const [stocks, setStocks] = useState([]);
   const [suppliers, setSuppliers] = useState([]);
   const [allProducts, setAllProducts] = useState([]);
-  const [selectedSupplier, setSelectedSupplier] = useState('');
+  const [selectedSupplier, setSelectedSupplier] = useState(() => {
+    try {
+      const saved = localStorage.getItem('ns_selected_supplier');
+      if (saved) {
+        localStorage.removeItem('ns_selected_supplier');
+        return saved;
+      }
+    } catch (e) {}
+    return '';
+  });
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('');

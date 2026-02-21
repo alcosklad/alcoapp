@@ -130,7 +130,7 @@ function App() {
         onLogout={handleLogout}
       >
         <div style={{ display: activeTab === 'dashboard' ? 'block' : 'none' }}>
-          <DashboardDesktop user={user} />
+          <DashboardDesktop user={user} onNavigate={setActiveTab} />
         </div>
         <div style={{ display: activeTab === 'reception' ? 'block' : 'none' }}>
           <ReceptionDesktop />

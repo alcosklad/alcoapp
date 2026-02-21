@@ -5,7 +5,7 @@ import { Package, TrendingUp, ShoppingCart, AlertTriangle, FileText, Calendar, C
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, LineChart, Line, Legend } from 'recharts';
 import pb from '../../lib/pocketbase';
 
-export default function DashboardDesktop({ user }) {
+export default function DashboardDesktop({ user, onNavigate }) {
   const [stats, setStats] = useState({
     totalProducts: 0,
     totalSaleValue: 0,
@@ -517,11 +517,25 @@ export default function DashboardDesktop({ user }) {
       {/* Карточки статистики */}
       {isAdmin ? (
         <div className="grid grid-cols-2 lg:grid-cols-6 gap-3">
-          <StatCard icon={Package} label="Товаров на складе" value={`${stats.totalProducts.toLocaleString('ru-RU')} шт`} color="blue" clickable onClick={() => setShowStockBreakdown(true)} />
+          <StatCard 
+            icon={Package} 
+            label="Товаров на складе" 
+            value={`${stats.totalProducts.toLocaleString('ru-RU')} шт`} 
+            color="blue" 
+            clickable 
+            onClick={() => setShowStockBreakdown(true)} 
+          />
           <StatCard icon={ShoppingCart} label={`Сумма продажи за ${periodLabel}`} value={metrics.totalSaleValue.toLocaleString('ru-RU')} color="green" />
           <StatCard icon={TrendingUp} label={`Сумма закупа за ${periodLabel}`} value={metrics.totalPurchaseValue.toLocaleString('ru-RU')} color="purple" />
           <StatCard icon={BarChart3} label={`Маржа за ${periodLabel}`} value={margin.toLocaleString('ru-RU')} color={margin > 0 ? 'green' : 'orange'} />
-          <StatCard icon={FileText} label={`Приёмок за ${periodLabel}`} value={metrics.receptionsCount} color="indigo" />
+          <StatCard 
+            icon={FileText} 
+            label={`Приёмок за ${periodLabel}`} 
+            value={metrics.receptionsCount} 
+            color="indigo" 
+            clickable
+            onClick={() => onNavigate && onNavigate('reception')}
+          />
           <StatCard
             icon={AlertTriangle}
             label="Неликвид (>30 дн)"
@@ -666,6 +680,23 @@ export default function DashboardDesktop({ user }) {
           <div className="bg-white rounded-2xl max-w-6xl w-full mx-6 shadow-2xl" onClick={(e) => e.stopPropagation()}>
             <div className="flex items-center justify-between px-8 py-5 border-b border-gray-100">
               <div>
+                      
+                      onClik={() => {
+                        // Пытаемся найти suppierId по имени
+                        const supplier = suppliers.find(s => s.nme === item.name);
+                        if (upplier && onNavigate) {
+                          // Переход в раздел остатков с фильтрацией (в реальном приложении 
+                          // потребуется передать состояние или через кэш/роутинг, 
+                          // но пока просто перейдем на вкладку)
+                          setShowStockBreakdown(false);
+                          // Чтобы StockDesktop увидел выбранный город, можно 
+                          // сохранить его в localStorage или использовать общий стейт
+                          try { localStorage.setItem('ns_selected_supplier', supplier.id); } catch {}
+                          onNavigate('tock');
+                        }
+                      }}
+                      class cursor-pointer
+                    
                 <h3 className="text-xl font-bold text-gray-900">Товары по складам</h3>
                 <p className="text-sm text-gray-500 mt-0.5">Общее количество: <span className="font-semibold text-gray-700">{stats.totalProducts.toLocaleString('ru-RU')} шт</span></p>
               </div>
