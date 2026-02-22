@@ -863,8 +863,8 @@ export default function DashboardDesktop({ user, onNavigate }) {
               {stats.staleProducts.length === 0 ? (
                 <p className="text-gray-500 text-sm">Нет товаров</p>
               ) : (
-                stats.staleProducts.map((stock) => (
-                  <div key={stock.product || stock.id} className="p-3 bg-gray-50 rounded text-sm">
+                stats.staleProducts.map((stock, idx) => (
+                  <div key={stock.id || stock.product || `stale-${idx}`} className="p-3 bg-gray-50 rounded text-sm">
                     <div className="flex items-center justify-between mb-1">
                       <div>
                         <p className="font-medium text-gray-900">{stock?.expand?.product?.name || 'Товар'}</p>
@@ -877,7 +877,7 @@ export default function DashboardDesktop({ user, onNavigate }) {
                     {stock._cityBreakdown && stock._cityBreakdown.length > 0 && (
                       <div className="flex flex-wrap gap-1.5 mt-2 pt-2 border-t border-gray-200">
                         {stock._cityBreakdown.map((city, ci) => (
-                          <span key={city.supplierName || ci} className="inline-flex items-center gap-1 px-2 py-0.5 bg-white rounded text-xs text-gray-600 border border-gray-200">
+                          <span key={`city-${stock.id || stock.product || idx}-${ci}`} className="inline-flex items-center gap-1 px-2 py-0.5 bg-white rounded text-xs text-gray-600 border border-gray-200">
                             {city.supplierName}: <strong>{city.quantity}</strong>
                           </span>
                         ))}
