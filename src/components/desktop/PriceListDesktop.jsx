@@ -512,6 +512,8 @@ export default function PriceListDesktop() {
     alert(`Объединено: ${ok}${fail ? `, ошибок: ${fail}` : ''}`);
   };
 
+  const colCount = 8 + (selectMode ? 1 : 0);
+
   return (
     <div className="space-y-4">
       {/* Панель фильтров */}

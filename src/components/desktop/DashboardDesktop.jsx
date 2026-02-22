@@ -675,8 +675,8 @@ export default function DashboardDesktop({ user, onNavigate }) {
             </div>
           </div>
           {trendCityNames.length > 0 ? (
-            <div className="h-[250px] mt-4">
-              <ResponsiveContainer width="100%" height="100%">
+            <div className="h-[250px] mt-4 w-full" style={{ minWidth: 0, minHeight: 250 }}>
+              <ResponsiveContainer width="100%" height={250}>
                 <LineChart data={stockTrendData} margin={{ top: 5, right: 10, left: 0, bottom: 5 }}>
                   <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#E5E7EB" />
                   <XAxis dataKey="label" axisLine={false} tickLine={false} tick={{fill: '#6B7280', fontSize: 11}} dy={10} />
@@ -752,7 +752,7 @@ export default function DashboardDesktop({ user, onNavigate }) {
               </button>
             </div>
             {(chartView === 'purchases' ? paymentMethodsData : citySalesData).length > 0 ? (
-              <div className="flex items-center justify-center">
+              <div className="flex items-center justify-center w-full" style={{ minWidth: 0, minHeight: 240 }}>
                 <ResponsiveContainer width="100%" height={240}>
                   <PieChart>
                     <Pie
@@ -863,8 +863,8 @@ export default function DashboardDesktop({ user, onNavigate }) {
               {stats.staleProducts.length === 0 ? (
                 <p className="text-gray-500 text-sm">Нет товаров</p>
               ) : (
-                stats.staleProducts.map((stock, idx) => (
-                  <div key={idx} className="p-3 bg-gray-50 rounded text-sm">
+                stats.staleProducts.map((stock) => (
+                  <div key={stock.id || stock.product || Math.random().toString()} className="p-3 bg-gray-50 rounded text-sm">
                     <div className="flex items-center justify-between mb-1">
                       <div>
                         <p className="font-medium text-gray-900">{stock?.expand?.product?.name || 'Товар'}</p>
@@ -877,7 +877,7 @@ export default function DashboardDesktop({ user, onNavigate }) {
                     {stock._cityBreakdown && stock._cityBreakdown.length > 0 && (
                       <div className="flex flex-wrap gap-1.5 mt-2 pt-2 border-t border-gray-200">
                         {stock._cityBreakdown.map((city, ci) => (
-                          <span key={ci} className="inline-flex items-center gap-1 px-2 py-0.5 bg-white rounded text-xs text-gray-600 border border-gray-200">
+                          <span key={`city-${ci}`} className="inline-flex items-center gap-1 px-2 py-0.5 bg-white rounded text-xs text-gray-600 border border-gray-200">
                             {city.supplierName}: <strong>{city.quantity}</strong>
                           </span>
                         ))}
