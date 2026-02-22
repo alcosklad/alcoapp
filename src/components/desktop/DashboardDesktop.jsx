@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { getDashboardStats, getSuppliers, getAllOrders, getReceptions, getStocksAggregated, getWriteOffs } from '../../lib/pocketbase';
 import { getOrFetch } from '../../lib/cache';
-import { Package, TrendingUp, ShoppingCart, AlertTriangle, FileText, Calendar, Clock, BarChart3, X, RotateCcw } from 'lucide-react';
+import { Package, TrendingUp, ShoppingCart, AlertTriangle, FileText, Calendar, Clock, BarChart3, X, RotateCcw, Info } from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, LineChart, Line, Legend } from 'recharts';
 import pb from '../../lib/pocketbase';
 
@@ -35,6 +35,10 @@ export default function DashboardDesktop({ user, onNavigate }) {
   const [filterDateFrom, setFilterDateFrom] = useState('');
   const [filterDateTo, setFilterDateTo] = useState('');
   const [chartRange, setChartRange] = useState('week'); // week | month | quarter | halfyear | all
+
+  const [selectedChartCities, setSelectedChartCities] = useState([]);
+  const [hoveredChartLine, setHoveredChartLine] = useState(null);
+  const [showZeroStockInfo, setShowZeroStockInfo] = useState(false);
 
   const userRole = pb.authStore.model?.role;
   const isAdmin = userRole === 'admin';
@@ -224,7 +228,7 @@ export default function DashboardDesktop({ user, onNavigate }) {
   }, [filteredOrders, filteredReceptions]);
 
   // Линейный график динамики остатков: база = текущий остаток, +приёмки, −продажи, −списания
-  const { stockTrendData, trendCityNames, currentTotals, currentPurchaseTotals } = useMemo(() => {
+  const { stockTrendData, trendCityNames, zeroCities, currentTotals, currentPurchaseTotals } = useMemo(() => {
     const normalizeDay = (rawDate) => {
       const d = new Date((rawDate || '').replace(' ', 'T'));
       if (Number.isNaN(d.getTime())) return null;
@@ -287,7 +291,16 @@ export default function DashboardDesktop({ user, onNavigate }) {
     });
 
     const citySet = new Set();
-    Object.keys(currentTotals).forEach((city) => citySet.add(city));
+    Object.keys(currentPurchaseTotals).forEach((city) => {
+      // Only include cities that have > 0 purchase value initially
+      if (currentPurchaseTotals[city] > 0) {
+        citySet.add(city);
+      }
+    });
+    
+    // Track zero stock cities for the info tooltip
+    const zeroCities = Object.keys(currentPurchaseTotals).filter(city => currentPurchaseTotals[city] === 0);
+    
     relevantReceptions.forEach((rec) => {
       const cityName = rec.expand?.supplier?.name || suppliers.find((s) => s.id === rec.supplier)?.name || 'Неизвестно';
       if (cityName) citySet.add(cityName);
@@ -298,7 +311,11 @@ export default function DashboardDesktop({ user, onNavigate }) {
     if (selectedCities.length > 0) {
       cities = cities.filter((c) => selectedCityNames.includes(c));
     }
-    if (cities.length === 0) return { stockTrendData: [], trendCityNames: [] };
+    
+    // Filter out zero cities from the final trendCityNames if they didn't have any activity
+    // But keep them in zeroCities list
+    
+    if (cities.length === 0) return { stockTrendData: [], trendCityNames: [], zeroCities: [] };
 
     const increments = new Map();
     const decrements = new Map();
@@ -420,7 +437,38 @@ export default function DashboardDesktop({ user, onNavigate }) {
       rows.push(row);
     }
 
-    return { stockTrendData: rows, trendCityNames: cities, currentTotals, currentPurchaseTotals };
+    // Monthly aggregation for halfyear and all
+    if (chartRange === 'halfyear' || chartRange === 'all') {
+      const monthlyRows = [];
+      const monthMap = new Map();
+      
+      rows.forEach(row => {
+        const [day, month, year] = row.fullDate.split('.');
+        const monthKey = `${month}.${year}`;
+        if (!monthMap.has(monthKey)) {
+          monthMap.set(monthKey, { ...row, label: `${month}.${year.slice(2)}`, count: 1 });
+        } else {
+          const existing = monthMap.get(monthKey);
+          existing.count += 1;
+          cities.forEach(city => {
+            existing[city] = (existing[city] || 0) + row[city];
+            existing[`${city}_purchase`] = (existing[`${city}_purchase`] || 0) + row[`${city}_purchase`];
+          });
+        }
+      });
+      
+      monthMap.forEach(monthlyRow => {
+        const averagedRow = { label: monthlyRow.label, fullDate: monthlyRow.fullDate };
+        cities.forEach(city => {
+          averagedRow[city] = monthlyRow[city] / monthlyRow.count;
+          averagedRow[`${city}_purchase`] = monthlyRow[`${city}_purchase`] / monthlyRow.count;
+        });
+        monthlyRows.push(averagedRow);
+      });
+      return { stockTrendData: monthlyRows, trendCityNames: cities, zeroCities, currentTotals, currentPurchaseTotals };
+    }
+
+    return { stockTrendData: rows, trendCityNames: cities, zeroCities, currentTotals, currentPurchaseTotals };
   }, [receptionsData, salesData, writeOffsChartData, stocksData, chartRange, selectedCities, selectedCityNames, suppliers]);
 
   // Flat-line chart for "Текущий" mode: horizontal lines at current stock level
@@ -439,11 +487,27 @@ export default function DashboardDesktop({ user, onNavigate }) {
         label: d.toLocaleDateString('ru-RU', { day: '2-digit', month: '2-digit' }),
         fullDate: d.toLocaleDateString('ru-RU', { day: '2-digit', month: '2-digit', year: 'numeric' }),
       };
-      trendCityNames.forEach((city) => { row[city] = currentTotals[city] || 0; });
+      trendCityNames.forEach((city) => { row[`${city}_purchase`] = currentPurchaseTotals[city] || 0; });
       rows.push(row);
     }
+    
+    if (chartRange === 'halfyear' || chartRange === 'all') {
+      const monthlyRows = [];
+      const monthMap = new Map();
+      
+      rows.forEach(row => {
+        const [day, month, year] = row.fullDate.split('.');
+        const monthKey = `${month}.${year}`;
+        if (!monthMap.has(monthKey)) {
+          monthMap.set(monthKey, { ...row, label: `${month}.${year.slice(2)}` });
+          monthlyRows.push(monthMap.get(monthKey));
+        }
+      });
+      return monthlyRows;
+    }
+    
     return rows;
-  }, [trendCityNames, currentTotals, chartRange]);
+  }, [trendCityNames, currentPurchaseTotals, chartRange]);
 
   const CITY_COLORS = [
     '#3b82f6', '#22c55e', '#f59e0b', '#ef4444', '#8b5cf6',
@@ -673,7 +737,21 @@ export default function DashboardDesktop({ user, onNavigate }) {
       {isAdmin && (
         <div className="bg-white rounded-lg border border-gray-200 p-4">
           <div className="flex items-center justify-between mb-4 flex-wrap gap-2">
-            <h3 className="text-sm font-semibold text-gray-700">Остатки (шт) по городам</h3>
+            <h3 className="text-sm font-semibold text-gray-700 flex items-center gap-1.5">
+              Остатки (шт) по городам
+              {zeroCities && zeroCities.length > 0 && (
+                <div className="relative group">
+                  <Info size={14} className="text-gray-400 cursor-help hover:text-blue-500 transition-colors" />
+                  <div className="absolute left-1/2 -translate-x-1/2 bottom-full mb-2 hidden group-hover:block w-48 bg-gray-900 text-white text-xs rounded-lg py-2 px-3 shadow-lg z-50">
+                    <p className="font-medium mb-1 border-b border-gray-700 pb-1">Нет товаров в городах:</p>
+                    <ul className="space-y-0.5">
+                      {zeroCities.map(c => <li key={c} className="text-gray-300">• {c}</li>)}
+                    </ul>
+                    <div className="absolute left-1/2 -translate-x-1/2 top-full w-0 h-0 border-l-[6px] border-l-transparent border-t-[6px] border-t-gray-900 border-r-[6px] border-r-transparent"></div>
+                  </div>
+                </div>
+              )}
+            </h3>
             <div className="flex items-center gap-3 flex-wrap">
               {/* Mode tabs */}
               <div className="flex bg-gray-100 rounded-lg p-0.5">
@@ -720,7 +798,8 @@ export default function DashboardDesktop({ user, onNavigate }) {
                     axisLine={false} 
                     tickLine={false} 
                     tick={{fill: '#6B7280', fontSize: 11}} 
-                    tickFormatter={(val) => chartView === 'purchases' ? `${(val/1000).toFixed(0)}k` : val}
+                    tickFormatter={(val) => chartView === 'purchases' ? val / 1000 : val}
+                    domain={['auto', 'auto']}
                   />
                   <Tooltip 
                     contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }}
@@ -728,18 +807,99 @@ export default function DashboardDesktop({ user, onNavigate }) {
                       const label = name.includes('_purchase') ? name.replace('_purchase', '') : name;
                       return [chartView === 'purchases' ? `${val.toLocaleString('ru-RU')} ₽` : val, label];
                     }}
+                    filterNull={false}
+                    content={({ active, payload, label }) => {
+                      if (active && payload && payload.length) {
+                        // Если есть выбранные города по клику, показываем только их
+                        let visiblePayload = payload;
+                        if (selectedChartCities.length > 0) {
+                          visiblePayload = payload.filter(p => {
+                            const name = p.name.replace('_purchase', '');
+                            return selectedChartCities.includes(name);
+                          });
+                        } else if (hoveredChartLine) {
+                          // Если ничего не кликнуто, но мы навели на конкретную линию, показываем только её
+                          visiblePayload = payload.filter(p => p.name === hoveredChartLine);
+                        }
+                        
+                        // Если мы навели просто на график, но не на линию, и нет кликнутых, то не показываем огромный тултип со всеми городами
+                        // Покажем только топ-5 по значению, чтобы не перегружать экран, либо вообще скроем, пока не наведем на линию. 
+                        // По ТЗ: "при наведении на линию... будет показывать сумму закупа".
+                        if (!hoveredChartLine && selectedChartCities.length === 0) {
+                          return null; 
+                        }
+
+                        if (visiblePayload.length === 0) return null;
+
+                        return (
+                          <div className="bg-white p-3 rounded-xl shadow-lg border border-gray-100">
+                            <p className="text-xs font-semibold text-gray-500 mb-2">{label}</p>
+                            <div className="space-y-1.5">
+                              {visiblePayload.map((entry, index) => {
+                                const cityName = entry.name.replace('_purchase', '');
+                                return (
+                                  <div key={`item-${index}`} className="flex items-center gap-3">
+                                    <span className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: entry.color }}></span>
+                                    <span className="text-sm font-medium text-gray-700">{cityName}</span>
+                                    <span className="text-sm font-bold text-gray-900 ml-auto">
+                                      {chartView === 'purchases' ? `${entry.value.toLocaleString('ru-RU')} ₽` : `${entry.value.toLocaleString('ru-RU')} шт`}
+                                    </span>
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          </div>
+                        );
+                      }
+                      return null;
+                    }}
                   />
                   {trendCityNames.map((city, idx) => {
+                    const dataKey = chartView === 'purchases' ? `${city}_purchase` : city;
+                    const isHovered = hoveredChartLine === dataKey;
+                    const isSelected = selectedChartCities.includes(city);
+                    const hasSelection = selectedChartCities.length > 0;
+                    
+                    // Logic for dimming lines
+                    let opacity = 1;
+                    let strokeWidth = 2;
+                    
+                    if (hasSelection) {
+                      if (isSelected) {
+                        opacity = 1;
+                        strokeWidth = 3;
+                      } else if (isHovered) {
+                        opacity = 0.8;
+                        strokeWidth = 2;
+                      } else {
+                        opacity = 0.2;
+                      }
+                    } else {
+                      if (hoveredChartLine) {
+                        opacity = isHovered ? 1 : 0.2;
+                        strokeWidth = isHovered ? 3 : 2;
+                      }
+                    }
+
                     return (
                       <Line
                         key={city}
                         type="monotone"
-                        dataKey={chartView === 'purchases' ? `${city}_purchase` : city}
-                        name={chartView === 'purchases' ? `${city}_purchase` : city}
+                        dataKey={dataKey}
+                        name={dataKey}
                         stroke={`hsl(${(idx * 137) % 360}, 70%, 50%)`}
-                        strokeWidth={2}
+                        strokeWidth={strokeWidth}
+                        strokeOpacity={opacity}
                         dot={false}
-                        activeDot={{ r: 4, strokeWidth: 0 }}
+                        activeDot={{ r: (isHovered || isSelected) ? 5 : 0, strokeWidth: 0 }}
+                        onMouseEnter={() => setHoveredChartLine(dataKey)}
+                        onMouseLeave={() => setHoveredChartLine(null)}
+                        onClick={() => {
+                          setSelectedChartCities(prev => 
+                            prev.includes(city) ? prev.filter(c => c !== city) : [...prev, city]
+                          );
+                        }}
+                        style={{ cursor: 'pointer', transition: 'all 0.2s ease' }}
                       />
                     );
                   })}
