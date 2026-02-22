@@ -766,7 +766,7 @@ export default function DashboardDesktop({ user, onNavigate }) {
                       dataKey="value"
                     >
                       {(chartView === 'purchases' ? paymentMethodsData : citySalesData).map((entry, index) => (
-                        <Cell key={`cell-${index}`} fill={chartView === 'purchases' ? PIE_COLORS[index % PIE_COLORS.length] : CITY_COLORS[index % CITY_COLORS.length]} />
+                        <Cell key={`cell-${entry.name}`} fill={chartView === 'purchases' ? PIE_COLORS[index % PIE_COLORS.length] : CITY_COLORS[index % CITY_COLORS.length]} />
                       ))}
                     </Pie>
                     <Tooltip formatter={(value) => value.toLocaleString('ru-RU') + ' ₽'} />
@@ -799,11 +799,11 @@ export default function DashboardDesktop({ user, onNavigate }) {
                 <p className="text-gray-500 text-sm text-center py-8">Нет данных</p>
               ) : (
                 <div className="grid grid-cols-2 lg:grid-cols-3 gap-3">
-                  {(stats.stockBreakdown || []).map((item, idx) => {
+                  {(stats.stockBreakdown || []).map((item) => {
                     const supplier = suppliers.find(s => s.name === item.name);
                     return (
                       <div 
-                        key={idx} 
+                        key={item.name} 
                         onClick={() => {
                           if (supplier && onNavigate) {
                             setShowStockBreakdown(false);
@@ -864,7 +864,7 @@ export default function DashboardDesktop({ user, onNavigate }) {
                 <p className="text-gray-500 text-sm">Нет товаров</p>
               ) : (
                 stats.staleProducts.map((stock) => (
-                  <div key={stock.id || stock.product || Math.random().toString()} className="p-3 bg-gray-50 rounded text-sm">
+                  <div key={stock.product || stock.id} className="p-3 bg-gray-50 rounded text-sm">
                     <div className="flex items-center justify-between mb-1">
                       <div>
                         <p className="font-medium text-gray-900">{stock?.expand?.product?.name || 'Товар'}</p>
@@ -877,7 +877,7 @@ export default function DashboardDesktop({ user, onNavigate }) {
                     {stock._cityBreakdown && stock._cityBreakdown.length > 0 && (
                       <div className="flex flex-wrap gap-1.5 mt-2 pt-2 border-t border-gray-200">
                         {stock._cityBreakdown.map((city, ci) => (
-                          <span key={`city-${ci}`} className="inline-flex items-center gap-1 px-2 py-0.5 bg-white rounded text-xs text-gray-600 border border-gray-200">
+                          <span key={city.supplierName || ci} className="inline-flex items-center gap-1 px-2 py-0.5 bg-white rounded text-xs text-gray-600 border border-gray-200">
                             {city.supplierName}: <strong>{city.quantity}</strong>
                           </span>
                         ))}
