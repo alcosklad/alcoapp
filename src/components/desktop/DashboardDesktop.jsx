@@ -34,7 +34,9 @@ export default function DashboardDesktop({ user, onNavigate }) {
   const [filterDateFrom, setFilterDateFrom] = useState('');
   const [filterDateTo, setFilterDateTo] = useState('');
   const [chartRange, setChartRange] = useState('week'); // week | month | quarter | halfyear | all
-  const [chartMode, setChartMode] = useState('current'); // 'current' | 'dynamic'
+  const [activeLines, setActiveLines] = useState([]);
+
+  // ... (use effect to init activeLines when trendCityNames change)
   
   const userRole = pb.authStore.model?.role;
   const isAdmin = userRole === 'admin';
@@ -492,6 +494,34 @@ export default function DashboardDesktop({ user, onNavigate }) {
       .sort((a, b) => b.value - a.value);
   }, [filteredOrders]);
 
+  // Движение товаров (Приход/Расход) для графика эффективности
+  const movementData = useMemo(() => {
+    const cityStats = {};
+    trendCityNames.forEach(city => {
+      cityStats[city] = { name: city, income: 0, outcome: 0 };
+    });
+
+    filteredReceptions.forEach(rec => {
+      const cityName = rec.expand?.supplier?.name || suppliers.find((s) => s.id === rec.supplier)?.name;
+      if (cityName && cityStats[cityName]) {
+        const qty = (Array.isArray(rec.items) ? rec.items : []).reduce((sum, item) => sum + (Number(item.quantity) || 0), 0);
+        cityStats[cityName].income += qty;
+      }
+    });
+
+    filteredOrders.forEach(order => {
+      if (order.status === 'refund') return;
+      const orderSupplierId = order.supplier || (typeof order.expand?.user?.supplier === 'string' ? order.expand.user.supplier : order.expand?.user?.supplier?.id);
+      const cityName = order.city || order.expand?.user?.expand?.supplier?.name || suppliers.find(s => s.id === orderSupplierId)?.name;
+      if (cityName && cityStats[cityName]) {
+        const qty = (Array.isArray(order.items) ? order.items : []).reduce((sum, item) => sum + (Number(item.quantity) || 0), 0);
+        cityStats[cityName].outcome += qty;
+      }
+    });
+
+    return Object.values(cityStats).filter(s => s.income > 0 || s.outcome > 0);
+  }, [filteredReceptions, filteredOrders, trendCityNames, suppliers]);
+
   // Топ-3 продаваемых товара
   const topProducts = useMemo(() => {
     const productMap = {};
@@ -505,15 +535,23 @@ export default function DashboardDesktop({ user, onNavigate }) {
         const total = (Number(item.price) || 0) * qty;
         
         if (!productMap[id]) {
-          productMap[id] = { id, name, quantity: 0, total: 0 };
+          productMap[id] = { id, name, quantity: 0, total: 0, latestOrderTime: 0 };
         }
         productMap[id].quantity += qty;
         productMap[id].total += total;
+        
+        const orderTime = new Date(order.created || order.created_date || 0).getTime();
+        if (orderTime > productMap[id].latestOrderTime) {
+          productMap[id].latestOrderTime = orderTime;
+        }
       });
     });
     
     return Object.values(productMap)
-      .sort((a, b) => b.quantity - a.quantity)
+      .sort((a, b) => {
+        if (b.quantity !== a.quantity) return b.quantity - a.quantity;
+        return b.latestOrderTime - a.latestOrderTime;
+      })
       .slice(0, 3);
   }, [filteredOrders]);
 
@@ -605,7 +643,7 @@ export default function DashboardDesktop({ user, onNavigate }) {
             onClick={() => setShowStockBreakdown(true)} 
           />
           <StatCard icon={ShoppingCart} label={`Сумма продажи за ${periodLabel}`} value={metrics.totalSaleValue.toLocaleString('ru-RU')} color="green" />
-          <StatCard icon={TrendingUp} label={`Сумма закупа за ${periodLabel}`} value={metrics.totalPurchaseValue.toLocaleString('ru-RU')} color="purple" />
+          <StatCard icon={TrendingUp} label={`Сумма закупа (всего)`} value={stats.totalPurchaseValue.toLocaleString('ru-RU')} color="purple" />
           <StatCard icon={BarChart3} label={`Маржа за ${periodLabel}`} value={margin.toLocaleString('ru-RU')} color={margin > 0 ? 'green' : 'orange'} />
           <StatCard 
             icon={FileText} 
@@ -675,8 +713,8 @@ export default function DashboardDesktop({ user, onNavigate }) {
             </div>
           </div>
           {trendCityNames.length > 0 ? (
-            <div className="h-[250px] mt-4 w-full" style={{ minWidth: 0, minHeight: 250 }}>
-              <ResponsiveContainer width="100%" height={250}>
+            <div className="h-[350px] mt-4 w-full" style={{ minWidth: 0, minHeight: 350 }}>
+              <ResponsiveContainer width="100%" height={350}>
                 <LineChart data={stockTrendData} margin={{ top: 5, right: 10, left: 0, bottom: 5 }}>
                   <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#E5E7EB" />
                   <XAxis dataKey="label" axisLine={false} tickLine={false} tick={{fill: '#6B7280', fontSize: 11}} dy={10} />
@@ -688,51 +726,136 @@ export default function DashboardDesktop({ user, onNavigate }) {
                   />
                   <Tooltip 
                     contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }}
-                    formatter={(val) => chartView === 'purchases' ? [`${val.toLocaleString('ru-RU')} ₽`, 'Сумма закупа'] : [val, 'Остаток (шт)']}
+                    formatter={(val, name) => {
+                      const label = name.includes('_purchase') ? name.replace('_purchase', '') : name;
+                      return [chartView === 'purchases' ? `${val.toLocaleString('ru-RU')} ₽` : val, label];
+                    }}
                   />
-                  <Legend iconType="circle" wrapperStyle={{ fontSize: '11px', paddingTop: '10px' }} />
-                  {trendCityNames.map((city, idx) => (
-                    <Line
-                      key={city}
-                      type="monotone"
-                      dataKey={chartView === 'purchases' ? `${city}_purchase` : city}
-                      name={city}
-                      stroke={`hsl(${(idx * 137) % 360}, 70%, 50%)`}
-                      strokeWidth={2}
-                      dot={false}
-                      activeDot={{ r: 4, strokeWidth: 0 }}
-                    />
-                  ))}
+                  {trendCityNames.map((city, idx) => {
+                    if (activeLines.length > 0 && !activeLines.includes(city)) return null;
+                    return (
+                      <Line
+                        key={city}
+                        type="monotone"
+                        dataKey={chartView === 'purchases' ? `${city}_purchase` : city}
+                        name={chartView === 'purchases' ? `${city}_purchase` : city}
+                        stroke={`hsl(${(idx * 137) % 360}, 70%, 50%)`}
+                        strokeWidth={2}
+                        dot={false}
+                        activeDot={{ r: 4, strokeWidth: 0 }}
+                      />
+                    );
+                  })}
                 </LineChart>
               </ResponsiveContainer>
+              
+              {/* Custom Legend */}
+              <div className="flex flex-wrap items-center gap-2 mt-4 pt-4 border-t border-gray-100">
+                <button
+                  onClick={() => setActiveLines(trendCityNames)}
+                  className="px-2 py-1 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded text-xs transition-colors shrink-0"
+                  title="Сбросить выбор и показать все"
+                >
+                  <RotateCcw size={12} className="inline mr-1" /> Все
+                </button>
+                <div className="flex flex-wrap gap-2 flex-1">
+                  {trendCityNames.map((city, idx) => {
+                    const isActive = activeLines.includes(city);
+                    const color = `hsl(${(idx * 137) % 360}, 70%, 50%)`;
+                    return (
+                      <button
+                        key={city}
+                        onClick={() => {
+                          setActiveLines(prev => {
+                            // If currently everything is active, clicking one isolates it
+                            if (prev.length === trendCityNames.length) return [city];
+                            // If it's already active and alone, don't do anything (or maybe select all?)
+                            if (prev.length === 1 && prev.includes(city)) return trendCityNames;
+                            // Otherwise toggle
+                            if (prev.includes(city)) return prev.filter(c => c !== city);
+                            return [...prev, city];
+                          });
+                        }}
+                        className={`flex items-center gap-1.5 px-2 py-1 rounded text-xs transition-all ${isActive ? 'bg-white shadow-sm border border-gray-200 text-gray-800' : 'bg-transparent text-gray-400 border border-transparent hover:text-gray-600'}`}
+                      >
+                        <span className="w-2.5 h-2.5 rounded-full block" style={{ backgroundColor: isActive ? color : '#e5e7eb' }}></span>
+                        {city}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
             </div>
           ) : (
             <div className="flex items-center justify-center h-[500px] text-gray-400 text-sm">Нет данных</div>
           )}
 
-          {/* Топ-3 товара под графиком */}
-          {topProducts.length > 0 && (
-            <div className="pt-4 border-t border-gray-100 mt-4">
-              <h4 className="text-xs font-medium text-gray-500 uppercase tracking-wider mb-3">Топ-3 продаваемых товара за период</h4>
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                {topProducts.map((product, idx) => (
-                  <div key={product.id || `top-${idx}`} className="bg-gray-50 rounded-lg p-3 flex items-center gap-3">
-                    <div className={`w-8 h-8 rounded-full flex items-center justify-center font-bold text-sm ${idx === 0 ? 'bg-yellow-100 text-yellow-700' : idx === 1 ? 'bg-gray-200 text-gray-700' : 'bg-orange-100 text-orange-700'}`}>
-                      {idx + 1}
+      {/* Топ-3 товара под графиком */}
+      {topProducts.length > 0 && (
+        <div className="pt-4 border-t border-gray-100 mt-4">
+          <h4 className="text-xs font-medium text-gray-500 uppercase tracking-wider mb-3">Топ-3 продаваемых товара за период</h4>
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+            {topProducts.map((product, idx) => {
+              // Custom ranking styling based on quantity thresholds
+              const qty = product.quantity;
+              let rankStyle = '';
+              let badgeColor = '';
+              let badgeText = '';
+              
+              if (qty >= 8) {
+                rankStyle = 'bg-gradient-to-br from-yellow-100 to-yellow-200 text-yellow-700 border border-yellow-300 shadow-sm';
+                badgeColor = 'bg-yellow-100 text-yellow-800 border-yellow-200';
+                badgeText = 'Хит продаж';
+              } else if (qty >= 5) {
+                rankStyle = 'bg-gradient-to-br from-gray-100 to-gray-200 text-gray-600 border border-gray-300 shadow-sm';
+                badgeColor = 'bg-gray-100 text-gray-800 border-gray-200';
+                badgeText = 'Популярен';
+              } else {
+                rankStyle = 'bg-gradient-to-br from-orange-50 to-orange-100 text-orange-700 border border-orange-200 shadow-sm';
+                badgeColor = 'bg-orange-100 text-orange-800 border-orange-200';
+                badgeText = 'Стабильно';
+              }
+
+              return (
+                <div 
+                  key={product.id || `top-${idx}`} 
+                  onClick={() => {
+                    if (onNavigate && product?.id) {
+                      try { localStorage.setItem('ns_stock_search', product.name); } catch {}
+                      onNavigate('stock');
+                    }
+                  }}
+                  className="bg-white border border-gray-200 rounded-xl p-3 flex flex-col gap-3 cursor-pointer hover:border-blue-300 hover:shadow-md transition-all group relative overflow-hidden"
+                >
+                  <div className="flex items-center gap-3">
+                    <div className={`w-10 h-10 shrink-0 rounded-xl flex items-center justify-center font-bold text-lg ${rankStyle}`}>
+                      #{idx + 1}
                     </div>
                     <div className="flex-1 min-w-0">
-                      <p className="text-sm font-medium text-gray-900 truncate" title={product.name}>
+                      <p className="text-sm font-bold text-gray-900 line-clamp-2 group-hover:text-blue-700 transition-colors" title={product.name}>
                         {product.name}
                       </p>
-                      <p className="text-xs text-gray-500 mt-0.5">
-                        {product.quantity} шт • {product.total.toLocaleString('ru-RU')} ₽
-                      </p>
+                      <div className="flex items-center gap-2 mt-1">
+                        <span className={`text-[10px] px-1.5 py-0.5 rounded border font-medium ${badgeColor}`}>{badgeText}</span>
+                      </div>
                     </div>
                   </div>
-                ))}
-              </div>
-            </div>
-          )}
+                  <div className="pt-2 border-t border-gray-50 flex items-center justify-between">
+                    <div>
+                      <p className="text-xs text-gray-500">Продано</p>
+                      <p className="text-sm font-semibold text-gray-900">{product.quantity} шт</p>
+                    </div>
+                    <div className="text-right">
+                      <p className="text-xs text-gray-500">Сумма</p>
+                      <p className="text-sm font-semibold text-blue-600">{product.total.toLocaleString('ru-RU')} ₽</p>
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
         </div>
       )}
 
@@ -777,9 +900,35 @@ export default function DashboardDesktop({ user, onNavigate }) {
               <div className="flex items-center justify-center h-[240px] text-gray-400 text-sm">Нет данных</div>
             )}
           </div>
+
+          {/* График эффективности движения товаров */}
+          <div className="bg-white rounded-lg border border-gray-200 p-4">
+            <div className="flex items-center justify-between mb-3">
+              <h3 className="text-sm font-semibold text-gray-700">Эффективность движения (шт)</h3>
+            </div>
+            {movementData.length > 0 ? (
+              <div className="flex items-center justify-center w-full" style={{ minWidth: 0, minHeight: 240 }}>
+                <ResponsiveContainer width="100%" height={240}>
+                  <BarChart data={movementData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#E5E7EB" />
+                    <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{fill: '#6B7280', fontSize: 11}} dy={10} />
+                    <YAxis axisLine={false} tickLine={false} tick={{fill: '#6B7280', fontSize: 11}} />
+                    <Tooltip 
+                      contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }}
+                      cursor={{fill: '#F3F4F6'}}
+                    />
+                    <Legend iconType="circle" wrapperStyle={{ fontSize: '11px', paddingTop: '10px' }} />
+                    <Bar dataKey="income" name="Приход" fill="#8b5cf6" radius={[4, 4, 0, 0]} maxBarSize={40} />
+                    <Bar dataKey="outcome" name="Расход" fill="#f59e0b" radius={[4, 4, 0, 0]} maxBarSize={40} />
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
+            ) : (
+              <div className="flex items-center justify-center h-[240px] text-gray-400 text-sm">Нет данных за период</div>
+            )}
+          </div>
         </div>
       )}
-
 
       {/* Модалка разбивки по складам */}
       {showStockBreakdown && (
@@ -849,43 +998,81 @@ export default function DashboardDesktop({ user, onNavigate }) {
         </div>
       )}
 
-      {/* Модалка с неликвидом */}
       {showStaleProducts && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg p-6 max-w-2xl w-full mx-4 max-h-[80vh] overflow-auto" onClick={(e) => e.stopPropagation()}>
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="text-lg font-semibold text-gray-900">Товары без продаж более 30 дней</h3>
-              <button onClick={() => setShowStaleProducts(false)} className="text-gray-400 hover:text-gray-600">
-                ✕
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-gray-50 rounded-2xl max-w-4xl w-full max-h-[85vh] flex flex-col shadow-2xl overflow-hidden" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center justify-between px-6 py-4 bg-white border-b border-gray-200 shrink-0 z-10">
+              <div>
+                <h3 className="text-xl font-bold text-gray-900 flex items-center gap-2">
+                  <AlertTriangle className="text-orange-500" size={24} />
+                  Товары без продаж более 30 дней
+                </h3>
+                <p className="text-sm text-gray-500 mt-1">Кликните на карточку товара для перехода к остаткам</p>
+              </div>
+              <button onClick={() => setShowStaleProducts(false)} className="p-2 hover:bg-gray-100 rounded-xl transition-colors">
+                <X size={20} className="text-gray-400" />
               </button>
             </div>
-            <div className="space-y-2">
-              {stats.staleProducts.length === 0 ? (
-                <p className="text-gray-500 text-sm">Нет товаров</p>
-              ) : (
-                stats.staleProducts.map((stock, idx) => (
-                  <div key={stock.id || stock.product || `stale-${stock.name}-${idx}`} className="p-3 bg-gray-50 rounded text-sm">
-                    <div className="flex items-center justify-between mb-1">
-                      <div>
-                        <p className="font-medium text-gray-900">{stock?.expand?.product?.name || 'Товар'}</p>
-                      </div>
-                      <div className="text-right">
-                        <p className="text-gray-900">{stock.quantity} шт</p>
-                        <p className="text-xs text-gray-500">{(stock?.expand?.product?.price || 0).toLocaleString('ru-RU')}</p>
-                      </div>
-                    </div>
-                    {stock._cityBreakdown && stock._cityBreakdown.length > 0 && (
-                      <div className="flex flex-wrap gap-1.5 mt-2 pt-2 border-t border-gray-200">
-                        {stock._cityBreakdown.map((city, ci) => (
-                          <span key={`city-${stock.id || stock.product || idx}-${city.supplierName || ci}`} className="inline-flex items-center gap-1 px-2 py-0.5 bg-white rounded text-xs text-gray-600 border border-gray-200">
-                            {city.supplierName}: <strong>{city.quantity}</strong>
-                          </span>
-                        ))}
-                      </div>
-                    )}
+            <div className="p-6 overflow-y-auto">
+              <div className="space-y-4">
+                {stats.staleProducts.length === 0 ? (
+                  <div className="text-center py-12 bg-gray-50 rounded-xl border border-gray-100">
+                    <p className="text-gray-500">Нет залежавшихся товаров</p>
                   </div>
-                ))
-              )}
+                ) : (
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                    {stats.staleProducts.map((stock, idx) => {
+                      const product = stock?.expand?.product;
+                      const productName = product?.name || 'Неизвестный товар';
+                      const price = product?.price || 0;
+                      
+                      return (
+                        <div 
+                          key={stock.id || stock.product || `stale-${productName}-${idx}`} 
+                          onClick={() => {
+                            if (onNavigate && product?.id) {
+                              setShowStaleProducts(false);
+                              try { localStorage.setItem('ns_stock_search', productName); } catch {}
+                              onNavigate('stock');
+                            }
+                          }}
+                          className="group relative bg-white border border-gray-200 rounded-xl p-4 hover:border-orange-300 hover:shadow-md transition-all cursor-pointer overflow-hidden"
+                        >
+                          <div className="absolute top-0 left-0 w-1 h-full bg-orange-400"></div>
+                          <div className="flex justify-between items-start mb-3">
+                            <div className="pr-4">
+                              <h4 className="font-semibold text-gray-900 group-hover:text-blue-700 transition-colors line-clamp-2" title={productName}>
+                                {productName}
+                              </h4>
+                              <p className="text-xs text-gray-500 mt-1">{price.toLocaleString('ru-RU')} ₽ / шт</p>
+                            </div>
+                            <div className="bg-orange-50 px-2.5 py-1 rounded-lg text-right shrink-0">
+                              <p className="text-sm font-bold text-orange-700">{stock.quantity} шт</p>
+                              <p className="text-[10px] text-orange-500 font-medium mt-0.5">В наличии</p>
+                            </div>
+                          </div>
+                          
+                          {stock._cityBreakdown && stock._cityBreakdown.length > 0 && (
+                            <div className="pt-3 border-t border-gray-100 flex gap-2 flex-wrap">
+                              {stock._cityBreakdown.map((city, ci) => (
+                                <div 
+                                  key={`city-${stock.id || stock.product || idx}-${city.supplierName || ci}`} 
+                                  className="flex items-center gap-1.5 px-2 py-1 bg-gray-50 rounded text-xs text-gray-600"
+                                  title={city.supplierName}
+                                >
+                                  <span className="w-1.5 h-1.5 rounded-full bg-gray-400"></span>
+                                  <span className="truncate max-w-[80px]">{city.supplierName}</span>
+                                  <span className="font-semibold ml-1">{city.quantity}</span>
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
             </div>
           </div>
         </div>

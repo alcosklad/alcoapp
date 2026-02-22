@@ -1053,8 +1053,8 @@ export default function StockDesktop({ onNavigate }) {
                     <td className="px-3 py-2 text-right text-gray-900">—</td>
                     <td className="px-3 py-2 text-right text-gray-900">—</td>
                     <td className="px-3 py-2 text-right text-gray-900">—</td>
-                    <td className="px-3 py-2 text-right text-gray-600">{totalCostValue.toLocaleString('ru-RU')}</td>
-                    <td className="px-3 py-2 text-right text-gray-900">{totalSaleValue.toLocaleString('ru-RU')}</td>
+                    <td className="px-3 py-2 text-right text-gray-600">{totalCostValue.toLocaleString('ru-RU', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                    <td className="px-3 py-2 text-right text-gray-900">{totalSaleValue.toLocaleString('ru-RU', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
                   </tr>
                 </>
               )}

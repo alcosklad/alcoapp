@@ -529,7 +529,7 @@ export default function PriceListDesktop() {
     alert(`Объединено: ${ok}${fail ? `, ошибок: ${fail}` : ''}`);
   };
 
-  const colCount = 8 + (selectMode ? 1 : 0);
+  const colCount = 3 + (selectMode ? 1 : 0);
 
   return (
     <div className="space-y-4">
@@ -729,21 +729,12 @@ export default function PriceListDesktop() {
                 <th className="text-left px-3 py-2 font-medium text-gray-600 cursor-pointer hover:bg-gray-100" onClick={() => handleSort('name')}>
                   <div className="flex items-center gap-1">Наименование <SortIcon field="name" /></div>
                 </th>
-                <th className="text-left px-3 py-2 font-medium text-gray-600 cursor-pointer hover:bg-gray-100" onClick={() => handleSort('subcategory')}>
-                  <div className="flex items-center gap-1">Подкатегория <SortIcon field="subcategory" /></div>
-                </th>
-                <th className="text-right px-3 py-2 font-medium text-gray-600">Остаток</th>
                 <th className="text-right px-3 py-2 font-medium text-gray-600 cursor-pointer hover:bg-gray-100" onClick={() => handleSort('purchasePrice')}>
                   <div className="flex items-center justify-end gap-1">Закуп <SortIcon field="purchasePrice" /></div>
                 </th>
                 <th className="text-right px-3 py-2 font-medium text-gray-600 cursor-pointer hover:bg-gray-100" onClick={() => handleSort('price')}>
                   <div className="flex items-center justify-end gap-1">Продажа <SortIcon field="price" /></div>
                 </th>
-                <th className="text-right px-3 py-2 font-medium text-gray-600 cursor-pointer hover:bg-gray-100" onClick={() => handleSort('margin')}>
-                  <div className="flex items-center justify-end gap-1">Маржа <SortIcon field="margin" /></div>
-                </th>
-                <th className="text-right px-3 py-2 font-medium text-gray-600">Сумма закупа</th>
-                <th className="text-right px-3 py-2 font-medium text-gray-600">Сумма продажи</th>
               </tr>
             </thead>
             <tbody>
@@ -796,8 +787,6 @@ export default function PriceListDesktop() {
                         </td>
                       )}
                       <td className="px-3 py-1.5">{product.name || 'Без названия'}</td>
-                      <td className="px-3 py-1.5 text-gray-500 text-xs">{subcategory || '—'}</td>
-                      <td className="px-3 py-1.5 text-right font-medium text-gray-700">{(cityStocks[product.id]?.quantity || 0)} шт</td>
                       <td className="px-3 py-1.5 text-right font-medium">
                         <span className="text-gray-600">
                           {(selectedSupplier && cityStocks[product.id] && cityStocks[product.id].cost > 0
@@ -809,15 +798,6 @@ export default function PriceListDesktop() {
                       <td className="px-3 py-1.5 text-right font-medium">
                         <span className="font-medium">{(product.price || 0).toLocaleString('ru-RU')}</span>
                       </td>
-                      <td className={`px-3 py-1.5 text-right font-medium ${((product.price || 0) - (product.cost || 0)) > 0 ? 'text-green-600' : 'text-red-600'}`}>
-                        {((product.price || 0) - (product.cost || 0)).toLocaleString('ru-RU')}
-                      </td>
-                      <td className="px-3 py-1.5 text-right font-medium">
-                        {((cityStocks[product.id]?.quantity || 0) * (product.cost || 0)).toLocaleString('ru-RU')}
-                      </td>
-                      <td className="px-3 py-1.5 text-right font-medium">
-                        {((cityStocks[product.id]?.quantity || 0) * (product.price || 0)).toLocaleString('ru-RU')}
-                      </td>
                     </tr>
                     </React.Fragment>
                   );
@@ -828,13 +808,9 @@ export default function PriceListDesktop() {
             {filteredProducts.length > 0 && !loading && (
               <tfoot>
                 <tr className="bg-gray-100 border-t-2 border-gray-300 font-semibold text-xs">
-                  <td colSpan={selectMode ? 3 : 2} className="px-3 py-2 text-right text-gray-700">Итого:</td>
-                  <td className="px-3 py-2 text-right text-gray-900">{totalQty} шт</td>
+                  <td colSpan={selectMode ? 2 : 1} className="px-3 py-2 text-right text-gray-700">Итого:</td>
                   <td className="px-3 py-2 text-right text-gray-900">—</td>
                   <td className="px-3 py-2 text-right text-gray-900">—</td>
-                  <td className="px-3 py-2 text-right text-gray-900">—</td>
-                  <td className="px-3 py-2 text-right text-gray-600">{totalCostSum.toLocaleString('ru-RU')}</td>
-                  <td className="px-3 py-2 text-right text-gray-900">{totalSaleSum.toLocaleString('ru-RU')}</td>
                 </tr>
               </tfoot>
             )}
