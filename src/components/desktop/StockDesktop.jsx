@@ -610,6 +610,10 @@ export default function StockDesktop({ onNavigate }) {
             aVal = (pA.price || 0) - (pA.cost || 0);
             bVal = (pB.price || 0) - (pB.cost || 0);
             break;
+          case 'stockValuePurchase':
+            aVal = (a?.quantity || 0) * (pA.cost || 0);
+            bVal = (b?.quantity || 0) * (pB.cost || 0);
+            break;
           case 'stockValue':
             aVal = (a?.quantity || 0) * (pA.price || 0);
             bVal = (b?.quantity || 0) * (pB.price || 0);
@@ -781,7 +785,7 @@ export default function StockDesktop({ onNavigate }) {
   }, 0);
   const totalMargin = totalSaleValue - totalCostValue;
 
-  const colCount = (isAdmin ? 9 : 6) + (selectMode ? 1 : 0);
+  const colCount = 8 + (selectMode ? 1 : 0);
 
   return (
     <div className="space-y-4">
@@ -939,24 +943,21 @@ export default function StockDesktop({ onNavigate }) {
                 <th className="text-right px-3 py-2 font-medium text-gray-600 cursor-pointer hover:bg-gray-100" onClick={() => handleSort('quantity')}>
                   <div className="flex items-center justify-end gap-1">Остаток <SortIcon field="quantity" /></div>
                 </th>
-                {isAdmin && (
-                  <th className="text-right px-3 py-2 font-medium text-gray-600 cursor-pointer hover:bg-gray-100" onClick={() => handleSort('purchasePrice')}>
-                    <div className="flex items-center justify-end gap-1">Закуп <SortIcon field="purchasePrice" /></div>
-                  </th>
-                )}
+                <th className="text-right px-3 py-2 font-medium text-gray-600 cursor-pointer hover:bg-gray-100" onClick={() => handleSort('purchasePrice')}>
+                  <div className="flex items-center justify-end gap-1">Закуп <SortIcon field="purchasePrice" /></div>
+                </th>
                 <th className="text-right px-3 py-2 font-medium text-gray-600 cursor-pointer hover:bg-gray-100" onClick={() => handleSort('price')}>
                   <div className="flex items-center justify-end gap-1">Продажа <SortIcon field="price" /></div>
                 </th>
-                {isAdmin && (
-                  <th className="text-right px-3 py-2 font-medium text-gray-600 cursor-pointer hover:bg-gray-100" onClick={() => handleSort('margin')}>
-                    <div className="flex items-center justify-end gap-1">Маржа <SortIcon field="margin" /></div>
-                  </th>
-                )}
-                {isAdmin && (
-                  <th className="text-right px-3 py-2 font-medium text-gray-600 cursor-pointer hover:bg-gray-100" onClick={() => handleSort('stockValue')}>
-                    <div className="flex items-center justify-end gap-1">Сумма <SortIcon field="stockValue" /></div>
-                  </th>
-                )}
+                <th className="text-right px-3 py-2 font-medium text-gray-600 cursor-pointer hover:bg-gray-100" onClick={() => handleSort('margin')}>
+                  <div className="flex items-center justify-end gap-1">Маржа <SortIcon field="margin" /></div>
+                </th>
+                <th className="text-right px-3 py-2 font-medium text-gray-600 cursor-pointer hover:bg-gray-100" onClick={() => handleSort('stockValuePurchase')}>
+                  <div className="flex items-center justify-end gap-1">Сумма закупа <SortIcon field="stockValuePurchase" /></div>
+                </th>
+                <th className="text-right px-3 py-2 font-medium text-gray-600 cursor-pointer hover:bg-gray-100" onClick={() => handleSort('stockValue')}>
+                  <div className="flex items-center justify-end gap-1">Сумма продажи <SortIcon field="stockValue" /></div>
+                </th>
               </tr>
             </thead>
             <tbody>
@@ -1001,12 +1002,12 @@ export default function StockDesktop({ onNavigate }) {
                         <React.Fragment key={stock.id}>
                           {showCategoryHeader && category && (
                             <tr className="bg-indigo-100 border-y border-indigo-200">
-                              <td colSpan={selectMode ? 9 : 8} className="px-4 py-2.5 font-bold text-indigo-900 text-sm uppercase tracking-wider sticky top-0 z-10 shadow-sm">{category}</td>
+                              <td colSpan={colCount} className="px-4 py-2.5 font-bold text-indigo-900 text-sm uppercase tracking-wider sticky top-0 z-10 shadow-sm">{category}</td>
                             </tr>
                           )}
                           {showSubcategoryHeader && subcategory && (
                             <tr className="bg-indigo-50/60 border-y border-indigo-100">
-                              <td colSpan={selectMode ? 9 : 8} className="px-6 py-1.5 font-semibold text-indigo-700 text-xs border-l-[3px] border-indigo-400">{subcategory}</td>
+                              <td colSpan={colCount} className="px-6 py-1.5 font-semibold text-indigo-700 text-xs border-l-[3px] border-indigo-400">{subcategory}</td>
                             </tr>
                           )}
                           <tr
@@ -1036,22 +1037,24 @@ export default function StockDesktop({ onNavigate }) {
                                 )}
                               </span>
                             </td>
-                            {isAdmin && <td className="px-3 py-1.5 text-right text-gray-600">{cost.toLocaleString('ru-RU')}</td>}
+                            <td className="px-3 py-1.5 text-right font-medium">{cost.toLocaleString('ru-RU')}</td>
                             <td className="px-3 py-1.5 text-right font-medium">{price.toLocaleString('ru-RU')}</td>
-                            {isAdmin && <td className={`px-3 py-1.5 text-right font-medium ${margin > 0 ? 'text-green-600' : 'text-red-600'}`}>{margin.toLocaleString('ru-RU')}</td>}
-                            {isAdmin && <td className="px-3 py-1.5 text-right font-medium">{stockValue.toLocaleString('ru-RU')}</td>}
+                            <td className={`px-3 py-1.5 text-right font-medium ${margin > 0 ? 'text-green-600' : 'text-red-600'}`}>{margin.toLocaleString('ru-RU')}</td>
+                            <td className="px-3 py-1.5 text-right font-medium">{(quantity * cost).toLocaleString('ru-RU')}</td>
+                            <td className="px-3 py-1.5 text-right font-medium">{stockValue.toLocaleString('ru-RU')}</td>
                           </tr>
                         </React.Fragment>
                       );
                     });
                   })()}
                   <tr className="bg-gray-100 border-t-2 border-gray-300 font-semibold text-xs">
-                    <td colSpan={3} className="px-3 py-2 text-right text-gray-700">Итого:</td>
+                    <td colSpan={selectMode ? 3 : 2} className="px-3 py-2 text-right text-gray-700">Итого:</td>
                     <td className="px-3 py-2 text-right text-gray-900">{totalQuantity} шт</td>
-                    {isAdmin && <td className="px-3 py-2 text-right text-gray-600">{totalCostValue.toLocaleString('ru-RU')}</td>}
+                    <td className="px-3 py-2 text-right text-gray-900">—</td>
+                    <td className="px-3 py-2 text-right text-gray-900">—</td>
+                    <td className="px-3 py-2 text-right text-gray-900">—</td>
+                    <td className="px-3 py-2 text-right text-gray-600">{totalCostValue.toLocaleString('ru-RU')}</td>
                     <td className="px-3 py-2 text-right text-gray-900">{totalSaleValue.toLocaleString('ru-RU')}</td>
-                    {isAdmin && <td className={`px-3 py-2 text-right ${totalMargin > 0 ? 'text-green-700' : 'text-red-700'}`}>{totalMargin.toLocaleString('ru-RU')}</td>}
-                    {isAdmin && <td className="px-3 py-2 text-right text-gray-900">{totalSaleValue.toLocaleString('ru-RU')}</td>}
                   </tr>
                 </>
               )}

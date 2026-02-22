@@ -404,6 +404,21 @@ export default function PriceListDesktop() {
         return (a?.name || '').localeCompare(b?.name || '');
       }
 
+      if (sortField === 'subcategory') {
+        const subA = a.subcategory || detectSubcategory(a.name) || '';
+        const subB = b.subcategory || detectSubcategory(b.name) || '';
+        const cmp = sortDir === 'asc' ? subA.localeCompare(subB) : subB.localeCompare(subA);
+        if (cmp !== 0) return cmp;
+        return (a?.name || '').localeCompare(b?.name || '');
+      }
+
+      if (sortField === 'margin') {
+        const aVal = (a.price || 0) - (a.cost || 0);
+        const bVal = (b.price || 0) - (b.cost || 0);
+        if (aVal !== bVal) return sortDir === 'asc' ? aVal - bVal : bVal - aVal;
+        return (a?.name || '').localeCompare(b?.name || '');
+      }
+
       // Default: group by category → subcategory → name
       const catA = (Array.isArray(a?.category) ? a.category[0] : (a?.category || '')) || '';
       const catB = (Array.isArray(b?.category) ? b.category[0] : (b?.category || '')) || '';
@@ -695,15 +710,21 @@ export default function PriceListDesktop() {
                 <th className="text-left px-3 py-2 font-medium text-gray-600 cursor-pointer hover:bg-gray-100" onClick={() => handleSort('name')}>
                   <div className="flex items-center gap-1">Наименование <SortIcon field="name" /></div>
                 </th>
-                <th className="text-left px-3 py-2 font-medium text-gray-600 cursor-pointer hover:bg-gray-100" onClick={() => handleSort('category')}>
-                  <div className="flex items-center gap-1">Категория <SortIcon field="category" /></div>
+                <th className="text-left px-3 py-2 font-medium text-gray-600 cursor-pointer hover:bg-gray-100" onClick={() => handleSort('subcategory')}>
+                  <div className="flex items-center gap-1">Подкатегория <SortIcon field="subcategory" /></div>
                 </th>
+                <th className="text-right px-3 py-2 font-medium text-gray-600">Остаток</th>
                 <th className="text-right px-3 py-2 font-medium text-gray-600 cursor-pointer hover:bg-gray-100" onClick={() => handleSort('purchasePrice')}>
                   <div className="flex items-center justify-end gap-1">Закуп <SortIcon field="purchasePrice" /></div>
                 </th>
                 <th className="text-right px-3 py-2 font-medium text-gray-600 cursor-pointer hover:bg-gray-100" onClick={() => handleSort('price')}>
                   <div className="flex items-center justify-end gap-1">Продажа <SortIcon field="price" /></div>
                 </th>
+                <th className="text-right px-3 py-2 font-medium text-gray-600 cursor-pointer hover:bg-gray-100" onClick={() => handleSort('margin')}>
+                  <div className="flex items-center justify-end gap-1">Маржа <SortIcon field="margin" /></div>
+                </th>
+                <th className="text-right px-3 py-2 font-medium text-gray-600">Сумма закупа</th>
+                <th className="text-right px-3 py-2 font-medium text-gray-600">Сумма продажи</th>
               </tr>
             </thead>
             <tbody>
@@ -736,12 +757,12 @@ export default function PriceListDesktop() {
                     <React.Fragment key={product.id}>
                       {showCategoryHeader && category && (
                         <tr className="bg-indigo-100 border-y border-indigo-200">
-                          <td colSpan={selectMode ? 6 : 5} className="px-4 py-2.5 font-bold text-indigo-900 text-sm uppercase tracking-wider sticky top-0 z-10 shadow-sm">{category}</td>
+                          <td colSpan={colCount} className="px-4 py-2.5 font-bold text-indigo-900 text-sm uppercase tracking-wider sticky top-0 z-10 shadow-sm">{category}</td>
                         </tr>
                       )}
                       {showSubcategoryHeader && subcategory && (
                         <tr className="bg-indigo-50/60 border-y border-indigo-100">
-                          <td colSpan={selectMode ? 6 : 5} className="px-6 py-1.5 font-semibold text-indigo-700 text-xs border-l-[3px] border-indigo-400">{subcategory}</td>
+                          <td colSpan={colCount} className="px-6 py-1.5 font-semibold text-indigo-700 text-xs border-l-[3px] border-indigo-400">{subcategory}</td>
                         </tr>
                       )}
                     <tr
@@ -756,8 +777,9 @@ export default function PriceListDesktop() {
                         </td>
                       )}
                       <td className="px-3 py-1.5">{product.name || 'Без названия'}</td>
-                      <td className="px-3 py-1.5 text-gray-600">{category || '—'}</td>
-                      <td className="px-3 py-1.5 text-right">
+                      <td className="px-3 py-1.5 text-gray-500 text-xs">{subcategory || '—'}</td>
+                      <td className="px-3 py-1.5 text-right font-medium text-gray-700">{(totalStocks[product.id] || 0)} шт</td>
+                      <td className="px-3 py-1.5 text-right font-medium">
                         <span className="text-gray-600">
                           {(selectedSupplier && cityStocks[product.id] && cityStocks[product.id].cost > 0
                             ? cityStocks[product.id].cost
@@ -765,8 +787,17 @@ export default function PriceListDesktop() {
                           ).toLocaleString('ru-RU')}
                         </span>
                       </td>
-                      <td className="px-4 py-2.5 text-right">
+                      <td className="px-3 py-1.5 text-right font-medium">
                         <span className="font-medium">{(product.price || 0).toLocaleString('ru-RU')}</span>
+                      </td>
+                      <td className={`px-3 py-1.5 text-right font-medium ${((product.price || 0) - (product.cost || 0)) > 0 ? 'text-green-600' : 'text-red-600'}`}>
+                        {((product.price || 0) - (product.cost || 0)).toLocaleString('ru-RU')}
+                      </td>
+                      <td className="px-3 py-1.5 text-right font-medium">
+                        {((totalStocks[product.id] || 0) * (product.cost || 0)).toLocaleString('ru-RU')}
+                      </td>
+                      <td className="px-3 py-1.5 text-right font-medium">
+                        {((totalStocks[product.id] || 0) * (product.price || 0)).toLocaleString('ru-RU')}
                       </td>
                     </tr>
                     </React.Fragment>
@@ -775,6 +806,19 @@ export default function PriceListDesktop() {
               })()
               )}
             </tbody>
+            {filteredProducts.length > 0 && !loading && (
+              <tfoot>
+                <tr className="bg-gray-100 border-t-2 border-gray-300 font-semibold text-xs">
+                  <td colSpan={selectMode ? 3 : 2} className="px-3 py-2 text-right text-gray-700">Итого:</td>
+                  <td className="px-3 py-2 text-right text-gray-900">{totalQty} шт</td>
+                  <td className="px-3 py-2 text-right text-gray-900">—</td>
+                  <td className="px-3 py-2 text-right text-gray-900">—</td>
+                  <td className="px-3 py-2 text-right text-gray-900">—</td>
+                  <td className="px-3 py-2 text-right text-gray-600">{totalCostSum.toLocaleString('ru-RU')}</td>
+                  <td className="px-3 py-2 text-right text-gray-900">{totalSaleSum.toLocaleString('ru-RU')}</td>
+                </tr>
+              </tfoot>
+            )}
           </table>
         </div>
       </div>

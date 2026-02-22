@@ -224,10 +224,17 @@ export default function DashboardDesktop({ user, onNavigate }) {
   }, [filteredOrders, filteredReceptions]);
 
   // Линейный график динамики остатков: база = текущий остаток, +приёмки, −продажи, −списания
-  const { stockTrendData, trendCityNames, currentTotals } = useMemo(() => {
+  const { stockTrendData, trendCityNames, currentTotals, currentPurchaseTotals } = useMemo(() => {
     const normalizeDay = (rawDate) => {
       const d = new Date((rawDate || '').replace(' ', 'T'));
       if (Number.isNaN(d.getTime())) return null;
+      // Define update cut-off at 05:00 MSK (which is UTC+3)
+      // If hour in MSK is < 5, consider it as belonging to the previous logical business day
+      const utcHours = d.getUTCHours();
+      const mskHours = (utcHours + 3) % 24;
+      if (mskHours < 5) {
+        d.setDate(d.getDate() - 1);
+      }
       d.setHours(0, 0, 0, 0);
       return d;
     };
@@ -246,6 +253,7 @@ export default function DashboardDesktop({ user, onNavigate }) {
 
     // 1) Текущий реальный остаток по городам
     const currentTotals = {};
+    const currentPurchaseTotals = {}; // Added to track purchase value
     (stocksData || []).forEach((stock) => {
       const parts = Array.isArray(stock._cityBreakdown) && stock._cityBreakdown.length > 0
         ? stock._cityBreakdown
@@ -260,6 +268,9 @@ export default function DashboardDesktop({ user, onNavigate }) {
         const cityName = part.supplierName || suppliers.find((s) => s.id === part.supplierId)?.name || 'Неизвестно';
         if (!cityName) return;
         currentTotals[cityName] = (currentTotals[cityName] || 0) + qty;
+        
+        const costPrice = stock.cost || stock.expand?.product?.cost || stock.purchase_price || 0;
+        currentPurchaseTotals[cityName] = (currentPurchaseTotals[cityName] || 0) + (qty * costPrice);
       });
     });
 
@@ -291,8 +302,14 @@ export default function DashboardDesktop({ user, onNavigate }) {
 
     const increments = new Map();
     const decrements = new Map();
+    const purchaseIncrements = new Map();
+    const purchaseDecrements = new Map();
+    
     const addedWithinRange = Object.fromEntries(cities.map((city) => [city, 0]));
     const removedWithinRange = Object.fromEntries(cities.map((city) => [city, 0]));
+    
+    const purchaseAddedWithinRange = Object.fromEntries(cities.map((city) => [city, 0]));
+    const purchaseRemovedWithinRange = Object.fromEntries(cities.map((city) => [city, 0]));
 
     // Приёмки (+)
     relevantReceptions.forEach((rec) => {
@@ -300,12 +317,18 @@ export default function DashboardDesktop({ user, onNavigate }) {
       if (!day) return;
       const cityName = rec.expand?.supplier?.name || suppliers.find((s) => s.id === rec.supplier)?.name || 'Неизвестно';
       if (!cities.includes(cityName)) return;
+      
       const qty = (Array.isArray(rec.items) ? rec.items : []).reduce((sum, item) => sum + (Number(item.quantity) || 0), 0);
+      const purchaseVal = (Array.isArray(rec.items) ? rec.items : []).reduce((sum, item) => sum + ((Number(item.quantity) || 0) * (Number(item.cost || item.purchase_price) || 0)), 0);
+      
       if (!qty) return;
       if (day >= start && day <= now) {
         const key = `${cityName}|${day.getTime()}`;
         increments.set(key, (increments.get(key) || 0) + qty);
+        purchaseIncrements.set(key, (purchaseIncrements.get(key) || 0) + purchaseVal);
+        
         addedWithinRange[cityName] = (addedWithinRange[cityName] || 0) + qty;
+        purchaseAddedWithinRange[cityName] = (purchaseAddedWithinRange[cityName] || 0) + purchaseVal;
       }
     });
 
@@ -321,12 +344,18 @@ export default function DashboardDesktop({ user, onNavigate }) {
         || '';
       if (!cityName) return;
       if (!cities.includes(cityName)) return;
+      
       const qty = (Array.isArray(order.items) ? order.items : []).reduce((sum, item) => sum + (Number(item.quantity) || 0), 0);
+      const purchaseVal = (Array.isArray(order.items) ? order.items : []).reduce((sum, item) => sum + ((Number(item.quantity) || 0) * (Number(item.cost) || 0)), 0);
+      
       if (!qty) return;
       if (day >= start && day <= now) {
         const key = `${cityName}|${day.getTime()}`;
         decrements.set(key, (decrements.get(key) || 0) + qty);
+        purchaseDecrements.set(key, (purchaseDecrements.get(key) || 0) + purchaseVal);
+        
         removedWithinRange[cityName] = (removedWithinRange[cityName] || 0) + qty;
+        purchaseRemovedWithinRange[cityName] = (purchaseRemovedWithinRange[cityName] || 0) + purchaseVal;
       }
     });
 
@@ -336,12 +365,18 @@ export default function DashboardDesktop({ user, onNavigate }) {
       if (!day) return;
       const cityName = w.city || suppliers.find((s) => s.id === w.supplier)?.name || 'Неизвестно';
       if (!cities.includes(cityName)) return;
+      
       const qty = Number(w.quantity) || 0;
+      const purchaseVal = qty * (Number(w.cost_per_unit) || 0);
+      
       if (!qty) return;
       if (day >= start && day <= now) {
         const key = `${cityName}|${day.getTime()}`;
         decrements.set(key, (decrements.get(key) || 0) + qty);
+        purchaseDecrements.set(key, (purchaseDecrements.get(key) || 0) + purchaseVal);
+        
         removedWithinRange[cityName] = (removedWithinRange[cityName] || 0) + qty;
+        purchaseRemovedWithinRange[cityName] = (purchaseRemovedWithinRange[cityName] || 0) + purchaseVal;
       }
     });
 
@@ -352,8 +387,16 @@ export default function DashboardDesktop({ user, onNavigate }) {
         Math.max(0, (currentTotals[city] || 0) - (addedWithinRange[city] || 0) + (removedWithinRange[city] || 0)),
       ])
     );
+    
+    const purchaseBaseline = Object.fromEntries(
+      cities.map((city) => [
+        city,
+        Math.max(0, (currentPurchaseTotals[city] || 0) - (purchaseAddedWithinRange[city] || 0) + (purchaseRemovedWithinRange[city] || 0)),
+      ])
+    );
 
     const running = { ...baseline };
+    const runningPurchase = { ...purchaseBaseline };
     const rows = [];
 
     for (let d = new Date(start); d <= now; d.setDate(d.getDate() + 1)) {
@@ -367,12 +410,17 @@ export default function DashboardDesktop({ user, onNavigate }) {
         running[cityName] = Math.max(0,
           (running[cityName] || 0) + (increments.get(key) || 0) - (decrements.get(key) || 0)
         );
+        runningPurchase[cityName] = Math.max(0,
+          (runningPurchase[cityName] || 0) + (purchaseIncrements.get(key) || 0) - (purchaseDecrements.get(key) || 0)
+        );
+        
         row[cityName] = running[cityName];
+        row[`${cityName}_purchase`] = runningPurchase[cityName];
       });
       rows.push(row);
     }
 
-    return { stockTrendData: rows, trendCityNames: cities, currentTotals };
+    return { stockTrendData: rows, trendCityNames: cities, currentTotals, currentPurchaseTotals };
   }, [receptionsData, salesData, writeOffsChartData, stocksData, chartRange, selectedCities, selectedCityNames, suppliers]);
 
   // Flat-line chart for "Текущий" mode: horizontal lines at current stock level
@@ -627,33 +675,37 @@ export default function DashboardDesktop({ user, onNavigate }) {
             </div>
           </div>
           {trendCityNames.length > 0 ? (
-            <ResponsiveContainer width="100%" height={320}>
-              <LineChart
-                data={chartMode === 'current' ? currentStockChartData : stockTrendData}
-                margin={{ top: 5, right: 20, left: 0, bottom: 5 }}
-              >
-                <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
-                <XAxis dataKey="label" tick={{ fontSize: 10, fill: '#9ca3af' }} />
-                <YAxis tick={{ fontSize: 10, fill: '#9ca3af' }} width={50} allowDecimals={false} />
-                <Tooltip
-                  formatter={(value, name) => [`${Number(value || 0).toLocaleString('ru-RU')} шт`, name]}
-                  labelFormatter={(_, payload) => payload?.[0]?.payload?.fullDate || ''}
-                  contentStyle={{ fontSize: 12, borderRadius: 8, maxHeight: 320, overflowY: 'auto' }}
-                  itemSorter={(a) => -(a.value || 0)}
-                />
-                {trendCityNames.map((name, i) => (
-                  <Line
-                    key={name}
-                    type={chartMode === 'current' ? 'linear' : 'monotone'}
-                    dataKey={name}
-                    stroke={CITY_COLORS[i % CITY_COLORS.length]}
-                    strokeWidth={2}
-                    dot={false}
-                    activeDot={{ r: 4 }}
+            <div className="h-[250px] mt-4">
+              <ResponsiveContainer width="100%" height="100%">
+                <LineChart data={stockTrendData} margin={{ top: 5, right: 10, left: 0, bottom: 5 }}>
+                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#E5E7EB" />
+                  <XAxis dataKey="label" axisLine={false} tickLine={false} tick={{fill: '#6B7280', fontSize: 11}} dy={10} />
+                  <YAxis 
+                    axisLine={false} 
+                    tickLine={false} 
+                    tick={{fill: '#6B7280', fontSize: 11}} 
+                    tickFormatter={(val) => chartView === 'purchases' ? `${(val/1000).toFixed(0)}k` : val}
                   />
-                ))}
-              </LineChart>
-            </ResponsiveContainer>
+                  <Tooltip 
+                    contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }}
+                    formatter={(val) => chartView === 'purchases' ? [`${val.toLocaleString('ru-RU')} ₽`, 'Сумма закупа'] : [val, 'Остаток (шт)']}
+                  />
+                  <Legend iconType="circle" wrapperStyle={{ fontSize: '11px', paddingTop: '10px' }} />
+                  {trendCityNames.map((city, idx) => (
+                    <Line
+                      key={city}
+                      type="monotone"
+                      dataKey={chartView === 'purchases' ? `${city}_purchase` : city}
+                      name={city}
+                      stroke={`hsl(${(idx * 137) % 360}, 70%, 50%)`}
+                      strokeWidth={2}
+                      dot={false}
+                      activeDot={{ r: 4, strokeWidth: 0 }}
+                    />
+                  ))}
+                </LineChart>
+              </ResponsiveContainer>
+            </div>
           ) : (
             <div className="flex items-center justify-center h-[500px] text-gray-400 text-sm">Нет данных</div>
           )}

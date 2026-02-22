@@ -364,7 +364,9 @@ export const updateStock = async (productId, warehouseId, quantity, supplierId =
 // Получение остатков с расширением
 export const getStocksWithDetails = async (supplierId = null) => {
   try {
-    const filter = supplierId ? `supplier = "${supplierId}"` : '';
+    const filterParts = ['quantity > 0'];
+    if (supplierId) filterParts.push(`supplier = "${supplierId}"`);
+    const filter = filterParts.join(' && ');
     const stocks = await pb.collection('stocks').getFullList({
       filter,
       expand: 'product,warehouse,supplier'
