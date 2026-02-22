@@ -30,6 +30,7 @@ export default function DashboardDesktop({ user, onNavigate }) {
   const [stocksData, setStocksData] = useState([]);
   const [writeOffsChartData, setWriteOffsChartData] = useState([]);
   const [chartView, setChartView] = useState('purchases'); // 'purchases' or 'cities'
+  const [chartMode, setChartMode] = useState('current'); // 'current' or 'dynamic'
   const [filterPeriod, setFilterPeriod] = useState('month');
   const [filterDateFrom, setFilterDateFrom] = useState('');
   const [filterDateTo, setFilterDateTo] = useState('');
@@ -715,7 +716,7 @@ export default function DashboardDesktop({ user, onNavigate }) {
           {trendCityNames.length > 0 ? (
             <div className="h-[350px] mt-4 w-full" style={{ minWidth: 0, minHeight: 350 }}>
               <ResponsiveContainer width="100%" height={350}>
-                <LineChart data={stockTrendData} margin={{ top: 5, right: 10, left: 0, bottom: 5 }}>
+                <LineChart data={chartMode === 'current' ? currentStockChartData : stockTrendData} margin={{ top: 5, right: 10, left: 0, bottom: 5 }}>
                   <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#E5E7EB" />
                   <XAxis dataKey="label" axisLine={false} tickLine={false} tick={{fill: '#6B7280', fontSize: 11}} dy={10} />
                   <YAxis 
