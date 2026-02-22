@@ -53,16 +53,18 @@ export default function PriceListDesktop() {
   }, [selectedSupplier]);
 
   const loadCityStocks = async () => {
-    if (!selectedSupplier) {
-      setCityStocks({});
-      return;
-    }
     try {
-      const stocks = await getStocksWithDetails(selectedSupplier);
+      const stocks = await getStocksWithDetails(selectedSupplier || null);
       const map = {};
       (stocks || []).forEach(s => {
         if (s.product) {
-          map[s.product] = { cost: s.cost || 0 };
+          if (!map[s.product]) {
+            map[s.product] = { cost: s.cost || 0, quantity: 0 };
+          }
+          map[s.product].quantity += (Number(s.quantity) || 0);
+          if (s.cost > 0) {
+            map[s.product].cost = s.cost;
+          }
         }
       });
       setCityStocks(map);
@@ -354,6 +356,21 @@ export default function PriceListDesktop() {
     });
     return { min: min === Infinity ? 0 : min, max: max || 10000 };
   }, [products]);
+
+  const { totalQty, totalCostSum, totalSaleSum } = useMemo(() => {
+    let qty = 0;
+    let costSum = 0;
+    let saleSum = 0;
+    products.forEach(p => {
+      const q = cityStocks[p.id]?.quantity || 0;
+      const c = (selectedSupplier && cityStocks[p.id]?.cost > 0) ? cityStocks[p.id].cost : (p.cost || 0);
+      const pr = p.price || 0;
+      qty += q;
+      costSum += q * c;
+      saleSum += q * pr;
+    });
+    return { totalQty: qty, totalCostSum: costSum, totalSaleSum: saleSum };
+  }, [products, cityStocks, selectedSupplier]);
 
   const filteredProducts = products
     .filter(product => {
@@ -780,7 +797,7 @@ export default function PriceListDesktop() {
                       )}
                       <td className="px-3 py-1.5">{product.name || 'Без названия'}</td>
                       <td className="px-3 py-1.5 text-gray-500 text-xs">{subcategory || '—'}</td>
-                      <td className="px-3 py-1.5 text-right font-medium text-gray-700">{(totalStocks[product.id] || 0)} шт</td>
+                      <td className="px-3 py-1.5 text-right font-medium text-gray-700">{(cityStocks[product.id]?.quantity || 0)} шт</td>
                       <td className="px-3 py-1.5 text-right font-medium">
                         <span className="text-gray-600">
                           {(selectedSupplier && cityStocks[product.id] && cityStocks[product.id].cost > 0
@@ -796,10 +813,10 @@ export default function PriceListDesktop() {
                         {((product.price || 0) - (product.cost || 0)).toLocaleString('ru-RU')}
                       </td>
                       <td className="px-3 py-1.5 text-right font-medium">
-                        {((totalStocks[product.id] || 0) * (product.cost || 0)).toLocaleString('ru-RU')}
+                        {((cityStocks[product.id]?.quantity || 0) * (product.cost || 0)).toLocaleString('ru-RU')}
                       </td>
                       <td className="px-3 py-1.5 text-right font-medium">
-                        {((totalStocks[product.id] || 0) * (product.price || 0)).toLocaleString('ru-RU')}
+                        {((cityStocks[product.id]?.quantity || 0) * (product.price || 0)).toLocaleString('ru-RU')}
                       </td>
                     </tr>
                     </React.Fragment>
