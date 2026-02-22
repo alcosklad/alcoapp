@@ -35,10 +35,7 @@ export default function DashboardDesktop({ user, onNavigate }) {
   const [filterDateFrom, setFilterDateFrom] = useState('');
   const [filterDateTo, setFilterDateTo] = useState('');
   const [chartRange, setChartRange] = useState('week'); // week | month | quarter | halfyear | all
-  const [activeLines, setActiveLines] = useState([]);
 
-  // ... (use effect to init activeLines when trendCityNames change)
-  
   const userRole = pb.authStore.model?.role;
   const isAdmin = userRole === 'admin';
 
@@ -733,7 +730,6 @@ export default function DashboardDesktop({ user, onNavigate }) {
                     }}
                   />
                   {trendCityNames.map((city, idx) => {
-                    if (activeLines.length > 0 && !activeLines.includes(city)) return null;
                     return (
                       <Line
                         key={city}
@@ -749,43 +745,6 @@ export default function DashboardDesktop({ user, onNavigate }) {
                   })}
                 </LineChart>
               </ResponsiveContainer>
-              
-              {/* Custom Legend */}
-              <div className="flex flex-wrap items-center gap-2 mt-4 pt-4 border-t border-gray-100">
-                <button
-                  onClick={() => setActiveLines(trendCityNames)}
-                  className="px-2 py-1 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded text-xs transition-colors shrink-0"
-                  title="Сбросить выбор и показать все"
-                >
-                  <RotateCcw size={12} className="inline mr-1" /> Все
-                </button>
-                <div className="flex flex-wrap gap-2 flex-1">
-                  {trendCityNames.map((city, idx) => {
-                    const isActive = activeLines.includes(city);
-                    const color = `hsl(${(idx * 137) % 360}, 70%, 50%)`;
-                    return (
-                      <button
-                        key={city}
-                        onClick={() => {
-                          setActiveLines(prev => {
-                            // If currently everything is active, clicking one isolates it
-                            if (prev.length === trendCityNames.length) return [city];
-                            // If it's already active and alone, don't do anything (or maybe select all?)
-                            if (prev.length === 1 && prev.includes(city)) return trendCityNames;
-                            // Otherwise toggle
-                            if (prev.includes(city)) return prev.filter(c => c !== city);
-                            return [...prev, city];
-                          });
-                        }}
-                        className={`flex items-center gap-1.5 px-2 py-1 rounded text-xs transition-all ${isActive ? 'bg-white shadow-sm border border-gray-200 text-gray-800' : 'bg-transparent text-gray-400 border border-transparent hover:text-gray-600'}`}
-                      >
-                        <span className="w-2.5 h-2.5 rounded-full block" style={{ backgroundColor: isActive ? color : '#e5e7eb' }}></span>
-                        {city}
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
             </div>
           ) : (
             <div className="flex items-center justify-center h-[500px] text-gray-400 text-sm">Нет данных</div>
